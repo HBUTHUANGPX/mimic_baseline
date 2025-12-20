@@ -1,0 +1,42 @@
+// {
+//     "version": "0.2.0",
+//     "configurations": [
+//         {
+//             "name": "Python Debugger: Current File with Arguments",
+//             "type": "debugpy",
+//             "request": "launch",
+//             "program": "/home/hpx/HPX_LOCO_2/mimic_baseline/scripts/rsl_rl/play.py",
+//             "console": "integratedTerminal",
+//             "args": [
+//                 "--task","Tracking-Flat-Q1-v0",
+//                 "--num_envs","2",
+//                 "--wandb_path","2082672018-hpx/bydmmc/5hiysz7q",
+//                 "--motion_file_path","scripts/rsl_rl/motion_file.yaml",
+//                 // "--headless"
+//             ]
+//         }
+//     ]
+// }
+
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Current File with Arguments",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/home/hpx/HPX_LOCO_2/mimic_baseline/scripts/rsl_rl/train.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--task","Diss-Tracking-Flat-Q1-v0",
+                "--headless",
+                "--log_project_name", "bydmmc",
+                "--run_name", "Q1_slowly_walk",
+                "--resume",
+                "--load_run", "2025-12-18_10-00-22_Q1_slowly_walk",
+                "--checkpoint", "model_34500.pt"
+                // "--headless"
+            ]
+        }
+    ]
+}

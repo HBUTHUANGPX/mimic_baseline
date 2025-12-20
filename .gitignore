@@ -1,0 +1,10 @@
+hu_d04.urdf
+**/__pycache__/*
+**/*.egg-info/
+deploy_mujoco/recordings/
+deploy_mujoco/assets
+logs/*
+outputs/*
+wandb/*
+rsl_rl_v320/*
+IsaacLab_v230/* 

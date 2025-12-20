@@ -1,0 +1,14 @@
+{
+    "python.analysis.extraPaths": [
+        "/home/hpx/HPX_LOCO_2/mimic_baseline/IsaacLab_v230/source/isaaclab_assets",
+        "/home/hpx/HPX_LOCO_2/mimic_baseline/IsaacLab_v230/source/isaaclab_rl",
+        "/home/hpx/HPX_LOCO_2/mimic_baseline/IsaacLab_v230/source/isaaclab_tasks",
+        "/home/hpx/HPX_LOCO_2/mimic_baseline/IsaacLab_v230/source/isaaclab_mimic",
+        "/home/hpx/HPX_LOCO_2/mimic_baseline/IsaacLab_v230/source/isaaclab",
+        "/home/hpx/HPX_LOCO_2/mimic_baseline/IsaacLab_v230/source/isaaclab/isaaclab/envs",
+        "/home/hpx/HPX_LOCO_2/mimic_baseline/rsl_rl_v320",
+        "/home/hpx/HPX_LOCO_2/mimic_baseline/rsl_rl_v320/rsl_rl/runners",
+        "/home/hpx/HPX_LOCO_2/mimic_baseline/general_motion_tracker_whole_body_teleoperation",
+        "/home/hpx/HPX_LOCO_2/mimic_baseline/general_motion_tracker_whole_body_teleoperation/general_motion_tracker_whole_body_teleoperation",
+    ]
+}
