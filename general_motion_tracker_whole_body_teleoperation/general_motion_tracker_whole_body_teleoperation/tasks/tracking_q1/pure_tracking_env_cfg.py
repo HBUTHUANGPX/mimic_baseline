@@ -28,12 +28,12 @@ import general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp as 
 ##
 
 VELOCITY_RANGE = {
-    "x": (-0.0, 0.0),
-    "y": (-0.0, 0.0),
-    "z": (-0.0, 0.0),
-    "roll": (-0.0, 0.0),
-    "pitch": (-0.0, 0.0),
-    "yaw": (-0.0, 0.0),
+    "x": (-0.8, 0.8),
+    "y": (-0.5, 0.5),
+    "z": (-0.2, 0.8),
+    "roll": (-0.52, 0.52),
+    "pitch": (-0.52, 0.52),
+    "yaw": (-0.78, 0.78),
 }
 
 
@@ -97,17 +97,17 @@ class CommandsCfg:
             # "roll": (-0., 0.),
             # "pitch": (-0., 0.),
             # "yaw": (-0., 0.),
-            "x": (-0.0, 0.0),
-            "z": (-0.0, 0.0),
-            "y": (-0.0, 0.0),
-            "roll": (-0.0, 0.0),
-            "pitch": (-0.0, 0.0),
-            "yaw": (-0.0, 0.0),
+            "x": (-0.1, 0.1),
+            "z": (-0.0, 0.2),
+            "y": (-0.1, 0.1),
+            "roll": (-0.1, 0.1),
+            "pitch": (-0.1, 0.1),
+            "yaw": (-0.2, 0.2),
         },
         velocity_range=VELOCITY_RANGE,
         # joint_position_range=(-0., 0.),
         # joint_velocity_range=(-0., 0.),
-        joint_position_range=(-0.0, 0.0),
+        joint_position_range=(-0.1, 0.1),
         # joint_velocity_range=(-0.1, 0.1),
     )
 
@@ -131,18 +131,41 @@ class ObservationsCfg:
 
         # observation terms (order preserved)
         command = ObsTerm(
-            func=mdp.generated_commands, params={"command_name": "motion"}
+            func=mdp.generated_commands,
+            params={"command_name": "motion"},
+        )
+        motion_ref_pos_b = ObsTerm(
+            func=mdp.motion_ref_pos_b, 
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.02, n_max=0.02),
         )
         motion_ref_ori_b = ObsTerm(
             func=mdp.motion_ref_ori_b,
             params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.05, n_max=0.05),
         )
-        body_pos = ObsTerm(func=mdp.robot_body_pos_b, params={"command_name": "motion"})
-        body_ori = ObsTerm(func=mdp.robot_body_ori_b, params={"command_name": "motion"})
-        base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
-        base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
-        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
-        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
+        body_pos = ObsTerm(
+            func=mdp.robot_body_pos_b,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.005, n_max=0.005),
+        )
+        body_ori = ObsTerm(
+            func=mdp.robot_body_ori_b,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.01, n_max=0.01),
+        )
+        base_lin_vel = ObsTerm(
+            func=mdp.base_lin_vel, noise=Unoise(n_min=-0.25, n_max=0.25)
+        )
+        base_ang_vel = ObsTerm(
+            func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2)
+        )
+        joint_pos = ObsTerm(
+            func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.015, n_max=0.015)
+        )
+        joint_vel = ObsTerm(
+            func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.55, n_max=0.55)
+        )
         actions = ObsTerm(func=mdp.last_action)
 
         def __post_init__(self):
@@ -194,8 +217,52 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=[".*"]),
-            "pos_distribution_params": (-0.0, 0.0),
+            "pos_distribution_params": (-0.015, 0.015),
             "operation": "add",
+        },
+    )
+    base_com = EventTerm(
+        func=mdp.randomize_rigid_body_com,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names="torso_link"),
+            "com_range": {"x": (-0.08, 0.08), "y": (-0.045, 0.045), "z": (-0.01, 0.05)},
+        },
+    )
+    pelvis_com = EventTerm(
+        func=mdp.randomize_rigid_body_com,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names="pelvis_link"),
+            "com_range": {"x": (-0.02, 0.02), "y": (-0.04, 0.04), "z": (-0.01, 0.02)},
+        },
+    )
+    knee_link_com = EventTerm(
+        func=mdp.randomize_rigid_body_com,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=["L_knee_link", "R_knee_link"]),
+            "com_range": {"x": (-0.02, 0.02), "y": (-0.02, 0.02), "z": (-0.04, 0.04)},
+        },
+    )
+    robot_scale_mass = EventTerm(
+        func=mdp.randomize_rigid_body_mass,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=".*"),
+            "mass_distribution_params": (0.88, 1.12),
+            "operation": "scale",
+        },
+    )
+    robot_joint_stiffness_and_damping = EventTerm(
+        func=mdp.randomize_actuator_gains,
+        mode="startup", # startup 和 reset 的训练结构没什么区别，反而 reset 会增加训练时间
+        params={
+            "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
+            "stiffness_distribution_params": (1.0, 1.0),
+            "damping_distribution_params": (1.0, 1.0),
+            "operation": "scale",
+            "distribution": "log_uniform",
         },
     )
     # reset robot
