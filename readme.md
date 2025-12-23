@@ -1,3 +1,12 @@
+# install conda
+mkdir -p ~/miniconda3
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda3/miniconda.sh
+bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
+rm ~/miniconda3/miniconda.sh
+
+source ~/miniconda3/bin/activate
+
+conda init --all
 # conda env create
 conda create -n mimic_baseline python=3.11
 
@@ -6,7 +15,8 @@ conda activate mimic_baseline
 # isaacsim install by pip
 
 pip install "isaacsim[all,extscache]==5.1.0" --extra-index-url https://pypi.nvidia.com
-
+或
+pip install "isaacsim[all,extscache]==5.1.0" --extra-index-url https://pypi.nvidia.com -i https://pypi.tuna.tsinghua.edu.cn/simple
 # isaaclab install by git
 
 git clone https://github.com/HBUTHUANGPX/IsaacLab_v230.git

@@ -8,3 +8,6 @@ outputs/*
 wandb/*
 rsl_rl_v320/*
 IsaacLab_v230/* 
+general_motion_tracker_whole_body_teleoperation/general_motion_tracker_whole_body_teleoperation/assets/Q1.zip
+general_motion_tracker_whole_body_teleoperation/general_motion_tracker_whole_body_teleoperation/assets/Q1_old/*
+mjmodel.xml

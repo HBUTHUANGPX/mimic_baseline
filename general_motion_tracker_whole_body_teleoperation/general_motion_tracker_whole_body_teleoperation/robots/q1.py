@@ -43,8 +43,8 @@ ImplicitActuator_actuators = {
         stiffness={
             ".*_hip_roll_joint": 300,
             ".*_hip_yaw_joint": 200,
-            ".*_hip_pitch_joint": 600,
-            ".*_knee_joint": 600,
+            ".*_hip_pitch_joint": 500,
+            ".*_knee_joint": 500,
         },
         damping={
             ".*_hip_roll_joint": 2.5,
