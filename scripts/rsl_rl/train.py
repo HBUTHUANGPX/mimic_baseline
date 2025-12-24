@@ -228,15 +228,15 @@ def main(
     import pathlib
     import wandb
 
-    for name in file_name:
-        registry_name = name
-        if (
-            ":" not in registry_name
-        ):  # Check if the registry name includes alias, if not, append ":latest"
-            registry_name += ":latest"
-        api = wandb.Api()
-        artifact = api.artifact(registry_name)
-        motion_file.append(str(pathlib.Path(artifact.download()) / "motion.npz"))
+    # for name in file_name:
+    #     registry_name = name
+    #     if (
+    #         ":" not in registry_name
+    #     ):  # Check if the registry name includes alias, if not, append ":latest"
+    #         registry_name += ":latest"
+    #     api = wandb.Api()
+    #     artifact = api.artifact(registry_name)
+    #     motion_file.append(str(pathlib.Path(artifact.download()) / "motion.npz"))
     # env_cfg.commands.motion.motion_file = motion_file
     env_cfg.commands.motion.motion_file = ["/home/hpx/HPX_LOCO_2/mimic_baseline/artifacts/Q1_251021_01_slowly_walk_120Hz:v0/motion.npz"]
     # specify directory for logging experiments
