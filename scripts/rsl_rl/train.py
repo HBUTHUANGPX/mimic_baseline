@@ -237,7 +237,8 @@ def main(
         api = wandb.Api()
         artifact = api.artifact(registry_name)
         motion_file.append(str(pathlib.Path(artifact.download()) / "motion.npz"))
-    env_cfg.commands.motion.motion_file = motion_file
+    # env_cfg.commands.motion.motion_file = motion_file
+    env_cfg.commands.motion.motion_file = ["/home/hpx/HPX_LOCO_2/mimic_baseline/artifacts/Q1_251021_01_slowly_walk_120Hz:v0/motion.npz"]
     # specify directory for logging experiments
     log_root_path = os.path.join("logs", "rsl_rl", agent_cfg.experiment_name)
     log_root_path = os.path.abspath(log_root_path)

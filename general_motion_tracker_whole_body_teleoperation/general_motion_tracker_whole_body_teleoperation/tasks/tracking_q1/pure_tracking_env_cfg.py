@@ -141,6 +141,8 @@ class ObservationsCfg:
         joint_vel = ObsTerm(
             func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.55, n_max=0.55)
         )
+        def __post_init__(self):
+            self.enable_corruption = True
 
     @configclass
     class ProprioceptionCfg(ObsGroup):  # 不带噪声的本体感知观测组
@@ -195,6 +197,8 @@ class ObservationsCfg:
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.01, n_max=0.01),
         )
+        def __post_init__(self):
+            self.enable_corruption = True
 
     @configclass
     class LastActionCfg(ObsGroup):  # 不带噪声的上一个动作观测组
