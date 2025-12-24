@@ -14,10 +14,12 @@ class Q1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
     max_iterations = 90001
     save_interval = 1500
-    obs_groups ={
-        "policy": ["policy"],  # 映射到环境提供的 'policy' 观测组，用于演员网络
-        "critic": ["critic"],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
-    },
+    obs_groups = (
+        {
+            "policy": ["policy"],  # 映射到环境提供的 'policy' 观测组，用于演员网络
+            "critic": ["critic"],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
+        },
+    )
     experiment_name = "q1_flat"
     policy = RslRlPpoActorCriticCfg(
         init_noise_std=0.8,
@@ -47,10 +49,24 @@ class Q1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
 class PureQ1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
     max_iterations = 90001
-    obs_groups ={
-        "policy": ["policy"],  # 映射到环境提供的 'policy' 观测组，用于演员网络
-        "critic": ["critic"],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
-    },
+    # obs_groups ={
+    #     "policy": ["policy"],  # 映射到环境提供的 'policy' 观测组，用于演员网络
+    #     "critic": ["critic"],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
+    # },
+    obs_groups = (
+        {
+            "policy": [
+                "command_with_noise",
+                "proprioception_with_noise",
+                "last_action",
+            ],  # 映射到环境提供的 'policy' 观测组，用于演员网络
+            "critic": [
+                "command",
+                "proprioception",
+                "last_action",
+            ],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
+        },
+    )
     save_interval = 1500
     experiment_name = "pure_q1_flat"
     policy = RslRlPpoActorCriticCfg(
@@ -81,10 +97,20 @@ class PureQ1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
 class Q1FlatDistillationStudentTeacherCfg(RslRlDistillationRunnerCfg):
     num_steps_per_env = 24
     max_iterations = 90001
-    obs_groups ={
-        "policy": ["policy"],  # 映射到环境提供的 'policy' 观测组，用于演员网络
-        "teacher": ["teacher"],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
-    },
+    obs_groups = (
+        {
+            "policy": [
+                "command_with_noise_wo_privilege",
+                "proprioception_with_noise_wo_privilege",
+                "last_action",
+            ],  # 映射到环境提供的 'policy' 观测组，用于演员网络
+            "teacher": [
+                "command_with_noise",
+                "proprioception_with_noise",
+                "last_action",
+            ],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
+        },
+    )
     save_interval = 1500
     experiment_name = "q1_flat_distillation"
     policy = RslRlDistillationStudentTeacherCfg(
@@ -97,7 +123,7 @@ class Q1FlatDistillationStudentTeacherCfg(RslRlDistillationRunnerCfg):
     )
     algorithm = RslRlDistillationAlgorithmCfg(
         learning_rate=1.0e-3,
-        gradient_length = 15,
-        num_learning_epochs = 5,
+        gradient_length=15,
+        num_learning_epochs=5,
         class_name="Distillation",
     )

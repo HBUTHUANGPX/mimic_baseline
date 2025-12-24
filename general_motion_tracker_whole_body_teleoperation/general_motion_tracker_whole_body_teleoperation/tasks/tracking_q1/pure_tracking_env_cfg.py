@@ -126,6 +126,83 @@ class ObservationsCfg:
     """Observation specifications for the MDP."""
 
     @configclass
+    class ProprioceptionWithNoiseCfg(ObsGroup):  # 带噪声的本体感知观测组
+        """Observations for proprioception group with noise."""
+
+        base_lin_vel = ObsTerm(
+            func=mdp.base_lin_vel, noise=Unoise(n_min=-0.25, n_max=0.25)
+        )
+        base_ang_vel = ObsTerm(
+            func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2)
+        )
+        joint_pos = ObsTerm(
+            func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.015, n_max=0.015)
+        )
+        joint_vel = ObsTerm(
+            func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.55, n_max=0.55)
+        )
+
+    @configclass
+    class ProprioceptionCfg(ObsGroup):  # 不带噪声的本体感知观测组
+        """Observations for proprioception group without noise."""
+
+        base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
+        base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
+
+    @configclass
+    class CommandCfg(ObsGroup):  # 不带噪声的指令观测组
+        """Observations for command group."""
+
+        command = ObsTerm(
+            func=mdp.generated_commands, params={"command_name": "motion"}
+        )
+        motion_ref_pos_b = ObsTerm(
+            func=mdp.motion_ref_pos_b, params={"command_name": "motion"}
+        )
+        motion_ref_ori_b = ObsTerm(
+            func=mdp.motion_ref_ori_b, params={"command_name": "motion"}
+        )
+        body_pos = ObsTerm(func=mdp.robot_body_pos_b, params={"command_name": "motion"})
+        body_ori = ObsTerm(func=mdp.robot_body_ori_b, params={"command_name": "motion"})
+
+    @configclass
+    class CommandWithNoiseCfg(ObsGroup):  # 带噪声的指令观测组
+        """Observations for command group with noise."""
+
+        command = ObsTerm(
+            func=mdp.generated_commands,
+            params={"command_name": "motion"},
+        )
+        motion_ref_pos_b = ObsTerm(
+            func=mdp.motion_ref_pos_b,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.02, n_max=0.02),
+        )
+        motion_ref_ori_b = ObsTerm(
+            func=mdp.motion_ref_ori_b,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.05, n_max=0.05),
+        )
+        body_pos = ObsTerm(
+            func=mdp.robot_body_pos_b,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.005, n_max=0.005),
+        )
+        body_ori = ObsTerm(
+            func=mdp.robot_body_ori_b,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.01, n_max=0.01),
+        )
+
+    @configclass
+    class LastActionCfg(ObsGroup):  # 不带噪声的上一个动作观测组
+        """Observations for last action group."""
+
+        actions = ObsTerm(func=mdp.last_action)
+
+    @configclass
     class PolicyCfg(ObsGroup):
         """Observations for policy group."""
 
@@ -135,7 +212,7 @@ class ObservationsCfg:
             params={"command_name": "motion"},
         )
         motion_ref_pos_b = ObsTerm(
-            func=mdp.motion_ref_pos_b, 
+            func=mdp.motion_ref_pos_b,
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.02, n_max=0.02),
         )
@@ -194,6 +271,11 @@ class ObservationsCfg:
     # observation groups
     policy: PolicyCfg = PolicyCfg()
     critic: PrivilegedCfg = PrivilegedCfg()
+    last_action: LastActionCfg = LastActionCfg()
+    proprioception_with_noise: ProprioceptionWithNoiseCfg = ProprioceptionWithNoiseCfg()
+    proprioception: ProprioceptionCfg = ProprioceptionCfg()
+    command: CommandCfg = CommandCfg()
+    command_with_noise: CommandWithNoiseCfg = CommandWithNoiseCfg()
 
 
 @configclass
@@ -241,7 +323,9 @@ class EventCfg:
         func=mdp.randomize_rigid_body_com,
         mode="startup",
         params={
-            "asset_cfg": SceneEntityCfg("robot", body_names=["L_knee_link", "R_knee_link"]),
+            "asset_cfg": SceneEntityCfg(
+                "robot", body_names=["L_knee_link", "R_knee_link"]
+            ),
             "com_range": {"x": (-0.02, 0.02), "y": (-0.02, 0.02), "z": (-0.04, 0.04)},
         },
     )
@@ -256,7 +340,7 @@ class EventCfg:
     )
     robot_joint_stiffness_and_damping = EventTerm(
         func=mdp.randomize_actuator_gains,
-        mode="startup", # startup 和 reset 的训练结构没什么区别，反而 reset 会增加训练时间
+        mode="startup",  # startup 和 reset 的训练结构没什么区别，反而 reset 会增加训练时间
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
             "stiffness_distribution_params": (1.0, 1.0),

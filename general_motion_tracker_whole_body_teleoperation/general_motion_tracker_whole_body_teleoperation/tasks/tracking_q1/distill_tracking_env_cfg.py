@@ -150,7 +150,7 @@ class ObservationsCfg:
         def __post_init__(self):
             self.enable_corruption = True
             self.concatenate_terms = True
-    
+
     @configclass
     class TeacherCfg(ObsGroup):
         """Observations for policy group."""
@@ -194,10 +194,100 @@ class ObservationsCfg:
         joint_vel = ObsTerm(func=mdp.joint_vel_rel)
         actions = ObsTerm(func=mdp.last_action)
 
-    # observation groups
-    policy: PolicyCfg = PolicyCfg()
-    critic: PrivilegedCfg = PrivilegedCfg()
-    teacher: TeacherCfg = TeacherCfg()
+    @configclass
+    class ProprioceptionWithNoiseCfg(ObsGroup):  # 带噪声的本体感知观测组
+        """Observations for proprioception group with noise."""
+
+        base_lin_vel = ObsTerm(
+            func=mdp.base_lin_vel, noise=Unoise(n_min=-0.25, n_max=0.25)
+        )
+        base_ang_vel = ObsTerm(
+            func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2)
+        )
+        joint_pos = ObsTerm(
+            func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.015, n_max=0.015)
+        )
+        joint_vel = ObsTerm(
+            func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.55, n_max=0.55)
+        )
+
+    @configclass
+    class ProprioceptionWithNoiseWOPrivilegeCfg(ObsGroup):  # 带噪声的本体感知观测组
+        """Observations for proprioception group with noise."""
+
+        base_ang_vel = ObsTerm(
+            func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2)
+        )
+        joint_pos = ObsTerm(
+            func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.015, n_max=0.015)
+        )
+        joint_vel = ObsTerm(
+            func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.55, n_max=0.55)
+        )
+
+    @configclass
+    class CommandWithNoiseCfg(ObsGroup):  # 带噪声的指令观测组
+        """Observations for command group with noise."""
+
+        command = ObsTerm(
+            func=mdp.generated_commands,
+            params={"command_name": "motion"},
+        )
+        motion_ref_pos_b = ObsTerm(
+            func=mdp.motion_ref_pos_b,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.02, n_max=0.02),
+        )
+        motion_ref_ori_b = ObsTerm(
+            func=mdp.motion_ref_ori_b,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.05, n_max=0.05),
+        )
+        body_pos = ObsTerm(
+            func=mdp.robot_body_pos_b,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.005, n_max=0.005),
+        )
+        body_ori = ObsTerm(
+            func=mdp.robot_body_ori_b,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.01, n_max=0.01),
+        )
+
+    @configclass
+    class CommandWithNoiseWOPrivilegeCfg(ObsGroup):  # 带噪声的指令观测组
+        """Observations for command group with noise."""
+
+        command = ObsTerm(
+            func=mdp.generated_commands,
+            params={"command_name": "motion"},
+        )
+        motion_ref_ori_b = ObsTerm(
+            func=mdp.motion_ref_ori_b,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.05, n_max=0.05),
+        )
+
+    @configclass
+    class LastActionCfg(ObsGroup):  # 不带噪声的上一个动作观测组
+        """Observations for last action group."""
+
+        actions = ObsTerm(func=mdp.last_action)
+
+    # # observation groups
+    # policy: PolicyCfg = PolicyCfg()
+    # critic: PrivilegedCfg = PrivilegedCfg()
+    # teacher: TeacherCfg = TeacherCfg()
+
+    proprioception_with_noise: ProprioceptionWithNoiseCfg = ProprioceptionWithNoiseCfg()
+    proprioception_with_noise_wo_privilege: ProprioceptionWithNoiseWOPrivilegeCfg = (
+        ProprioceptionWithNoiseWOPrivilegeCfg()
+    )
+    command_with_noise: CommandWithNoiseCfg = CommandWithNoiseCfg()
+    command_with_noise_wo_privilege: CommandWithNoiseWOPrivilegeCfg = (
+        CommandWithNoiseWOPrivilegeCfg()
+    )
+    last_action: LastActionCfg = LastActionCfg()
 
 
 @configclass
@@ -232,7 +322,11 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names="torso_link"),
-            "com_range": {"x": (-0.025, 0.025), "y": (-0.025, 0.025), "z": (0.01, 0.05)},
+            "com_range": {
+                "x": (-0.025, 0.025),
+                "y": (-0.025, 0.025),
+                "z": (0.01, 0.05),
+            },
         },
     )
 
@@ -247,11 +341,12 @@ class EventCfg:
     # reset robot
     reset_robot = EventTerm(
         func=mdp.reset_robot_state_by_motioncommand,
-        mode = "reset",
+        mode="reset",
         params={
-            "command_name":"motion",
-        }
+            "command_name": "motion",
+        },
     )
+
 
 @configclass
 class RewardsCfg:
