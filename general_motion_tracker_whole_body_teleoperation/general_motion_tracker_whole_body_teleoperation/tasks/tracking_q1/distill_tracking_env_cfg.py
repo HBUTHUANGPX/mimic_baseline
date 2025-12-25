@@ -228,6 +228,7 @@ class ObservationsCfg:
         )
         def __post_init__(self):
             self.enable_corruption = True
+            self.history_length = 24
     @configclass
     class CommandWithNoiseCfg(ObsGroup):  # 带噪声的指令观测组
         """Observations for command group with noise."""
@@ -274,7 +275,7 @@ class ObservationsCfg:
         )
         def __post_init__(self):
             self.enable_corruption = True
-            
+
     @configclass
     class LastActionCfg(ObsGroup):  # 不带噪声的上一个动作观测组
         """Observations for last action group."""

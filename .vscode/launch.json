@@ -18,6 +18,29 @@
 //     ]
 // }
 
+// {
+//     "version": "0.2.0",
+//     "configurations": [
+//         {
+//             "name": "Python Debugger: Current File with Arguments",
+//             "type": "debugpy",
+//             "request": "launch",
+//             "program": "/home/hpx/HPX_LOCO_2/mimic_baseline/scripts/rsl_rl/train.py",
+//             "console": "integratedTerminal",
+//             "args": [
+//                 "--task","Diss-Tracking-Flat-Q1-v0",
+//                 "--headless",
+//                 "--log_project_name", "bydmmc",
+//                 "--run_name", "Q1_slowly_walk",
+//                 "--resume",
+//                 "--load_run", "2025-12-18_10-00-22_Q1_slowly_walk",
+//                 "--checkpoint", "model_34500.pt"
+//                 // "--headless"
+//             ]
+//         }
+//     ]
+// }
+
 {
     "version": "0.2.0",
     "configurations": [
@@ -25,17 +48,11 @@
             "name": "Python Debugger: Current File with Arguments",
             "type": "debugpy",
             "request": "launch",
-            "program": "/home/hpx/HPX_LOCO_2/mimic_baseline/scripts/rsl_rl/train.py",
+            "program": "/home/hpx/HPX_LOCO_2/mimic_baseline/scripts/rsl_rl/play.py",
             "console": "integratedTerminal",
             "args": [
                 "--task","Diss-Tracking-Flat-Q1-v0",
-                "--headless",
-                "--log_project_name", "bydmmc",
-                "--run_name", "Q1_slowly_walk",
-                "--resume",
-                "--load_run", "2025-12-18_10-00-22_Q1_slowly_walk",
-                "--checkpoint", "model_34500.pt"
-                // "--headless"
+                "--num_envs", "2",
             ]
         }
     ]

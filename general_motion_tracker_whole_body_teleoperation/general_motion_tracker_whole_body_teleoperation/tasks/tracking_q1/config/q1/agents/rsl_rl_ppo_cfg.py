@@ -92,6 +92,14 @@ class PureQ1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         max_grad_norm=1.0,
     )
 
+# 新增 CVAE 配置类，继承原配置以兼容
+@configclass
+class RslRlDistillationStudentTeacher_CVAECfg(RslRlDistillationStudentTeacherCfg):
+    latent_dim: int = 64                            # 潜在空间维度
+    beta_kl: float = 0.1                            # KL 散度权重
+    class_name: str = "StudentTeacher_CVAE"         # 新类名（将在 modules 中定义）
+    normalize_mu=True,  # 新参数：启用对 mu 的 EmpiricalNormalization
+    z_scale_factor: float = 1.0,  # z 的缩放因子
 
 @configclass  # 对有特权信息训练的教师网络进行蒸馏
 class Q1FlatDistillationStudentTeacherCfg(RslRlDistillationRunnerCfg):
@@ -113,13 +121,18 @@ class Q1FlatDistillationStudentTeacherCfg(RslRlDistillationRunnerCfg):
     )
     save_interval = 1500
     experiment_name = "q1_flat_distillation"
-    policy = RslRlDistillationStudentTeacherCfg(
+    policy = RslRlDistillationStudentTeacher_CVAECfg(
+        class_name="StudentTeacher_CVAE",
         init_noise_std=0.8,
         teacher_hidden_dims=[512, 256, 128],
         student_hidden_dims=[512, 256, 128],
         activation="elu",
         student_obs_normalization=True,
         teacher_obs_normalization=True,
+        latent_dim=8,
+        beta_kl=0.1,
+        normalize_mu=True,
+        z_scale_factor=0.05,
     )
     algorithm = RslRlDistillationAlgorithmCfg(
         learning_rate=1.0e-3,

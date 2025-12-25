@@ -65,9 +65,45 @@ class _OnnxMotionPolicyExporter(_OnnxPolicyExporter):
             self.body_ang_vel_w[time_step_clamped],
         )
 
+    def forward_cvae(self, x, time_step):
+        """CVAE 前向传播（用于 ONNX 导出，仅使用先验分布）。
+        
+        Args:
+            x: 输入观测（部署观测）。
+        
+        Returns:
+            动作均值。
+        """
+        obs = self.normalizer(x)  # 规范化输入观测
+        # 计算先验参数
+        mu_p = self.prior_mu(obs)
+        logvar_p = self.prior_logvar(obs)
+        # 规范化 mu（如果启用）
+        if self.normalize_mu:
+            mu_p = self.mu_normalizer(mu_p)
+        # 使用均值作为 z（确定性推理，避免随机性）
+        z = mu_p * self.z_scale_factor  # 应用缩放因子
+        # 连接观测和 z 输入解码器
+        decoder_input = torch.cat([obs, z], dim=-1)
+        time_step_clamped = torch.clamp(
+            time_step.long().squeeze(-1), max=self.time_step_total - 1
+        )
+        return (
+            self.decoder(decoder_input),
+            self.joint_pos[time_step_clamped],
+            self.joint_vel[time_step_clamped],
+            self.body_pos_w[time_step_clamped],
+            self.body_quat_w[time_step_clamped],
+            self.body_lin_vel_w[time_step_clamped],
+            self.body_ang_vel_w[time_step_clamped],
+        )
+
     def export(self, path, filename):
         self.to("cpu")
-        obs = torch.zeros(1, self.actor[0].in_features)
+        if self.is_cvae:
+            obs = torch.zeros(1, self.prior_mu[0].in_features)  # dummy 输入（学生观测维度）
+        else:
+            obs = torch.zeros(1, self.actor[0].in_features)
         time_step = torch.zeros(1, 1)
         torch.onnx.export(
             self,
