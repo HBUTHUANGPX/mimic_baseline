@@ -27,13 +27,21 @@ if TYPE_CHECKING:
 import re
 
 
+# def extract_part(path):
+#     # 使用正则匹配 '/([^:/]+):' 模式，捕获组1为所需部分
+#     match = re.search(r"/([^:/]+):", path)
+#     if match:
+#         return match.group(1)
+#     return None
 def extract_part(path):
-    # 使用正则匹配 '/([^:/]+):' 模式，捕获组1为所需部分
-    match = re.search(r"/([^:/]+):", path)
-    if match:
-        return match.group(1)
+    # 假设路径以 'artifacts/' 开头，提取其后的相对路径（包括子文件夹和文件名）
+    if path.startswith("artifacts/"):
+        # 去除 'artifacts/' 前缀，并返回剩余部分
+        relative_path = path[len("artifacts/"):]
+        # 验证是否为有效的NPZ文件路径
+        if relative_path.endswith('.npz'):
+            return relative_path
     return None
-
 
 class MotionLoader:
     def __init__(

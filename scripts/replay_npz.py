@@ -3,7 +3,7 @@
 .. code-block:: bash
 
     # Usage
-    python replay_motion.py --motion_file source/whole_body_tracking/whole_body_tracking/assets/g1/motions/lafan_walk_short.npz
+    python replay_motion.py --motion_file source/general_motion_tracker_whole_body_teleoperation/general_motion_tracker_whole_body_teleoperation/assets/g1/motions/lafan_walk_short.npz
 """
 
 """Launch Isaac Sim Simulator first."""
@@ -39,10 +39,8 @@ from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 ##
 # Pre-defined configs
 ##
-from whole_body_tracking.robots.g1 import G1_CYLINDER_CFG
-from whole_body_tracking.robots.h1_2 import H1_2_CYLINDER_CFG
-from whole_body_tracking.robots.q1 import Q1_CYLINDER_CFG
-from whole_body_tracking.tasks.tracking.mdp import MotionLoader
+from general_motion_tracker_whole_body_teleoperation.robots.q1 import Q1_CYLINDER_CFG
+from general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp import MotionLoader
 
 
 @configclass
@@ -69,16 +67,7 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     # Define simulation stepping
     sim_dt = sim.get_physics_dt()
 
-    registry_name = "2082672018-hpx/csv_to_npz/Q1_251021_01_slowly_walk_120Hz"
-    if ":" not in registry_name:  # Check if the registry name includes alias, if not, append ":latest"
-        registry_name += ":latest"
-    import pathlib
-
-    import wandb
-
-    api = wandb.Api()
-    artifact = api.artifact(registry_name)
-    motion_file = str(pathlib.Path(artifact.download()) / "motion.npz")
+    motion_file = "/home/hpx/HPX_LOCO_2/mimic_baseline/artifacts/lafan_bvh/ground1_subject1.npz"
 
     motion = MotionLoader(
         motion_file,

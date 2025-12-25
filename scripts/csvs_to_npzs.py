@@ -1,28 +1,33 @@
-"""This script replay a motion from a csv file and output it to a npz file
+"""This script replays motions from all CSV files in a specified input folder and outputs them to NPZ files in the output folder.
 
 .. code-block:: bash
 
     # Usage
-    python csv_to_npz.py --input_file LAFAN/dance1_subject2.csv --input_fps 30 --frame_range 122 722 \
-    --output_file ./motions/dance1_subject2.npz --output_fps 50
+    python csv_to_npz.py --input_folder /path/to/csv_folder --output_folder /path/to/npz_folder --input_fps 30 --frame_range 122 722 --output_fps 50
 """
-
-"""Launch Isaac Sim Simulator first."""
 
 import argparse
 import numpy as np
-from typing import Any, Dict, Optional, Sequence, Union
+import torch
+import os
+
 from isaaclab.app import AppLauncher
 
-# add argparse arguments
+# Add argparse arguments
 parser = argparse.ArgumentParser(
-    description="Replay motion from csv file and output to npz file."
+    description="Replay motions from all CSV files in the input folder and output to NPZ files in the output folder."
 )
 parser.add_argument(
-    "--input_file",
+    "--input_folder",
     type=str,
     required=True,
-    help="The path to the input motion csv file.",
+    help="The path to the input folder containing CSV motion files.",
+)
+parser.add_argument(
+    "--output_folder",
+    type=str,
+    required=True,
+    help="The path to the output folder for saving NPZ files.",
 )
 parser.add_argument(
     "--input_fps", type=int, default=30, help="The fps of the input motion."
@@ -34,33 +39,30 @@ parser.add_argument(
     metavar=("START", "END"),
     help=(
         "frame range: START END (both inclusive). The frame index starts from 1. If not provided, all frames will be"
-        " loaded."
+        " loaded for each file."
     ),
-)
-parser.add_argument(
-    "--output_name", type=str, required=True, help="The name of the motion npz file."
+    default=None,
 )
 parser.add_argument(
     "--output_fps", type=int, default=50, help="The fps of the output motion."
 )
 
-# append AppLauncher cli args
+# Append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
-# parse the arguments
+# Parse the arguments
 args_cli = parser.parse_args()
 
-# launch omniverse app
+# Launch omniverse app
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
-"""Rest everything follows."""
+# Now we are ready!
+print("[INFO]: Setup complete...")
 
-import torch
-
+from isaaclab.sim import SimulationContext
 import isaaclab.sim as sim_utils
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
 from isaaclab.scene import InteractiveScene, InteractiveSceneCfg
-from isaaclab.sim import SimulationContext
 from isaaclab.utils import configclass
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 from isaaclab.utils.math import (
@@ -69,12 +71,10 @@ from isaaclab.utils.math import (
     quat_mul,
     quat_slerp,
 )
-
 ##
 # Pre-defined configs
 ##
 from general_motion_tracker_whole_body_teleoperation.robots.q1 import Q1_CYLINDER_CFG
-
 
 @configclass
 class ReplayMotionsSceneCfg(InteractiveSceneCfg):
@@ -253,26 +253,33 @@ class MotionLoader:
         return state, reset_flag
 
 
-def run_simulator(
-    sim: sim_utils.SimulationContext, scene: InteractiveScene, joint_names: list[str]
+def process_single_motion(
+    sim: SimulationContext,
+    scene: InteractiveScene,
+    joint_names: list[str],
+    motion_file: str,
+    output_file: str,
+    input_fps: int,
+    output_fps: int,
+    frame_range: tuple[int, int] | None,
 ):
-    """Runs the simulation loop."""
+    """Processes a single motion: replays it in simulation and saves to NPZ."""
     # Load motion
     motion = MotionLoader(
-        motion_file=args_cli.input_file,
-        input_fps=args_cli.input_fps,
-        output_fps=args_cli.output_fps,
+        motion_file=motion_file,
+        input_fps=input_fps,
+        output_fps=output_fps,
         device=sim.device,
-        frame_range=args_cli.frame_range,
+        frame_range=frame_range,
     )
 
     # Extract scene entities
     robot = scene["robot"]
     robot_joint_indexes = robot.find_joints(joint_names, preserve_order=True)[0]
 
-    # ------- data logger -------------------------------------------------------
+    # Data logger
     log = {
-        "fps": [args_cli.output_fps],
+        "fps": [output_fps],
         "joint_pos": [],
         "joint_vel": [],
         "body_pos_w": [],
@@ -280,11 +287,13 @@ def run_simulator(
         "body_lin_vel_w": [],
         "body_ang_vel_w": [],
     }
-    file_saved = False
-    # --------------------------------------------------------------------------
 
-    # Simulation loop
-    while simulation_app.is_running():
+    # Reset simulation for this motion
+    sim.reset()
+    scene.reset()
+
+    file_saved = False
+    while not file_saved and simulation_app.is_running():
         (
             (
                 motion_base_pos,
@@ -297,7 +306,7 @@ def run_simulator(
             reset_flag,
         ) = motion.get_next_state()
 
-        # set root state
+        # Set root state
         root_states = robot.data.default_root_state.clone()
         root_states[:, :3] = motion_base_pos
         root_states[:, :2] += scene.env_origins[:, :2]
@@ -306,31 +315,31 @@ def run_simulator(
         root_states[:, 10:] = motion_base_ang_vel
         robot.write_root_state_to_sim(root_states)
 
-        # set joint state
+        # Set joint state
         joint_pos = robot.data.default_joint_pos.clone()
         joint_vel = robot.data.default_joint_vel.clone()
         joint_pos[:, robot_joint_indexes] = motion_dof_pos
         joint_vel[:, robot_joint_indexes] = motion_dof_vel
         robot.write_joint_state_to_sim(joint_pos, joint_vel)
-        sim.render()  # We don't want physic (sim.step())
+
+        sim.render()  # We don't want physics (sim.step())
         scene.update(sim.get_physics_dt())
 
         pos_lookat = root_states[0, :3].cpu().numpy()
         sim.set_camera_view(pos_lookat + np.array([3.0, 3.0, 0.5]), pos_lookat)
 
-        if not file_saved:
-            log["joint_pos"].append(robot.data.joint_pos[0, :].cpu().numpy().copy())
-            log["joint_vel"].append(robot.data.joint_vel[0, :].cpu().numpy().copy())
-            log["body_pos_w"].append(robot.data.body_pos_w[0, :].cpu().numpy().copy())
-            log["body_quat_w"].append(robot.data.body_quat_w[0, :].cpu().numpy().copy())
-            log["body_lin_vel_w"].append(
-                robot.data.body_lin_vel_w[0, :].cpu().numpy().copy()
-            )
-            log["body_ang_vel_w"].append(
-                robot.data.body_ang_vel_w[0, :].cpu().numpy().copy()
-            )
+        log["joint_pos"].append(robot.data.joint_pos[0, :].cpu().numpy().copy())
+        log["joint_vel"].append(robot.data.joint_vel[0, :].cpu().numpy().copy())
+        log["body_pos_w"].append(robot.data.body_pos_w[0, :].cpu().numpy().copy())
+        log["body_quat_w"].append(robot.data.body_quat_w[0, :].cpu().numpy().copy())
+        log["body_lin_vel_w"].append(
+            robot.data.body_lin_vel_w[0, :].cpu().numpy().copy()
+        )
+        log["body_ang_vel_w"].append(
+            robot.data.body_ang_vel_w[0, :].cpu().numpy().copy()
+        )
 
-        if reset_flag and not file_saved:
+        if reset_flag:
             file_saved = True
             for k in (
                 "joint_pos",
@@ -342,27 +351,10 @@ def run_simulator(
             ):
                 log[k] = np.stack(log[k], axis=0)
 
-            np.savez("/tmp/motion.npz", **log)
-
-            import wandb
-            from wandb.wandb_run import Run
-            from wandb.sdk.lib.disabled import RunDisabled
-
-            COLLECTION = args_cli.output_name
-            run: Union[Run, RunDisabled, None] = wandb.init(
-                project="csv_to_npz", name=COLLECTION
-            )
-            print(f"[INFO]: Logging motion to wandb: {COLLECTION}")
-            REGISTRY = "motions"
-            logged_artifact = run.log_artifact(
-                artifact_or_path="/tmp/motion.npz", name=COLLECTION, type=REGISTRY
-            )
-            run.link_artifact(
-                artifact=logged_artifact,
-                target_path=f"wandb-registry-{REGISTRY}/{COLLECTION}",
-                aliases=None,
-            )
-            print(f"[INFO]: Motion saved to wandb registry: {REGISTRY}/{COLLECTION}")
+            # Ensure output directory exists
+            os.makedirs(os.path.dirname(output_file), exist_ok=True)
+            np.savez(output_file, **log)
+            print(f"[INFO]: Motion saved to {output_file}")
 
 
 def main():
@@ -371,52 +363,80 @@ def main():
     sim_cfg = sim_utils.SimulationCfg(device=args_cli.device)
     sim_cfg.dt = 1.0 / args_cli.output_fps
     sim = SimulationContext(sim_cfg)
+
     # Design scene
     scene_cfg = ReplayMotionsSceneCfg(num_envs=1, env_spacing=2.0)
     scene = InteractiveScene(scene_cfg)
-    # Play the simulator
+
     sim.reset()
-    # Now we are ready!
     print("[INFO]: Setup complete...")
-    # Run the simulator
-    run_simulator(
-        sim,
-        scene,
-        joint_names=[
-            "L_hip_roll_joint",
-            "L_hip_yaw_joint",
-            "L_hip_pitch_joint",
-            "L_knee_joint",
-            "L_ankle_pitch_joint",
-            "L_ankle_roll_joint",
-            "R_hip_roll_joint",
-            "R_hip_yaw_joint",
-            "R_hip_pitch_joint",
-            "R_knee_joint",
-            "R_ankle_pitch_joint",
-            "R_ankle_roll_joint",
-            "pelvis_joint",
-            "L_shoulder_pitch_joint",
-            "L_shoulder_roll_joint",
-            "L_shoulder_yaw_joint",
-            "L_elbow_joint",
-            "L_forearm_yaw_joint",
-            "L_wrist_roll_joint",
-            "L_wrist_pitch_joint",
-            "R_shoulder_pitch_joint",
-            "R_shoulder_roll_joint",
-            "R_shoulder_yaw_joint",
-            "R_elbow_joint",
-            "R_forearm_yaw_joint",
-            "R_wrist_roll_joint",
-            "R_wrist_pitch_joint",
-            "head_yaw_joint",
-            "head_pitch_joint",
-        ],
-    )
+
+    # Collect all CSV files recursively
+    csv_files = []
+    for root, _, files in os.walk(args_cli.input_folder):
+        for file in files:
+            if file.endswith(".csv"):
+                csv_files.append(os.path.join(root, file))
+
+    if not csv_files:
+        print("[WARNING]: No CSV files found in the input folder.")
+    else:
+        print(f"[INFO]: Found {len(csv_files)} CSV files to process.")
+
+    # Process each CSV file sequentially
+    joint_names = [
+        "L_hip_roll_joint",
+        "L_hip_yaw_joint",
+        "L_hip_pitch_joint",
+        "L_knee_joint",
+        "L_ankle_pitch_joint",
+        "L_ankle_roll_joint",
+        "R_hip_roll_joint",
+        "R_hip_yaw_joint",
+        "R_hip_pitch_joint",
+        "R_knee_joint",
+        "R_ankle_pitch_joint",
+        "R_ankle_roll_joint",
+        "pelvis_joint",
+        "L_shoulder_pitch_joint",
+        "L_shoulder_roll_joint",
+        "L_shoulder_yaw_joint",
+        "L_elbow_joint",
+        "L_forearm_yaw_joint",
+        "L_wrist_roll_joint",
+        "L_wrist_pitch_joint",
+        "R_shoulder_pitch_joint",
+        "R_shoulder_roll_joint",
+        "R_shoulder_yaw_joint",
+        "R_elbow_joint",
+        "R_forearm_yaw_joint",
+        "R_wrist_roll_joint",
+        "R_wrist_pitch_joint",
+        "head_yaw_joint",
+        "head_pitch_joint",
+    ]
+
+    for csv_path in csv_files:
+        rel_path = os.path.relpath(csv_path, args_cli.input_folder)
+        npz_path = os.path.join(args_cli.output_folder, rel_path.replace(".csv", ".npz"))
+        print(f"[INFO]: Processing {csv_path} -> {npz_path}")
+        process_single_motion(
+            sim=sim,
+            scene=scene,
+            joint_names=joint_names,
+            motion_file=csv_path,
+            output_file=npz_path,
+            input_fps=args_cli.input_fps,
+            output_fps=args_cli.output_fps,
+            frame_range=args_cli.frame_range,
+        )
+
+    print("[INFO]: All motions processed.!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+
+    # Close sim app
+
 
 if __name__ == "__main__":
-    # run the main function
+    # Run the main function
     main()
-    # close sim app
     simulation_app.close()

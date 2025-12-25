@@ -12,3 +12,5 @@ general_motion_tracker_whole_body_teleoperation/general_motion_tracker_whole_bod
 general_motion_tracker_whole_body_teleoperation/general_motion_tracker_whole_body_teleoperation/assets/Q1_old/*
 mjmodel.xml
 MUJOCO_LOG.TXT
+lafan_Q1/*
+artifacts/lafan_bvh/*

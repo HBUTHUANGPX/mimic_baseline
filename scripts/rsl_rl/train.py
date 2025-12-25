@@ -135,9 +135,9 @@ import os
 import time
 import torch
 from datetime import datetime
-
+import glob
 from rsl_rl.runners import DistillationRunner, OnPolicyRunner
-
+from typing import List
 from isaaclab.envs import (
     DirectMARLEnv,
     DirectMARLEnvCfg,
@@ -177,7 +177,59 @@ def read_yaml_file(file_path):
     except yaml.YAMLError as exc:
         print(f"YAML解析错误: {exc}")
         return None
+
+def collect_npz_paths(yaml_path: str = "motion_file.yaml") -> List[str]:
+    """
+    从指定的YAML文件中读取配置，收集NPZ文件路径列表。
+    - 先添加file_name中指定的NPZ文件路径。
+    - 然后添加folder_name中每个文件夹下的所有NPZ文件路径，但避免与file_name中文件名的重复（基于文件名）。
+    - 最后剔除wo_file_name中指定的文件路径和wo_folder_name中文件夹下的所有NPZ文件路径。
     
+    :param yaml_path: YAML文件的路径，默认为"motion_file.yaml"。
+    :return: 收集后的NPZ文件路径列表。
+    """
+    data = read_yaml_file(yaml_path)
+    if data is None:
+        return []
+
+    # 提取配置
+    file_names = data.get('file_name', [])
+    folder_names = data.get('folder_name', [])
+    wo_file_names = data.get('wo_file_name', [])
+    wo_folder_names = data.get('wo_folder_name', [])  # 假设为wo_folder_name，修正可能的拼写错误
+
+    # 使用集合存储路径，以避免重复
+    npz_paths = set()
+    existing_basenames = set()
+
+    # 第一步：添加file_name中的NPZ文件路径，并记录其basename
+    for path in file_names:
+        if path.endswith('.npz') and os.path.exists(path):
+            npz_paths.add(path)
+            existing_basenames.add(os.path.basename(path))
+
+    # 第二步：添加folder_name中每个文件夹下的NPZ文件路径，避免与现有basename重复
+    for folder in folder_names:
+        if os.path.isdir(folder):
+            for npz_file in glob.glob(os.path.join(folder, '*.npz')):
+                basename = os.path.basename(npz_file)
+                if basename not in existing_basenames:
+                    npz_paths.add(npz_file)
+                    existing_basenames.add(basename)  # 更新basename集合，避免后续重复
+
+    # 第三步：剔除wo_file_name中的指定文件路径
+    for wo_path in wo_file_names:
+        npz_paths.discard(wo_path)
+
+    # 第四步：剔除wo_folder_name中每个文件夹下的所有NPZ文件路径
+    for wo_folder in wo_folder_names:
+        if os.path.isdir(wo_folder):
+            for npz_file in glob.glob(os.path.join(wo_folder, '*.npz')):
+                npz_paths.discard(npz_file)
+
+    # 返回排序后的列表，便于一致性
+    return sorted(list(npz_paths))
+
 @hydra_task_config(args_cli.task, args_cli.agent)
 def main(
     env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg,
@@ -222,23 +274,10 @@ def main(
         env_cfg.seed = seed
         agent_cfg.seed = seed
 
-    yaml_data = read_yaml_file(args_cli.motion_file_path)
-    file_name = yaml_data["file_name"]
-    motion_file = []
-    import pathlib
-    import wandb
-
-    # for name in file_name:
-    #     registry_name = name
-    #     if (
-    #         ":" not in registry_name
-    #     ):  # Check if the registry name includes alias, if not, append ":latest"
-    #         registry_name += ":latest"
-    #     api = wandb.Api()
-    #     artifact = api.artifact(registry_name)
-    #     motion_file.append(str(pathlib.Path(artifact.download()) / "motion.npz"))
-    # env_cfg.commands.motion.motion_file = motion_file
-    env_cfg.commands.motion.motion_file = ["/home/hpx/HPX_LOCO_2/mimic_baseline/artifacts/Q1_251021_01_slowly_walk_120Hz:v0/motion.npz"]
+    motion_file = collect_npz_paths(args_cli.motion_file_path)
+    print(f"[INFO] Collected {len(motion_file)} motion files for training.")
+    # print(motion_file)
+    env_cfg.commands.motion.motion_file = motion_file
     # specify directory for logging experiments
     log_root_path = os.path.join("logs", "rsl_rl", agent_cfg.experiment_name)
     log_root_path = os.path.abspath(log_root_path)

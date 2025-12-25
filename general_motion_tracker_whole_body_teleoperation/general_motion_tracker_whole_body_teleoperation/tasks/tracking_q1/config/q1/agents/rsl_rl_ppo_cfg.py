@@ -129,9 +129,9 @@ class Q1FlatDistillationStudentTeacherCfg(RslRlDistillationRunnerCfg):
         activation="elu",
         student_obs_normalization=True,
         teacher_obs_normalization=True,
-        latent_dim=8,
-        beta_kl=0.1,
-        normalize_mu=True,
+        latent_dim=64,
+        beta_kl=0.001,
+        normalize_mu=False,
         z_scale_factor=0.05,
     )
     algorithm = RslRlDistillationAlgorithmCfg(
@@ -139,4 +139,5 @@ class Q1FlatDistillationStudentTeacherCfg(RslRlDistillationRunnerCfg):
         gradient_length=15,
         num_learning_epochs=5,
         class_name="Distillation",
+        max_grad_norm=1.0,
     )
