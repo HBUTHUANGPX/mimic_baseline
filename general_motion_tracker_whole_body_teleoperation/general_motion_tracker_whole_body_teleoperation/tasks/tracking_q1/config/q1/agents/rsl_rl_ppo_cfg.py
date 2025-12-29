@@ -48,7 +48,8 @@ class Q1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
 @configclass  # 有特权信息的训练
 class PureQ1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
-    max_iterations = 11
+    max_iterations = 5001
+    # max_iterations = 3001
     # obs_groups ={
     #     "policy": ["policy"],  # 映射到环境提供的 'policy' 观测组，用于演员网络
     #     "critic": ["critic"],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
@@ -67,7 +68,7 @@ class PureQ1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
             ],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
         },
     )
-    save_interval = 2
+    save_interval = 2500
     experiment_name = "pure_q1_flat"
     policy = RslRlPpoActorCriticCfg(
         init_noise_std=0.8,

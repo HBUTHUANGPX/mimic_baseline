@@ -315,12 +315,48 @@ def main(
     log_root_path = os.path.abspath(log_root_path)
     print(f"[INFO] Logging experiment in directory: {log_root_path}")
     # specify directory for logging runs: {time-stamp}_{run_name}
-    log_dir_time = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+    log_dir_time = datetime.now().strftime("%Y_%m_%d_%H_%M")
     # The Ray Tune workflow extracts experiment name using the logging line below, hence, do not change it (see PR #2346, comment-2819298849)
     print(f"Exact experiment name requested from command line: {log_dir_time}")
     # wrap around environment for rsl-rl
     env = RslRlVecEnvWrapper(_env, clip_actions=agent_cfg.clip_actions)
     print(f"[INFO] wrap around environment for rsl-rl")
+    # convert to single-agent instance if required by the RL algorithm
+    
+    print(f"[INFO] convert to single-agent instance if required by the RL algorithm")
+
+    # save resume path before creating a new log_dir
+    if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
+        resume_path = get_checkpoint_path(
+            "/home/hpx/HPX_LOCO_2/mimic_baseline/logs/rsl_rl/pure_q1_flat", agent_cfg.load_run, agent_cfg.load_checkpoint
+        )
+    print(f"[INFO] save resume path before creating a new log_dir")
+
+    start_time = time.time()
+
+    # create runner from rsl-rl
+    if agent_cfg.class_name == "OnPolicyRunner":
+        runner = OnPolicyRunner(
+            env, agent_cfg.to_dict(), log_dir=None, device=agent_cfg.device
+        )
+    elif agent_cfg.class_name == "DistillationRunner":
+        print("[INFO]: Creating DistillationRunner")
+        runner = DistillationRunner(
+            env, agent_cfg.to_dict(), log_dir=None, device=agent_cfg.device
+        )
+    else:
+        raise ValueError(f"Unsupported runner class: {agent_cfg.class_name}")
+    print(f"[INFO] create runner from rsl-rl")
+    
+    # load the checkpoint
+    if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
+        print(f"[INFO]: Loading model checkpoint from: {resume_path}")
+        # load previously trained model
+        runner.load(resume_path)
+    print(f"[INFO] write git state to logs,load the checkpoint")
+    
+    from rsl_rl.utils import resolve_obs_groups
+
     for idx, mf in enumerate(motion_file):
         env.unwrapped.command_manager.cfg.motion.motion_file = mf
         env.unwrapped.command_manager._terms['motion'].load_motion(mf)
@@ -333,57 +369,31 @@ def main(
         if agent_cfg.run_name:
             log_dir = os.path.join(log_root_path, log_dir_time+f"_{agent_cfg.run_name}", path)
         else:
-            log_dir = os.path.join(log_root_path, log_dir_time, path)
-        # set the log directory for the environment (works for all environment types)
-        env_cfg.log_dir = log_dir
+            log_dir = os.path.join(log_root_path, log_dir_time,path)
         
-        # convert to single-agent instance if required by the RL algorithm
-        
-        print(f"[INFO] convert to single-agent instance if required by the RL algorithm")
-
-        # save resume path before creating a new log_dir
-        if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
-            resume_path = get_checkpoint_path(
-                "/home/hpx/HPX_LOCO_2/mimic_baseline/logs/rsl_rl/pure_q1_flat", agent_cfg.load_run, agent_cfg.load_checkpoint
-            )
-        print(f"[INFO] save resume path before creating a new log_dir")
-
-        start_time = time.time()
-
-        # create runner from rsl-rl
-        if agent_cfg.class_name == "OnPolicyRunner":
-            runner = OnPolicyRunner(
-                env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device
-            )
-        elif agent_cfg.class_name == "DistillationRunner":
-            print("[INFO]: Creating DistillationRunner")
-            runner = DistillationRunner(
-                env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device
-            )
-        else:
-            raise ValueError(f"Unsupported runner class: {agent_cfg.class_name}")
-        print(f"[INFO] create runner from rsl-rl")
-        # write git state to logs
-        runner.add_git_repo_to_log(__file__)
-        # load the checkpoint
-        if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
-            print(f"[INFO]: Loading model checkpoint from: {resume_path}")
-            # load previously trained model
-            runner.load(resume_path)
-        print(f"[INFO] write git state to logs,load the checkpoint")
-
         # dump the configuration into log-directory
         dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)
         dump_yaml(os.path.join(log_dir, "params", "agent.yaml"), agent_cfg)
         print(f"[INFO] dump the configuration into log-directory")
 
+        runner.cfg = agent_cfg.to_dict()
+        runner.policy_cfg = agent_cfg.to_dict()["policy"]
+        runner.alg_cfg = agent_cfg.to_dict()["algorithm"]
+        _obs = runner.env.get_observations()
+        runner.cfg["obs_groups"] = resolve_obs_groups(_obs, runner.cfg["obs_groups"], runner._get_default_obs_sets())
+        runner.alg = runner._construct_algorithm(_obs)
+        runner.init_logger(log_dir)
+        # write git state to logs
+        runner.add_git_repo_to_log(__file__)
+        runner.current_learning_iteration = 0
         # run training
         runner.learn(
             num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True
         )
         print(f"Training time: {round(time.time() - start_time, 2)} seconds")
-        if runner.logger.logger_type == "wandb":
-            runner.logger.writer.stop()
+        if not runner.logger.disable_logs:
+            if runner.logger.logger_type == "wandb":
+                runner.logger.writer.stop()
         # close the simulator
     env.close()
 
