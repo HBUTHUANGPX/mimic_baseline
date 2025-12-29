@@ -53,6 +53,7 @@ class MotionLoader:
         # 支持单个字符串或列表，统一转换为列表
         if isinstance(motion_file, str):
             self.motion_file = [motion_file]
+            print(f"[INFO] load motion file: {motion_file}")
         else:
             self.motion_file = motion_file
         for file in self.motion_file:
@@ -177,7 +178,6 @@ class MotionCommand(CommandTerm):
 
     def __init__(self, cfg: MotionCommandCfg, env: ManagerBasedRLEnv):
         super().__init__(cfg, env)
-
         self.robot: Articulation = env.scene[cfg.asset_name]
         self.robot_ref_body_index = self.robot.body_names.index(self.cfg.reference_body)
         self.motion_ref_body_index = self.cfg.body_names.index(self.cfg.reference_body)
@@ -186,9 +186,11 @@ class MotionCommand(CommandTerm):
             dtype=torch.long,
             device=self.device,
         )
-
+        self.load_motion(self.cfg.motion_file)
+        
+    def load_motion(self, motion_file: str | Sequence[str]):
         self.motion = MotionLoader(
-            self.cfg.motion_file, self.body_indexes, device=self.device
+            motion_file, self.body_indexes, device=self.device
         )
         self.counts = torch.zeros(
             self.motion.num_motions, dtype=torch.float32, device=self.device
@@ -197,10 +199,10 @@ class MotionCommand(CommandTerm):
             self.num_envs, dtype=torch.long, device=self.device
         )
         self.body_pos_relative_w = torch.zeros(
-            self.num_envs, len(cfg.body_names), 3, device=self.device
+            self.num_envs, len(self.cfg.body_names), 3, device=self.device
         )
         self.body_quat_relative_w = torch.zeros(
-            self.num_envs, len(cfg.body_names), 4, device=self.device
+            self.num_envs, len(self.cfg.body_names), 4, device=self.device
         )
         self.body_quat_relative_w[:, :, 0] = 1.0
 

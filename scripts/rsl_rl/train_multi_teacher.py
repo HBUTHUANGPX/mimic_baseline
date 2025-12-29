@@ -1,0 +1,395 @@
+# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# All rights reserved.
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+"""Script to train RL agent with RSL-RL."""
+
+"""Launch Isaac Sim Simulator first."""
+
+import argparse
+import sys
+
+from isaaclab.app import AppLauncher
+
+# local imports
+import cli_args  # isort: skip
+
+# add argparse arguments
+parser = argparse.ArgumentParser(description="Train an RL agent with RSL-RL.")
+parser.add_argument(
+    "--video", action="store_true", default=False, help="Record videos during training."
+)
+parser.add_argument(
+    "--video_length",
+    type=int,
+    default=200,
+    help="Length of the recorded video (in steps).",
+)
+parser.add_argument(
+    "--video_interval",
+    type=int,
+    default=2000,
+    help="Interval between video recordings (in steps).",
+)
+parser.add_argument(
+    "--num_envs", type=int, default=None, help="Number of environments to simulate."
+)
+parser.add_argument("--task", type=str, default=None, help="Name of the task.")
+parser.add_argument(
+    "--agent",
+    type=str,
+    default="rsl_rl_cfg_entry_point",
+    help="Name of the RL agent configuration entry point.",
+)
+parser.add_argument(
+    "--seed", type=int, default=None, help="Seed used for the environment"
+)
+parser.add_argument(
+    "--max_iterations", type=int, default=None, help="RL Policy training iterations."
+)
+parser.add_argument(
+    "--distributed",
+    action="store_true",
+    default=False,
+    help="Run training with multiple GPUs or nodes.",
+)
+parser.add_argument(
+    "--export_io_descriptors",
+    action="store_true",
+    default=False,
+    help="Export IO descriptors.",
+)
+parser.add_argument(
+    "--ray-proc-id",
+    "-rid",
+    type=int,
+    default=None,
+    help="Automatically configured by Ray integration, otherwise None.",
+)
+parser.add_argument(
+    "--motion_file_path",
+    type=str,
+    default="scripts/rsl_rl/motion_file.yaml",
+    help="The name of the motion yaml file_path.",
+)
+
+# append RSL-RL cli arguments
+cli_args.add_rsl_rl_args(parser)
+# append AppLauncher cli args
+AppLauncher.add_app_launcher_args(parser)
+args_cli, hydra_args = parser.parse_known_args()
+
+# always enable cameras to record video
+if args_cli.video:
+    args_cli.enable_cameras = True
+
+# clear out sys.argv for Hydra
+sys.argv = [sys.argv[0]] + hydra_args
+
+# launch omniverse app
+app_launcher = AppLauncher(args_cli)
+simulation_app = app_launcher.app
+
+"""Check for minimum supported RSL-RL version."""
+
+import importlib.metadata as metadata
+import platform
+
+from packaging import version
+
+# check minimum supported rsl-rl version
+RSL_RL_VERSION = "3.0.1"
+installed_version = metadata.version("rsl-rl-lib")
+if version.parse(installed_version) < version.parse(RSL_RL_VERSION):
+    if platform.system() == "Windows":
+        cmd = [
+            r".\isaaclab.bat",
+            "-p",
+            "-m",
+            "pip",
+            "install",
+            f"rsl-rl-lib=={RSL_RL_VERSION}",
+        ]
+    else:
+        cmd = [
+            "./isaaclab.sh",
+            "-p",
+            "-m",
+            "pip",
+            "install",
+            f"rsl-rl-lib=={RSL_RL_VERSION}",
+        ]
+    print(
+        f"Please install the correct version of RSL-RL.\nExisting version is: '{installed_version}'"
+        f" and required version is: '{RSL_RL_VERSION}'.\nTo install the correct version, run:"
+        f"\n\n\t{' '.join(cmd)}\n"
+    )
+    exit(1)
+
+"""Rest everything follows."""
+
+import gymnasium as gym
+import logging
+import os
+import time
+import torch
+from datetime import datetime
+import glob
+from rsl_rl.runners import DistillationRunner, OnPolicyRunner
+from typing import List
+from isaaclab.envs import (
+    DirectMARLEnv,
+    DirectMARLEnvCfg,
+    DirectRLEnvCfg,
+    ManagerBasedRLEnvCfg,
+    multi_agent_to_single_agent,
+)
+from isaaclab.utils.dict import print_dict
+from isaaclab.utils.io import dump_yaml
+
+from isaaclab_rl.rsl_rl import RslRlBaseRunnerCfg, RslRlVecEnvWrapper
+
+import isaaclab_tasks  # noqa: F401
+from isaaclab_tasks.utils import get_checkpoint_path
+from isaaclab_tasks.utils.hydra import hydra_task_config
+import general_motion_tracker_whole_body_teleoperation.tasks  # noqa: F401
+import yaml  # 导入PyYAML库
+
+# import logger
+logger = logging.getLogger(__name__)
+
+# PLACEHOLDER: Extension template (do not remove this comment)
+
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
+torch.backends.cudnn.deterministic = False
+torch.backends.cudnn.benchmark = False
+
+def read_yaml_file(file_path):
+    try:
+        with open(file_path, "r", encoding="utf-8") as file:
+            data = yaml.safe_load(file)
+        return data
+    except FileNotFoundError:
+        print(f"文件 {file_path} 不存在。")
+        return None
+    except yaml.YAMLError as exc:
+        print(f"YAML解析错误: {exc}")
+        return None
+
+def collect_npz_paths(yaml_path: str = "motion_file.yaml") -> List[str]:
+    """
+    从指定的YAML文件中读取配置，收集NPZ文件路径列表。
+    - 先添加file_name中指定的NPZ文件路径。
+    - 然后添加folder_name中每个文件夹下的所有NPZ文件路径，但避免与file_name中文件名的重复（基于文件名）。
+    - 最后剔除wo_file_name中指定的文件路径和wo_folder_name中文件夹下的所有NPZ文件路径。
+    
+    :param yaml_path: YAML文件的路径，默认为"motion_file.yaml"。
+    :return: 收集后的NPZ文件路径列表。
+    """
+    data = read_yaml_file(yaml_path)
+    if data is None:
+        return []
+
+    # 提取配置
+    file_names = data.get('file_name', [])
+    folder_names = data.get('folder_name', [])
+    wo_file_names = data.get('wo_file_name', [])
+    wo_folder_names = data.get('wo_folder_name', [])  # 假设为wo_folder_name，修正可能的拼写错误
+
+    # 使用集合存储路径，以避免重复
+    npz_paths = set()
+    existing_basenames = set()
+
+    # 第一步：添加file_name中的NPZ文件路径，并记录其basename
+    for path in file_names:
+        if path.endswith('.npz') and os.path.exists(path):
+            npz_paths.add(path)
+            existing_basenames.add(os.path.basename(path))
+
+    # 第二步：添加folder_name中每个文件夹下的NPZ文件路径，避免与现有basename重复
+    for folder in folder_names:
+        if os.path.isdir(folder):
+            for npz_file in glob.glob(os.path.join(folder, '*.npz')):
+                basename = os.path.basename(npz_file)
+                if basename not in existing_basenames:
+                    npz_paths.add(npz_file)
+                    existing_basenames.add(basename)  # 更新basename集合，避免后续重复
+
+    # 第三步：剔除wo_file_name中的指定文件路径
+    for wo_path in wo_file_names:
+        npz_paths.discard(wo_path)
+
+    # 第四步：剔除wo_folder_name中每个文件夹下的所有NPZ文件路径
+    for wo_folder in wo_folder_names:
+        if os.path.isdir(wo_folder):
+            for npz_file in glob.glob(os.path.join(wo_folder, '*.npz')):
+                npz_paths.discard(npz_file)
+
+    # 返回排序后的列表，便于一致性
+    return sorted(list(npz_paths))
+
+@hydra_task_config(args_cli.task, args_cli.agent)
+def main(
+    env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg,
+    agent_cfg: RslRlBaseRunnerCfg,
+):
+    motion_file = collect_npz_paths(args_cli.motion_file_path)
+    print(f"[INFO] Collected {len(motion_file)} motion files for training.")
+    # print(motion_file)
+
+    """Train with RSL-RL agent."""
+    # override configurations with non-hydra CLI arguments
+    agent_cfg = cli_args.update_rsl_rl_cfg(agent_cfg, args_cli)
+    env_cfg.scene.num_envs = (
+        args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
+    )
+    agent_cfg.max_iterations = (
+        args_cli.max_iterations
+        if args_cli.max_iterations is not None
+        else agent_cfg.max_iterations
+    )
+
+    # set the environment seed
+    # note: certain randomizations occur in the environment initialization so we set the seed here
+    env_cfg.seed = agent_cfg.seed
+    env_cfg.sim.device = (
+        args_cli.device if args_cli.device is not None else env_cfg.sim.device
+    )
+    # check for invalid combination of CPU device with distributed training
+    if (
+        args_cli.distributed
+        and args_cli.device is not None
+        and "cpu" in args_cli.device
+    ):
+        raise ValueError(
+            "Distributed training is not supported when using CPU device. "
+            "Please use GPU device (e.g., --device cuda) for distributed training."
+        )
+
+    # multi-gpu training configuration
+    if args_cli.distributed:
+        env_cfg.sim.device = f"cuda:{app_launcher.local_rank}"
+        agent_cfg.device = f"cuda:{app_launcher.local_rank}"
+
+        # set seed to have diversity in different threads
+        seed = agent_cfg.seed + app_launcher.local_rank
+        env_cfg.seed = seed
+        agent_cfg.seed = seed
+
+    # set the IO descriptors export flag if requested
+    if isinstance(env_cfg, ManagerBasedRLEnvCfg):
+        env_cfg.export_io_descriptors = args_cli.export_io_descriptors
+    else:
+        logger.warning(
+            "IO descriptors are only supported for manager based RL environments. No IO descriptors will be exported."
+        )
+
+    
+    env_cfg.commands.motion.motion_file = motion_file[0]
+
+    # create isaac environment
+    _env = gym.make(
+        args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None
+    )
+    
+    if isinstance(_env.unwrapped, DirectMARLEnv):
+        _env = multi_agent_to_single_agent(_env)
+    print(f"[INFO] create isaac environment")
+    # wrap for video recording
+    if args_cli.video:
+        video_kwargs = {
+            "video_folder": os.path.join(log_dir, "videos", "train"),
+            "step_trigger": lambda step: step % args_cli.video_interval == 0,
+            "video_length": args_cli.video_length,
+            "disable_logger": True,
+        }
+        print("[INFO] Recording videos during training.")
+        print_dict(video_kwargs, nesting=4)
+        _env = gym.wrappers.RecordVideo(_env, **video_kwargs)
+    print(f"[INFO] wrap for video recording")
+    
+    # specify directory for logging experiments
+    log_root_path = os.path.join("logs", "rsl_rl", agent_cfg.experiment_name)
+    log_root_path = os.path.abspath(log_root_path)
+    print(f"[INFO] Logging experiment in directory: {log_root_path}")
+    # specify directory for logging runs: {time-stamp}_{run_name}
+    log_dir_time = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+    # The Ray Tune workflow extracts experiment name using the logging line below, hence, do not change it (see PR #2346, comment-2819298849)
+    print(f"Exact experiment name requested from command line: {log_dir_time}")
+    # wrap around environment for rsl-rl
+    env = RslRlVecEnvWrapper(_env, clip_actions=agent_cfg.clip_actions)
+    print(f"[INFO] wrap around environment for rsl-rl")
+    for idx, mf in enumerate(motion_file):
+        env.unwrapped.command_manager.cfg.motion.motion_file = mf
+        env.unwrapped.command_manager._terms['motion'].load_motion(mf)
+        print(f"  [{idx}] {mf}")
+        if mf.startswith("artifacts/"):
+            path = mf[len("artifacts/"):]
+        path = path.replace("/", "_")
+        if path.endswith(".npz"):
+            path = path[:-4]
+        if agent_cfg.run_name:
+            log_dir = os.path.join(log_root_path, log_dir_time+f"_{agent_cfg.run_name}", path)
+        else:
+            log_dir = os.path.join(log_root_path, log_dir_time, path)
+        # set the log directory for the environment (works for all environment types)
+        env_cfg.log_dir = log_dir
+        
+        # convert to single-agent instance if required by the RL algorithm
+        
+        print(f"[INFO] convert to single-agent instance if required by the RL algorithm")
+
+        # save resume path before creating a new log_dir
+        if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
+            resume_path = get_checkpoint_path(
+                "/home/hpx/HPX_LOCO_2/mimic_baseline/logs/rsl_rl/pure_q1_flat", agent_cfg.load_run, agent_cfg.load_checkpoint
+            )
+        print(f"[INFO] save resume path before creating a new log_dir")
+
+        start_time = time.time()
+
+        # create runner from rsl-rl
+        if agent_cfg.class_name == "OnPolicyRunner":
+            runner = OnPolicyRunner(
+                env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device
+            )
+        elif agent_cfg.class_name == "DistillationRunner":
+            print("[INFO]: Creating DistillationRunner")
+            runner = DistillationRunner(
+                env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device
+            )
+        else:
+            raise ValueError(f"Unsupported runner class: {agent_cfg.class_name}")
+        print(f"[INFO] create runner from rsl-rl")
+        # write git state to logs
+        runner.add_git_repo_to_log(__file__)
+        # load the checkpoint
+        if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
+            print(f"[INFO]: Loading model checkpoint from: {resume_path}")
+            # load previously trained model
+            runner.load(resume_path)
+        print(f"[INFO] write git state to logs,load the checkpoint")
+
+        # dump the configuration into log-directory
+        dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)
+        dump_yaml(os.path.join(log_dir, "params", "agent.yaml"), agent_cfg)
+        print(f"[INFO] dump the configuration into log-directory")
+
+        # run training
+        runner.learn(
+            num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True
+        )
+        print(f"Training time: {round(time.time() - start_time, 2)} seconds")
+        if runner.logger.logger_type == "wandb":
+            runner.logger.writer.stop()
+        # close the simulator
+    env.close()
+
+
+if __name__ == "__main__":
+    # run the main function
+    main()
+    # close sim app
+    simulation_app.close()

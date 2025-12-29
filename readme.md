@@ -43,3 +43,6 @@ https://isaac-sim.github.io/IsaacLab/main/source/features/multi_gpu.html#multi-g
 python scripts/rsl_rl/train.py  --task=Diss-Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Q1_slowly_walk --resume --load_run 2025-12-18_21-23-56_Q1_slowly_walk --checkpoint model_90000.pt
 
 python scripts/csvs_to_npzs.py --input_folder lafan_Q1/lafan_bvh/ --output_folder artifacts/lafan_bvh/ --headless
+
+
+python -m torch.distributed.run --nnodes=1 --nproc_per_node=8 scripts/rsl_rl/train.py  --task=Pure-Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Pure_Q1_slowly_walk
