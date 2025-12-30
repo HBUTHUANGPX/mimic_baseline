@@ -118,6 +118,7 @@ class Q1FlatDistillationStudentTeacherCfg(RslRlDistillationRunnerCfg):
                 "proprioception_with_noise",
                 "last_action",
             ],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
+            "motion_id": ["motion_id"],  # 新增 motion_id 观测组
         },
     )
     save_interval = 1500

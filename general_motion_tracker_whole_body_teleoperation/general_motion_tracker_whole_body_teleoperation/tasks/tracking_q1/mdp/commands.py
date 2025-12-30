@@ -42,7 +42,13 @@ def extract_part(path):
         if relative_path.endswith('.npz'):
             return relative_path
     return None
-
+def get_run_name(mf: str) -> str | None:
+    if mf.startswith("artifacts/"):
+        path = mf[len("artifacts/"):]
+    path = path.replace("/", "_")
+    if path.endswith(".npz"):
+        path = path[:-4]
+    return path
 class MotionLoader:
     def __init__(
         self,
@@ -56,11 +62,14 @@ class MotionLoader:
             print(f"[INFO] load motion file: {motion_file}")
         else:
             self.motion_file = motion_file
+            print(f"[INFO] load motion file: {motion_file}")
         for file in self.motion_file:
             assert os.path.isfile(file), f"Invalid file path: {file}"
         self.extracted_list = [
             extract_part(p) for p in self.motion_file if extract_part(p) is not None
         ]
+        self.run_names = [get_run_name(p) for p in self.motion_file]
+        print(f"[INFO] run names: {self.run_names}")
         self.num_motions = len(self.motion_file)
         assert self.num_motions > 0, "At least one motion file is required."
 
@@ -71,10 +80,12 @@ class MotionLoader:
         body_quat_w_list = []
         body_lin_vel_w_list = []
         body_ang_vel_w_list = []
+        motion_id_list = []
         self.motion_lengths = []  # Length of each motion segment
         self.fps = None  # Assume all files have the same fps
 
-        for _file in self.motion_file:
+        # for _file in self.motion_file:
+        for i , _file in enumerate(self.motion_file):
             data = np.load(_file)
             if self.fps is None:
                 self.fps = data["fps"]
@@ -101,6 +112,7 @@ class MotionLoader:
             body_ang_vel_w_list.append(
                 torch.tensor(data["body_ang_vel_w"], dtype=torch.float32, device=device)
             )
+            motion_id_list.append(torch.tensor(i, dtype=torch.float32, device=device) * torch.ones(data["joint_pos"].shape[0],1, dtype=torch.float32, device=device))
             self.motion_lengths.append(data["joint_pos"].shape[0])
 
         # Concatenate along time dimension (dim=0)
@@ -110,6 +122,7 @@ class MotionLoader:
         self._body_quat_w = torch.cat(body_quat_w_list, dim=0)
         self._body_lin_vel_w = torch.cat(body_lin_vel_w_list, dim=0)
         self._body_ang_vel_w = torch.cat(body_ang_vel_w_list, dim=0)
+        self._motion_id = torch.cat(motion_id_list, dim=0)
 
         self._body_indexes = body_indexes
         self.time_step_total = self.joint_pos.shape[0]
@@ -221,6 +234,10 @@ class MotionCommand(CommandTerm):
         for name in self.motion.extracted_list:
             self.metrics[name] = torch.zeros(self.num_envs, device=self.device)
     
+    @property
+    def motion_id(self) -> torch.Tensor:
+        return self.motion._motion_id[self.time_steps]
+
     @property
     def command(
         self,

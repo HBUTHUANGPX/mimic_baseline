@@ -10,6 +10,9 @@ from general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp.comma
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedEnv
 
+def motion_id(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    return command.motion_id
 
 def robot_ref_ori_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
