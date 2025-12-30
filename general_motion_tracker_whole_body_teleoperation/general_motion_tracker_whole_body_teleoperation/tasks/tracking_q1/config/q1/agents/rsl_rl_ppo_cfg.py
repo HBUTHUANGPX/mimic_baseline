@@ -123,6 +123,7 @@ class Q1FlatDistillationStudentTeacherCfg(RslRlDistillationRunnerCfg):
     )
     save_interval = 1500
     experiment_name = "q1_flat_distillation"
+    class_name: str = "MultiTeacherDistillationRunner"
     policy = RslRlDistillationStudentTeacher_CVAECfg(
         class_name="StudentTeacher_CVAE",
         init_noise_std=0.8,

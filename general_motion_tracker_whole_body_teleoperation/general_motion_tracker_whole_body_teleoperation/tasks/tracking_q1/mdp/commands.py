@@ -49,6 +49,7 @@ def get_run_name(mf: str) -> str | None:
     if path.endswith(".npz"):
         path = path[:-4]
     return path
+
 class MotionLoader:
     def __init__(
         self,

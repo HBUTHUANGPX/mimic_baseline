@@ -136,7 +136,11 @@ import time
 import torch
 from datetime import datetime
 import glob
-from rsl_rl.runners import DistillationRunner, OnPolicyRunner
+from rsl_rl.runners import (
+    DistillationRunner,
+    OnPolicyRunner,
+    MultiTeacherDistillationRunner,
+)
 from typing import List
 from isaaclab.envs import (
     DirectMARLEnv,
@@ -166,6 +170,7 @@ torch.backends.cudnn.allow_tf32 = True
 torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = False
 
+
 def read_yaml_file(file_path):
     try:
         with open(file_path, "r", encoding="utf-8") as file:
@@ -178,13 +183,14 @@ def read_yaml_file(file_path):
         print(f"YAML解析错误: {exc}")
         return None
 
+
 def collect_npz_paths(yaml_path: str = "motion_file.yaml") -> List[str]:
     """
     从指定的YAML文件中读取配置，收集NPZ文件路径列表。
     - 先添加file_name中指定的NPZ文件路径。
     - 然后添加folder_name中每个文件夹下的所有NPZ文件路径，但避免与file_name中文件名的重复（基于文件名）。
     - 最后剔除wo_file_name中指定的文件路径和wo_folder_name中文件夹下的所有NPZ文件路径。
-    
+
     :param yaml_path: YAML文件的路径，默认为"motion_file.yaml"。
     :return: 收集后的NPZ文件路径列表。
     """
@@ -193,10 +199,12 @@ def collect_npz_paths(yaml_path: str = "motion_file.yaml") -> List[str]:
         return []
 
     # 提取配置
-    file_names = data.get('file_name', [])
-    folder_names = data.get('folder_name', [])
-    wo_file_names = data.get('wo_file_name', [])
-    wo_folder_names = data.get('wo_folder_name', [])  # 假设为wo_folder_name，修正可能的拼写错误
+    file_names = data.get("file_name", [])
+    folder_names = data.get("folder_name", [])
+    wo_file_names = data.get("wo_file_name", [])
+    wo_folder_names = data.get(
+        "wo_folder_name", []
+    )  # 假设为wo_folder_name，修正可能的拼写错误
 
     # 使用集合存储路径，以避免重复
     npz_paths = set()
@@ -204,14 +212,14 @@ def collect_npz_paths(yaml_path: str = "motion_file.yaml") -> List[str]:
 
     # 第一步：添加file_name中的NPZ文件路径，并记录其basename
     for path in file_names:
-        if path.endswith('.npz') and os.path.exists(path):
+        if path.endswith(".npz") and os.path.exists(path):
             npz_paths.add(path)
             existing_basenames.add(os.path.basename(path))
 
     # 第二步：添加folder_name中每个文件夹下的NPZ文件路径，避免与现有basename重复
     for folder in folder_names:
         if os.path.isdir(folder):
-            for npz_file in glob.glob(os.path.join(folder, '*.npz')):
+            for npz_file in glob.glob(os.path.join(folder, "*.npz")):
                 basename = os.path.basename(npz_file)
                 if basename not in existing_basenames:
                     npz_paths.add(npz_file)
@@ -224,11 +232,12 @@ def collect_npz_paths(yaml_path: str = "motion_file.yaml") -> List[str]:
     # 第四步：剔除wo_folder_name中每个文件夹下的所有NPZ文件路径
     for wo_folder in wo_folder_names:
         if os.path.isdir(wo_folder):
-            for npz_file in glob.glob(os.path.join(wo_folder, '*.npz')):
+            for npz_file in glob.glob(os.path.join(wo_folder, "*.npz")):
                 npz_paths.discard(npz_file)
 
     # 返回排序后的列表，便于一致性
     return sorted(list(npz_paths))
+
 
 def get_checkpoint_path(
     log_path: str, run_dir: str = ".*", sort_alpha: bool = True
@@ -260,9 +269,13 @@ def get_checkpoint_path(
     runs = []  # 初始化一个空列表
     print(f"[INFO]: Searching for runs in: '{log_path}' matching regex: '{run_dir}'")
     for run in os.scandir(log_path):  # 遍历log_path目录下的所有条目
-        if run.is_dir() and re.match(run_dir, run.name):  # 检查是否为目录且名称匹配正则表达式
+        if run.is_dir() and re.match(
+            run_dir, run.name
+        ):  # 检查是否为目录且名称匹配正则表达式
             print(f"[INFO]: Found matching run: '{run.name}'")
-            runs.append(os.path.join(log_path, run))  # 如果条件满足，则将完整路径追加到列表中
+            runs.append(
+                os.path.join(log_path, run)
+            )  # 如果条件满足，则将完整路径追加到列表中
 
     # Sort matched runs by alphabetical order (latest run should be last) or by modification time
     if sort_alpha:
@@ -274,25 +287,35 @@ def get_checkpoint_path(
     try:
         run_path = runs[-1]
     except IndexError:
-        raise ValueError(f"No runs present in the directory: '{log_path}' match: '{run_dir}'.")
+        raise ValueError(
+            f"No runs present in the directory: '{log_path}' match: '{run_dir}'."
+        )
 
     # Collect all motion subdirectories under the run path (exclude non-dirs and special dirs like 'params')
     motion_subdirs = []
     for sub in os.scandir(run_path):
-        if sub.is_dir() and sub.name != "params":  # 假设 'params' 非 motion 目录，可根据需要调整过滤
+        if (
+            sub.is_dir() and sub.name != "params"
+        ):  # 假设 'params' 非 motion 目录，可根据需要调整过滤
             motion_subdirs.append(os.path.join(run_path, sub.name))
 
     if len(motion_subdirs) == 0:
-        raise ValueError(f"No motion subdirectories found in the run directory: '{run_path}'.")
+        raise ValueError(
+            f"No motion subdirectories found in the run directory: '{run_path}'."
+        )
 
     # For each motion subdirectory, find the latest checkpoint
     checkpoint_paths = []
     for subdir in motion_subdirs:
         # List all model checkpoints matching 'model_*.pt'
-        model_checkpoints = [f for f in os.listdir(subdir) if re.match(r"model_.*\.pt", f)]
+        model_checkpoints = [
+            f for f in os.listdir(subdir) if re.match(r"model_.*\.pt", f)
+        ]
         # Check if any checkpoints are present
         if len(model_checkpoints) == 0:
-            raise ValueError(f"No checkpoints in the subdirectory: '{subdir}' match 'model_*.pt'.")
+            raise ValueError(
+                f"No checkpoints in the subdirectory: '{subdir}' match 'model_*.pt'."
+            )
         # Sort alphabetically while ensuring that *_10 comes after *_9
         model_checkpoints.sort(key=lambda m: f"{m:0>15}")
         # Get latest matched checkpoint file
@@ -300,6 +323,8 @@ def get_checkpoint_path(
         checkpoint_paths.append(os.path.join(subdir, checkpoint_file))
 
     return checkpoint_paths
+
+
 @hydra_task_config(args_cli.task, args_cli.agent)
 def main(
     env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg,
@@ -383,7 +408,8 @@ def main(
     # save resume path before creating a new log_dir
     if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
         resume_path = get_checkpoint_path(
-            "/home/hpx/HPX_LOCO_2/mimic_baseline/logs/rsl_rl/pure_q1_flat", agent_cfg.load_run,
+            "/home/hpx/HPX_LOCO_2/mimic_baseline/logs/rsl_rl/pure_q1_flat",
+            agent_cfg.load_run,
         )
     print(f"[INFO]: Resuming training from checkpoint: {resume_path}")
     # wrap for video recording
@@ -413,15 +439,29 @@ def main(
         runner = DistillationRunner(
             env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device
         )
+    elif agent_cfg.class_name == "MultiTeacherDistillationRunner":
+        print("[INFO]: Creating MultiTeacherDistillationRunner")
+        motion_run_names = env.unwrapped.command_manager._terms[
+            "motion"
+        ].motion.run_names
+        runner = MultiTeacherDistillationRunner(
+            env,
+            agent_cfg.to_dict(),
+            log_dir=log_dir,
+            device=agent_cfg.device,
+            motion_run_names=motion_run_names,
+            teacher_names=resume_path,
+        )
     else:
         raise ValueError(f"Unsupported runner class: {agent_cfg.class_name}")
+    # runner.alg = runner._construct_algorithm(obs)
     # write git state to logs
     runner.add_git_repo_to_log(__file__)
     # load the checkpoint
     if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
         print(f"[INFO]: Loading model checkpoint from: {resume_path}")
         # load previously trained model
-        runner.load(resume_path,map_location=agent_cfg.device)
+        runner.load(resume_path, map_location=agent_cfg.device)
 
     # dump the configuration into log-directory
     dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)
