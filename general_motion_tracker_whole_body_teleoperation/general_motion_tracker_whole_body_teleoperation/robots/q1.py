@@ -29,14 +29,14 @@ ImplicitActuator_actuators = {
             ".*_knee_joint",
         ],
         effort_limit_sim={
-            ".*_hip_roll_joint": 60.0, # 保守稳定运行 40.0 峰值 90.0
-            ".*_hip_yaw_joint": 40.0,# 保守稳定运行 25.0 峰值 90.0
+            ".*_hip_roll_joint": 80.0, # 保守稳定运行 65.0 峰值 150.0
+            ".*_hip_yaw_joint": 60.0,# 保守稳定运行 40.0 峰值 125.0
             ".*_hip_pitch_joint": 160.0,# 保守稳定运行 130.0 峰值 330.0
             ".*_knee_joint": 160.0,# 保守稳定运行 130.0 峰值 330.0
         },
         velocity_limit_sim={
-            ".*_hip_roll_joint": 16.441001554,
-            ".*_hip_yaw_joint": 15.603243513,
+            ".*_hip_roll_joint": 14.660765717,
+            ".*_hip_yaw_joint": 12.566370614,
             ".*_hip_pitch_joint": 12.88052988,
             ".*_knee_joint": 12.88052988,
         },
@@ -48,7 +48,7 @@ ImplicitActuator_actuators = {
         },
         damping={
             ".*_hip_roll_joint": 2.5,
-            ".*_hip_yaw_joint": 1.5,
+            ".*_hip_yaw_joint": 6.0,
             ".*_hip_pitch_joint": 3.0,
             ".*_knee_joint": 3.0,
         },
@@ -60,7 +60,7 @@ ImplicitActuator_actuators = {
         },
     ),
     "feet": ImplicitActuatorCfg(
-        effort_limit_sim=36.0,# 保守稳定运行 12.0*2 峰值 36.0*2
+        effort_limit_sim=90.0,# 保守稳定运行 40.0*2 峰值 66.0*2
         velocity_limit_sim=9.320058206,
         joint_names_expr=[".*_ankle_pitch_joint", ".*_ankle_roll_joint"],
         stiffness=200.0,
@@ -72,7 +72,7 @@ ImplicitActuator_actuators = {
         velocity_limit_sim=8.58701992,
         joint_names_expr=["pelvis_joint"],
         stiffness=280,
-        damping=1.5,
+        damping=6.0,
         armature=213 * 1e-7 * (51 ^ 2),
     ),
     "heads": ImplicitActuatorCfg(
