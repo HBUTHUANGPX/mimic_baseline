@@ -27,13 +27,21 @@ import general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp as 
 # Scene definition
 ##
 
+# VELOCITY_RANGE = {
+#     "x": (-0.8, 0.8),
+#     "y": (-0.5, 0.5),
+#     "z": (-0.2, 0.2),
+#     "roll": (-0.52, 0.52),
+#     "pitch": (-0.52, 0.52),
+#     "yaw": (-0.78, 0.78),
+# }
 VELOCITY_RANGE = {
-    "x": (-0.8, 0.8),
-    "y": (-0.5, 0.5),
-    "z": (-0.2, 0.2),
-    "roll": (-0.52, 0.52),
-    "pitch": (-0.52, 0.52),
-    "yaw": (-0.78, 0.78),
+    "x": (-0.0, 0.0),
+    "y": (-0.0, 0.0),
+    "z": (-0.0, 0.0),
+    "roll": (-0.0, 0.0),
+    "pitch": (-0.0, 0.0),
+    "yaw": (-0.0, 0.0),
 }
 
 
@@ -91,18 +99,18 @@ class CommandsCfg:
         resampling_time_range=(1.0e9, 1.0e9),
         debug_vis=True,
         pose_range={
-            # "x": (-0.0, 0.0),
-            # "y": (-0.0, 0.0),
-            # "z": (-0.0, 0.0),
-            # "roll": (-0., 0.),
-            # "pitch": (-0., 0.),
-            # "yaw": (-0., 0.),
-            "x": (-0.1, 0.1),
-            "z": (-0.0, 0.2),
-            "y": (-0.1, 0.1),
-            "roll": (-0.1, 0.1),
-            "pitch": (-0.1, 0.1),
-            "yaw": (-0.2, 0.2),
+            "x": (-0.0, 0.0),
+            "y": (-0.0, 0.0),
+            "z": (-0.0, 0.0),
+            "roll": (-0., 0.),
+            "pitch": (-0., 0.),
+            "yaw": (-0., 0.),
+            # "x": (-0.1, 0.1),
+            # "z": (-0.0, 0.2),
+            # "y": (-0.1, 0.1),
+            # "roll": (-0.1, 0.1),
+            # "pitch": (-0.1, 0.1),
+            # "yaw": (-0.2, 0.2),
         },
         velocity_range=VELOCITY_RANGE,
         # joint_position_range=(-0., 0.),
@@ -210,6 +218,7 @@ class ObservationsCfg:
         joint_vel = ObsTerm(
             func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.55, n_max=0.55)
         )
+
         def __post_init__(self):
             self.enable_corruption = True
 
@@ -226,9 +235,35 @@ class ObservationsCfg:
         joint_vel = ObsTerm(
             func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.55, n_max=0.55)
         )
+
         def __post_init__(self):
             self.enable_corruption = True
             self.history_length = 24
+
+    @configclass
+    class ProprioceptionCfg(ObsGroup):  # 带噪声的本体感知观测组
+        """Observations for proprioception group with noise."""
+
+        base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
+        base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
+
+        def __post_init__(self):
+            self.enable_corruption = True
+
+    @configclass
+    class ProprioceptionWOPrivilegeCfg(ObsGroup):  # 带噪声的本体感知观测组
+        """Observations for proprioception group with noise."""
+
+        base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
+
+        def __post_init__(self):
+            self.enable_corruption = True
+            self.history_length = 24
+
     @configclass
     class CommandWithNoiseCfg(ObsGroup):  # 带噪声的指令观测组
         """Observations for command group with noise."""
@@ -257,6 +292,7 @@ class ObservationsCfg:
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.01, n_max=0.01),
         )
+
         def __post_init__(self):
             self.enable_corruption = True
 
@@ -273,6 +309,51 @@ class ObservationsCfg:
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.05, n_max=0.05),
         )
+
+        def __post_init__(self):
+            self.enable_corruption = True
+
+    @configclass
+    class CommandCfg(ObsGroup):  # 带噪声的指令观测组
+        """Observations for command group with noise."""
+
+        command = ObsTerm(
+            func=mdp.generated_commands,
+            params={"command_name": "motion"},
+        )
+        motion_ref_pos_b = ObsTerm(
+            func=mdp.motion_ref_pos_b,
+            params={"command_name": "motion"},
+        )
+        motion_ref_ori_b = ObsTerm(
+            func=mdp.motion_ref_ori_b,
+            params={"command_name": "motion"},
+        )
+        body_pos = ObsTerm(
+            func=mdp.robot_body_pos_b,
+            params={"command_name": "motion"},
+        )
+        body_ori = ObsTerm(
+            func=mdp.robot_body_ori_b,
+            params={"command_name": "motion"},
+        )
+
+        def __post_init__(self):
+            self.enable_corruption = True
+
+    @configclass
+    class CommandWOPrivilegeCfg(ObsGroup):  # 带噪声的指令观测组
+        """Observations for command group with noise."""
+
+        command = ObsTerm(
+            func=mdp.generated_commands,
+            params={"command_name": "motion"},
+        )
+        motion_ref_ori_b = ObsTerm(
+            func=mdp.motion_ref_ori_b,
+            params={"command_name": "motion"},
+        )
+
         def __post_init__(self):
             self.enable_corruption = True
 
@@ -293,16 +374,24 @@ class ObservationsCfg:
     # critic: PrivilegedCfg = PrivilegedCfg()
     # teacher: TeacherCfg = TeacherCfg()
 
-    proprioception_with_noise: ProprioceptionWithNoiseCfg = ProprioceptionWithNoiseCfg()
-    proprioception_with_noise_wo_privilege: ProprioceptionWithNoiseWOPrivilegeCfg = (
-        ProprioceptionWithNoiseWOPrivilegeCfg()
+    # proprioception_with_noise: ProprioceptionWithNoiseCfg = ProprioceptionWithNoiseCfg()
+    # proprioception_with_noise_wo_privilege: ProprioceptionWithNoiseWOPrivilegeCfg = (
+    #     ProprioceptionWithNoiseWOPrivilegeCfg()
+    # )
+    # command_with_noise: CommandWithNoiseCfg = CommandWithNoiseCfg()
+    # command_with_noise_wo_privilege: CommandWithNoiseWOPrivilegeCfg = (
+    #     CommandWithNoiseWOPrivilegeCfg()
+    # )
+
+    proprioception: ProprioceptionCfg = ProprioceptionCfg()
+    proprioception_wo_privilege: ProprioceptionWOPrivilegeCfg = (
+        ProprioceptionWOPrivilegeCfg()
     )
-    command_with_noise: CommandWithNoiseCfg = CommandWithNoiseCfg()
-    command_with_noise_wo_privilege: CommandWithNoiseWOPrivilegeCfg = (
-        CommandWithNoiseWOPrivilegeCfg()
-    )
+    command: CommandCfg = CommandCfg()
+    command_wo_privilege: CommandWOPrivilegeCfg = CommandWOPrivilegeCfg()
     last_action: LastActionCfg = LastActionCfg()
     motion_id: MotionIdCfg = MotionIdCfg()
+
 
 @configclass
 class EventCfg:
@@ -321,36 +410,36 @@ class EventCfg:
         },
     )
 
-    add_joint_default_pos = EventTerm(
-        func=mdp.randomize_joint_default_pos,
-        mode="startup",
-        params={
-            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*"]),
-            "pos_distribution_params": (-0.01, 0.01),
-            "operation": "add",
-        },
-    )
+    # add_joint_default_pos = EventTerm(
+    #     func=mdp.randomize_joint_default_pos,
+    #     mode="startup",
+    #     params={
+    #         "asset_cfg": SceneEntityCfg("robot", joint_names=[".*"]),
+    #         "pos_distribution_params": (-0.01, 0.01),
+    #         "operation": "add",
+    #     },
+    # )
 
-    base_com = EventTerm(
-        func=mdp.randomize_rigid_body_com,
-        mode="startup",
-        params={
-            "asset_cfg": SceneEntityCfg("robot", body_names="torso_link"),
-            "com_range": {
-                "x": (-0.025, 0.025),
-                "y": (-0.025, 0.025),
-                "z": (0.01, 0.05),
-            },
-        },
-    )
+    # base_com = EventTerm(
+    #     func=mdp.randomize_rigid_body_com,
+    #     mode="startup",
+    #     params={
+    #         "asset_cfg": SceneEntityCfg("robot", body_names="torso_link"),
+    #         "com_range": {
+    #             "x": (-0.025, 0.025),
+    #             "y": (-0.025, 0.025),
+    #             "z": (0.01, 0.05),
+    #         },
+    #     },
+    # )
 
     # interval
-    push_robot = EventTerm(
-        func=mdp.push_by_setting_velocity,
-        mode="interval",
-        interval_range_s=(1.0, 3.0),
-        params={"velocity_range": VELOCITY_RANGE},
-    )
+    # push_robot = EventTerm(
+    #     func=mdp.push_by_setting_velocity,
+    #     mode="interval",
+    #     interval_range_s=(1.0, 3.0),
+    #     params={"velocity_range": VELOCITY_RANGE},
+    # )
 
     # reset robot
     reset_robot = EventTerm(

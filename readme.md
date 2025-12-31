@@ -46,3 +46,5 @@ python scripts/csvs_to_npzs.py --input_folder lafan_Q1/lafan_bvh/ --output_folde
 
 
 python -m torch.distributed.run --nnodes=1 --nproc_per_node=8 scripts/rsl_rl/train.py  --task=Pure-Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Pure_Q1_slowly_walk
+
+python scripts/rsl_rl/train_multi_teacher_student.py  --task=Diss-Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Q1_LAFAN_walk_Diss  --load_run 2025_12_29_15_00_Pure_Q1

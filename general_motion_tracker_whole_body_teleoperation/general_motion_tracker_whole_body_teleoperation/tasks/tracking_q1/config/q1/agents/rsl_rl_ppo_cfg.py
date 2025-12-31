@@ -106,16 +106,31 @@ class RslRlDistillationStudentTeacher_CVAECfg(RslRlDistillationStudentTeacherCfg
 class Q1FlatDistillationStudentTeacherCfg(RslRlDistillationRunnerCfg):
     num_steps_per_env = 24
     max_iterations = 90001
+    # obs_groups = (
+    #     {
+    #         "policy": [
+    #             "command_with_noise_wo_privilege",
+    #             "proprioception_with_noise_wo_privilege",
+    #             "last_action",
+    #         ],  # 映射到环境提供的 'policy' 观测组，用于演员网络
+    #         "teacher": [
+    #             "command_with_noise",
+    #             "proprioception_with_noise",
+    #             "last_action",
+    #         ],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
+    #         "motion_id": ["motion_id"],  # 新增 motion_id 观测组
+    #     },
+    # )
     obs_groups = (
         {
             "policy": [
-                "command_with_noise_wo_privilege",
-                "proprioception_with_noise_wo_privilege",
+                "command_wo_privilege",
+                "proprioception_wo_privilege",
                 "last_action",
             ],  # 映射到环境提供的 'policy' 观测组，用于演员网络
             "teacher": [
-                "command_with_noise",
-                "proprioception_with_noise",
+                "command",
+                "proprioception",
                 "last_action",
             ],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
             "motion_id": ["motion_id"],  # 新增 motion_id 观测组
@@ -133,7 +148,7 @@ class Q1FlatDistillationStudentTeacherCfg(RslRlDistillationRunnerCfg):
         student_obs_normalization=True,
         teacher_obs_normalization=True,
         latent_dim=64,
-        beta_kl=0.001,
+        beta_kl=0.0001,
         normalize_mu=False,
         z_scale_factor=0.05,
     )
