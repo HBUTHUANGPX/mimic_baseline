@@ -4,11 +4,11 @@
     <compiler meshdir="../meshes" discardvisual="false" />
   </mujoco>
   <!-- [CAUTION] uncomment when convert to mujoco -->
-  <!-- <link name="world"></link>
+  <link name="world"></link>
   <joint name="floating_base_joint" type="floating">
     <parent link="world" />
     <child link="pelvis_link" />
-  </joint> -->
+  </joint>
 <!-- pelvis -->
   <link name="pelvis_link">
     <inertial>
@@ -19,7 +19,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/pelvis_link.STL" />
+        <mesh filename="package://Q1/meshes/pelvis_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -42,7 +42,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/L_hip_roll_link.STL" />
+        <mesh filename="package://Q1/meshes/L_hip_roll_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -71,7 +71,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/L_hip_yaw_link.STL" />
+        <mesh filename="package://Q1/meshes/L_hip_yaw_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -100,7 +100,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/L_hip_pitch_link.STL" />
+        <mesh filename="package://Q1/meshes/L_hip_pitch_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -129,7 +129,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/L_knee_link.STL" />
+        <mesh filename="package://Q1/meshes/L_knee_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -170,7 +170,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/L_ankle_pitch_link.STL" />
+        <mesh filename="package://Q1/meshes/L_ankle_pitch_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.64706 0.61961 0.58824 1" />
@@ -180,7 +180,7 @@
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
         <cylinder radius="0.001" length="0.001"/>
-        <!-- <mesh filename="meshes/L_ankle_pitch_link.STL" /> -->
+        <!-- <mesh filename="package://Q1/meshes/L_ankle_pitch_link.STL" /> -->
       </geometry>
     </collision>
   </link>
@@ -200,7 +200,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/L_ankle_roll_link.STL" />
+        <mesh filename="package://Q1/meshes/L_ankle_roll_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -285,7 +285,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/R_hip_roll_link.STL" />
+        <mesh filename="package://Q1/meshes/R_hip_roll_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -314,7 +314,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/R_hip_yaw_link.STL" />
+        <mesh filename="package://Q1/meshes/R_hip_yaw_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -343,7 +343,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/R_hip_pitch_link.STL" />
+        <mesh filename="package://Q1/meshes/R_hip_pitch_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -372,7 +372,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/R_knee_link.STL" />
+        <mesh filename="package://Q1/meshes/R_knee_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -413,7 +413,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/R_ankle_pitch_link.STL" />
+        <mesh filename="package://Q1/meshes/R_ankle_pitch_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -442,7 +442,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/R_ankle_roll_link.STL" />
+        <mesh filename="package://Q1/meshes/R_ankle_roll_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -527,7 +527,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/torso_link.STL" />
+        <mesh filename="package://Q1/meshes/torso_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -557,7 +557,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/L_shoulder_pitch_link.STL" />
+        <mesh filename="package://Q1/meshes/L_shoulder_pitch_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -586,7 +586,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/L_shoulder_roll_link.STL" />
+        <mesh filename="package://Q1/meshes/L_shoulder_roll_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -615,7 +615,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 1.570796327" />
       <geometry>
-        <mesh filename="meshes/L_shoulder_yaw_link.STL" />
+        <mesh filename="package://Q1/meshes/L_shoulder_yaw_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -644,7 +644,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 1.570796327" />
       <geometry>
-        <mesh filename="meshes/L_elbow_link.STL" />
+        <mesh filename="package://Q1/meshes/L_elbow_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -673,7 +673,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/L_forearm_yaw_link.STL" />
+        <mesh filename="package://Q1/meshes/L_forearm_yaw_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -702,7 +702,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/L_wrist_roll_link.STL" />
+        <mesh filename="package://Q1/meshes/L_wrist_roll_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -731,7 +731,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/L_wrist_pitch_link.STL" />
+        <mesh filename="package://Q1/meshes/L_wrist_pitch_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -761,7 +761,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/R_shoulder_pitch_link.STL" />
+        <mesh filename="package://Q1/meshes/R_shoulder_pitch_link.STL" />
       </geometry>
       <material name="">
         <color rgba="1 1 1 1" />
@@ -790,7 +790,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/R_shoulder_roll_link.STL" />
+        <mesh filename="package://Q1/meshes/R_shoulder_roll_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -819,7 +819,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 -1.570796327" />
       <geometry>
-        <mesh filename="meshes/R_shoulder_yaw_link.STL" />
+        <mesh filename="package://Q1/meshes/R_shoulder_yaw_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -848,7 +848,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 -1.570796327" />
       <geometry>
-        <mesh filename="meshes/R_elbow_link.STL" />
+        <mesh filename="package://Q1/meshes/R_elbow_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -877,7 +877,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/R_forearm_yaw_link.STL" />
+        <mesh filename="package://Q1/meshes/R_forearm_yaw_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -906,7 +906,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/R_wrist_roll_link.STL" />
+        <mesh filename="package://Q1/meshes/R_wrist_roll_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -935,7 +935,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/R_wrist_pitch_link.STL" />
+        <mesh filename="package://Q1/meshes/R_wrist_pitch_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -965,7 +965,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/head_yaw_link.STL" />
+        <mesh filename="package://Q1/meshes/head_yaw_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
@@ -994,7 +994,7 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/head_pitch_link.STL" />
+        <mesh filename="package://Q1/meshes/head_pitch_link.STL" />
       </geometry>
       <material name="">
         <color rgba="0.79216 0.81961 0.93333 1" />
