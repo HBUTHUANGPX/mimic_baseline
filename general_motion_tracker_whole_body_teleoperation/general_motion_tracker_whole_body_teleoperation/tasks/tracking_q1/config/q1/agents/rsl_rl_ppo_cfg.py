@@ -160,6 +160,6 @@ class Q1FlatDistillationStudentTeacherCfg(RslRlDistillationRunnerCfg):
         learning_rate=1.0e-3,
         gradient_length=15,
         num_learning_epochs=5,
-        class_name="Distillation",
+        class_name="MultiTeacherDistillation",
         max_grad_norm=1.0,
     )
