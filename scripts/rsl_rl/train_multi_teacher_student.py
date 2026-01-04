@@ -458,7 +458,7 @@ def main(
     # write git state to logs
     runner.add_git_repo_to_log(__file__)
     # load the checkpoint
-    if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
+    if agent_cfg.resume or agent_cfg.algorithm.class_name == "MultiTeacherDistillation":
         print(f"[INFO]: Loading model checkpoint from: {resume_path}")
         # load previously trained model
         runner.load(resume_path, map_location=agent_cfg.device)
