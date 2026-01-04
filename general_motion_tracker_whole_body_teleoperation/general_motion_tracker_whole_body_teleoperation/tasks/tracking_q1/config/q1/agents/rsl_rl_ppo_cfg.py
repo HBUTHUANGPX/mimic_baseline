@@ -48,7 +48,7 @@ class Q1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
 @configclass  # 有特权信息的训练
 class PureQ1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
-    max_iterations = 5001
+    max_iterations = 10001
     # max_iterations = 3001
     # obs_groups ={
     #     "policy": ["policy"],  # 映射到环境提供的 'policy' 观测组，用于演员网络
@@ -101,6 +101,8 @@ class RslRlDistillationStudentTeacher_CVAECfg(RslRlDistillationStudentTeacherCfg
     class_name: str = "StudentTeacher_CVAE"         # 新类名（将在 modules 中定义）
     normalize_mu=True,  # 新参数：启用对 mu 的 EmpiricalNormalization
     z_scale_factor: float = 1.0,  # z 的缩放因子
+    prior_hidden_dims: tuple[int] | list[int] = [256, 256, 256],
+    encoder_hidden_dims: tuple[int] | list[int] = [256, 256, 256],
 
 @configclass  # 对有特权信息训练的教师网络进行蒸馏
 class Q1FlatDistillationStudentTeacherCfg(RslRlDistillationRunnerCfg):
@@ -143,7 +145,7 @@ class Q1FlatDistillationStudentTeacherCfg(RslRlDistillationRunnerCfg):
         class_name="StudentTeacher_CVAE",
         init_noise_std=0.8,
         teacher_hidden_dims=[512, 256, 128],
-        student_hidden_dims=[512, 256, 128],
+        student_hidden_dims=[1024, 512, 256, 128],
         activation="elu",
         student_obs_normalization=True,
         teacher_obs_normalization=True,
@@ -151,6 +153,8 @@ class Q1FlatDistillationStudentTeacherCfg(RslRlDistillationRunnerCfg):
         beta_kl=0.0001,
         normalize_mu=False,
         z_scale_factor=0.05,
+        prior_hidden_dims = [1024, 512, 128],
+        encoder_hidden_dims = [512, 256, 128],
     )
     algorithm = RslRlDistillationAlgorithmCfg(
         learning_rate=1.0e-3,
