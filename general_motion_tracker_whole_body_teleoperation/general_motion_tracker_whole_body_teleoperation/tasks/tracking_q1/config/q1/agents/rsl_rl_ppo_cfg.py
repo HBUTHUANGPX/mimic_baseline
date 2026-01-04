@@ -138,7 +138,7 @@ class Q1FlatDistillationStudentTeacherCfg(RslRlDistillationRunnerCfg):
             "motion_id": ["motion_id"],  # 新增 motion_id 观测组
         },
     )
-    save_interval = 1500
+    save_interval = 500
     experiment_name = "q1_flat_distillation"
     class_name: str = "MultiTeacherDistillationRunner"
     policy = RslRlDistillationStudentTeacher_CVAECfg(
