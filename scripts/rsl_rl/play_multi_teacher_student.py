@@ -352,7 +352,7 @@ def main(
         # run everything in inference mode
         with torch.inference_mode():
             # agent stepping
-            actions = policy(obs,only_action=True)
+            actions = policy(obs)
             # env stepping
             obs, _, dones, _ = env.step(actions)
             # reset recurrent states for episodes that have terminated
