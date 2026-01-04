@@ -1,0 +1,379 @@
+# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
+# All rights reserved.
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+"""Script to play a checkpoint if an RL agent from RSL-RL."""
+
+"""Launch Isaac Sim Simulator first."""
+
+import argparse
+import sys
+
+from isaaclab.app import AppLauncher
+
+# local imports
+import cli_args  # isort: skip
+
+# add argparse arguments
+parser = argparse.ArgumentParser(description="Train an RL agent with RSL-RL.")
+parser.add_argument(
+    "--video", action="store_true", default=False, help="Record videos during training."
+)
+parser.add_argument(
+    "--video_length",
+    type=int,
+    default=200,
+    help="Length of the recorded video (in steps).",
+)
+parser.add_argument(
+    "--disable_fabric",
+    action="store_true",
+    default=False,
+    help="Disable fabric and use USD I/O operations.",
+)
+parser.add_argument(
+    "--num_envs", type=int, default=None, help="Number of environments to simulate."
+)
+parser.add_argument("--task", type=str, default=None, help="Name of the task.")
+parser.add_argument(
+    "--agent",
+    type=str,
+    default="rsl_rl_cfg_entry_point",
+    help="Name of the RL agent configuration entry point.",
+)
+parser.add_argument(
+    "--seed", type=int, default=None, help="Seed used for the environment"
+)
+parser.add_argument(
+    "--use_pretrained_checkpoint",
+    action="store_true",
+    help="Use the pre-trained checkpoint from Nucleus.",
+)
+parser.add_argument(
+    "--real-time",
+    action="store_true",
+    default=False,
+    help="Run in real-time, if possible.",
+)
+parser.add_argument(
+    "--motion_file_path",
+    type=str,
+    default="scripts/rsl_rl/motion_file.yaml",
+    help="The name of the motion yaml file_path.",
+)
+parser.add_argument(
+    "--domain_randomization",
+    action="store_true",
+    default=False,
+    help="Enable domain randomization during evaluation.",
+)
+parser.add_argument(
+    "--other_dirs",
+    type=str,
+    default=None,
+    help="Comma-separated list of other directories to include.",
+)
+# append RSL-RL cli arguments
+cli_args.add_rsl_rl_args(parser)
+# append AppLauncher cli args
+AppLauncher.add_app_launcher_args(parser)
+# parse the arguments
+args = parser.parse_args()
+args_cli, hydra_args = parser.parse_known_args()
+# always enable cameras to record video
+if args_cli.video:
+    args_cli.enable_cameras = True
+
+# clear out sys.argv for Hydra
+sys.argv = [sys.argv[0]] + hydra_args
+
+# launch omniverse app
+app_launcher = AppLauncher(args_cli)
+simulation_app = app_launcher.app
+
+"""Rest everything follows."""
+
+import gymnasium as gym
+import os
+import time
+import torch
+import glob
+from typing import List
+
+from rsl_rl.runners import DistillationRunner, OnPolicyRunner, MultiTeacherDistillationRunner
+
+from isaaclab.envs import (
+    DirectMARLEnv,
+    DirectMARLEnvCfg,
+    DirectRLEnvCfg,
+    ManagerBasedRLEnvCfg,
+    multi_agent_to_single_agent,
+)
+from isaaclab.utils.assets import retrieve_file_path
+from isaaclab.utils.dict import print_dict
+from isaaclab.utils.pretrained_checkpoint import get_published_pretrained_checkpoint
+
+from isaaclab_rl.rsl_rl import (
+    RslRlBaseRunnerCfg,
+    RslRlVecEnvWrapper,
+    export_policy_as_jit,
+    export_policy_as_onnx,
+)
+
+import isaaclab_tasks  # noqa: F401
+from isaaclab_tasks.utils import get_checkpoint_path
+from isaaclab_tasks.utils.hydra import hydra_task_config
+import general_motion_tracker_whole_body_teleoperation.tasks  # noqa: F401
+from general_motion_tracker_whole_body_teleoperation.utils.exporter import (
+    attach_onnx_metadata,
+    export_motion_policy_as_onnx,
+)
+
+# PLACEHOLDER: Extension template (do not remove this comment)
+
+import yaml  # 导入PyYAML库
+
+
+def read_yaml_file(file_path):
+    try:
+        with open(file_path, "r", encoding="utf-8") as file:
+            data = yaml.safe_load(file)
+        return data
+    except FileNotFoundError:
+        print(f"文件 {file_path} 不存在。")
+        return None
+    except yaml.YAMLError as exc:
+        print(f"YAML解析错误: {exc}")
+        return None
+
+def collect_npz_paths(yaml_path: str = "motion_file.yaml") -> List[str]:
+    """
+    从指定的YAML文件中读取配置，收集NPZ文件路径列表。
+    - 先添加file_name中指定的NPZ文件路径。
+    - 然后添加folder_name中每个文件夹下的所有NPZ文件路径，但避免与file_name中文件名的重复（基于文件名）。
+    - 最后剔除wo_file_name中指定的文件路径和wo_folder_name中文件夹下的所有NPZ文件路径。
+    
+    :param yaml_path: YAML文件的路径，默认为"motion_file.yaml"。
+    :return: 收集后的NPZ文件路径列表。
+    """
+    data = read_yaml_file(yaml_path)
+    if data is None:
+        return []
+
+    # 提取配置
+    file_names = data.get('file_name', [])
+    folder_names = data.get('folder_name', [])
+    wo_file_names = data.get('wo_file_name', [])
+    wo_folder_names = data.get('wo_folder_name', [])  # 假设为wo_folder_name，修正可能的拼写错误
+
+    # 使用集合存储路径，以避免重复
+    npz_paths = set()
+    existing_basenames = set()
+
+    # 第一步：添加file_name中的NPZ文件路径，并记录其basename
+    for path in file_names:
+        if path.endswith('.npz') and os.path.exists(path):
+            npz_paths.add(path)
+            existing_basenames.add(os.path.basename(path))
+
+    # 第二步：添加folder_name中每个文件夹下的NPZ文件路径，避免与现有basename重复
+    for folder in folder_names:
+        if os.path.isdir(folder):
+            for npz_file in glob.glob(os.path.join(folder, '*.npz')):
+                basename = os.path.basename(npz_file)
+                if basename not in existing_basenames:
+                    npz_paths.add(npz_file)
+                    existing_basenames.add(basename)  # 更新basename集合，避免后续重复
+
+    # 第三步：剔除wo_file_name中的指定文件路径
+    for wo_path in wo_file_names:
+        npz_paths.discard(wo_path)
+
+    # 第四步：剔除wo_folder_name中每个文件夹下的所有NPZ文件路径
+    for wo_folder in wo_folder_names:
+        if os.path.isdir(wo_folder):
+            for npz_file in glob.glob(os.path.join(wo_folder, '*.npz')):
+                npz_paths.discard(npz_file)
+
+    # 返回排序后的列表，便于一致性
+    return sorted(list(npz_paths))
+
+@hydra_task_config(args_cli.task, args_cli.agent)
+def main(
+    env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg,
+    agent_cfg: RslRlBaseRunnerCfg,
+):
+    """Play with RSL-RL agent."""
+    # grab task name for checkpoint path
+    task_name = args_cli.task.split(":")[-1]
+    train_task_name = task_name.replace("-Play", "")
+    retain_events = ['reset_robot']  # 指定要保留的事件名称列表
+    if args_cli.domain_randomization:
+        # 获取所有事件参数，并剔除非保留项
+        for event_name in dir(env_cfg.events):
+            print(f"[INFO] Checking event: {event_name}")
+            if not event_name.startswith('_') and event_name not in retain_events:
+                setattr(env_cfg.events, event_name, None)
+    # override configurations with non-hydra CLI arguments
+    agent_cfg: RslRlBaseRunnerCfg = cli_args.update_rsl_rl_cfg(agent_cfg, args_cli)
+    env_cfg.scene.num_envs = (
+        args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
+    )
+
+    # set the environment seed
+    # note: certain randomizations occur in the environment initialization so we set the seed here
+    env_cfg.seed = agent_cfg.seed
+    env_cfg.sim.device = (
+        args_cli.device if args_cli.device is not None else env_cfg.sim.device
+    )
+
+    # specify directory for logging experiments
+    log_root_path = os.path.join("logs", "rsl_rl", agent_cfg.experiment_name)
+    log_root_path = os.path.abspath(log_root_path)
+    print(f"[INFO] Loading experiment from directory: {log_root_path}")
+    if args_cli.use_pretrained_checkpoint:
+        resume_path = get_published_pretrained_checkpoint("rsl_rl", train_task_name)
+        if not resume_path:
+            print(
+                "[INFO] Unfortunately a pre-trained checkpoint is currently unavailable for this task."
+            )
+            return
+    elif args_cli.checkpoint:
+        resume_path = retrieve_file_path(args_cli.checkpoint)
+    else:
+        if args.other_dirs is not None:
+            resume_path = get_checkpoint_path(
+                log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint, other_dirs=[args_cli.other_dirs]
+            )   
+        else:
+            resume_path = get_checkpoint_path(
+                log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint
+            )
+        print(f"[INFO] Resuming from checkpoint: {resume_path}")
+
+    log_dir = os.path.dirname(resume_path)
+
+    # set the log directory for the environment (works for all environment types)
+    env_cfg.log_dir = log_dir
+    motion_file = collect_npz_paths(args_cli.motion_file_path)
+    print(f"[INFO] Collected {len(motion_file)} motion files for play.")
+    env_cfg.commands.motion.motion_file = motion_file
+    # create isaac environment
+    env = gym.make(
+        args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None
+    )
+
+    # convert to single-agent instance if required by the RL algorithm
+    if isinstance(env.unwrapped, DirectMARLEnv):
+        env = multi_agent_to_single_agent(env)
+
+    # wrap for video recording
+    if args_cli.video:
+        video_kwargs = {
+            "video_folder": os.path.join(log_dir, "videos", "play"),
+            "step_trigger": lambda step: step == 0,
+            "video_length": args_cli.video_length,
+            "disable_logger": True,
+        }
+        print("[INFO] Recording videos during training.")
+        print_dict(video_kwargs, nesting=4)
+        env = gym.wrappers.RecordVideo(env, **video_kwargs)
+
+    # wrap around environment for rsl-rl
+    env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
+
+    print(f"[INFO]: Loading model checkpoint from: {resume_path}")
+    # load previously trained model
+    if agent_cfg.class_name == "OnPolicyRunner":
+        runner = OnPolicyRunner(
+            env, agent_cfg.to_dict(), log_dir=None, device=agent_cfg.device
+        )
+    elif agent_cfg.class_name == "DistillationRunner":
+        runner = DistillationRunner(
+            env, agent_cfg.to_dict(), log_dir=None, device=agent_cfg.device
+        )
+    elif agent_cfg.class_name == "MultiTeacherDistillationRunner":
+        print("[INFO]: Creating MultiTeacherDistillationRunner")
+        motion_run_names = env.unwrapped.command_manager._terms[
+            "motion"
+        ].motion.run_names
+        runner = MultiTeacherDistillationRunner(
+            env,
+            agent_cfg.to_dict(),
+            log_dir=log_dir,
+            device=agent_cfg.device,
+            motion_run_names=motion_run_names,
+            teacher_names=resume_path,
+        )
+    else:
+        raise ValueError(f"Unsupported runner class: {agent_cfg.class_name}")
+    runner.load(resume_path, is_eval=True)
+
+    # obtain the trained policy for inference
+    policy = runner.get_inference_policy(device=env.unwrapped.device)
+
+    # extract the neural network module
+    # we do this in a try-except to maintain backwards compatibility.
+    try:
+        # version 2.3 onwards
+        policy_nn = runner.alg.policy
+    except AttributeError:
+        # version 2.2 and below
+        policy_nn = runner.alg.actor_critic
+
+    # extract the normalizer
+    if hasattr(policy_nn, "actor_obs_normalizer"):
+        normalizer = policy_nn.actor_obs_normalizer
+    elif hasattr(policy_nn, "student_obs_normalizer"):
+        normalizer = policy_nn.student_obs_normalizer
+    else:
+        normalizer = None
+
+    # export policy to onnx/jit
+    export_model_dir = os.path.join(os.path.dirname(resume_path), "exported")
+
+    # export_motion_policy_as_onnx(
+    #     env.unwrapped,
+    #     policy_nn,
+    #     normalizer=normalizer,
+    #     path=export_model_dir,
+    #     filename="policy.onnx",
+    # )
+    
+    dt = env.unwrapped.step_dt
+
+    # reset environment
+    obs = env.get_observations()
+    timestep = 0
+    # simulate environment
+    while simulation_app.is_running():
+        start_time = time.time()
+        # run everything in inference mode
+        with torch.inference_mode():
+            # agent stepping
+            actions = policy(obs,only_action=True)
+            # env stepping
+            obs, _, dones, _ = env.step(actions)
+            # reset recurrent states for episodes that have terminated
+            policy_nn.reset(dones)
+        if args_cli.video:
+            timestep += 1
+            # Exit the play loop after recording one video
+            if timestep == args_cli.video_length:
+                break
+
+        # time delay for real-time evaluation
+        sleep_time = dt - (time.time() - start_time)
+        if args_cli.real_time and sleep_time > 0:
+            time.sleep(sleep_time)
+
+    # close the simulator
+    env.close()
+
+
+if __name__ == "__main__":
+    # run the main function
+    main()
+    # close sim app
+    simulation_app.close()
