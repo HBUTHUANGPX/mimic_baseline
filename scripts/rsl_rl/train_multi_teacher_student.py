@@ -406,7 +406,7 @@ def main(
         env = multi_agent_to_single_agent(env)
 
     # save resume path before creating a new log_dir
-    if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
+    if agent_cfg.resume or agent_cfg.algorithm.class_name == "MultiTeacherDistillation":
         resume_path = get_checkpoint_path(
             "/home/hpx/HPX_LOCO_2/mimic_baseline/logs/rsl_rl/pure_q1_flat",
             agent_cfg.load_run,
