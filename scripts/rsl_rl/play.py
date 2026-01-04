@@ -62,11 +62,24 @@ parser.add_argument(
     default="scripts/rsl_rl/motion_file.yaml",
     help="The name of the motion yaml file_path.",
 )
+parser.add_argument(
+    "--domain_randomization",
+    action="store_true",
+    default=False,
+    help="Enable domain randomization during evaluation.",
+)
+parser.add_argument(
+    "--other_dirs",
+    type=str,
+    default=None,
+    help="Comma-separated list of other directories to include.",
+)
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 # parse the arguments
+args = parser.parse_args()
 args_cli, hydra_args = parser.parse_known_args()
 # always enable cameras to record video
 if args_cli.video:
@@ -195,7 +208,13 @@ def main(
     # grab task name for checkpoint path
     task_name = args_cli.task.split(":")[-1]
     train_task_name = task_name.replace("-Play", "")
-
+    retain_events = ['reset_robot']  # 指定要保留的事件名称列表
+    if args_cli.domain_randomization:
+        # 获取所有事件参数，并剔除非保留项
+        for event_name in dir(env_cfg.events):
+            print(f"[INFO] Checking event: {event_name}")
+            if not event_name.startswith('_') and event_name not in retain_events:
+                setattr(env_cfg.events, event_name, None)
     # override configurations with non-hydra CLI arguments
     agent_cfg: RslRlBaseRunnerCfg = cli_args.update_rsl_rl_cfg(agent_cfg, args_cli)
     env_cfg.scene.num_envs = (
@@ -223,9 +242,15 @@ def main(
     elif args_cli.checkpoint:
         resume_path = retrieve_file_path(args_cli.checkpoint)
     else:
-        resume_path = get_checkpoint_path(
-            log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint
-        )
+        if args.other_dirs is not None:
+            resume_path = get_checkpoint_path(
+                log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint, other_dirs=[args_cli.other_dirs]
+            )   
+        else:
+            resume_path = get_checkpoint_path(
+                log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint
+            )
+        print(f"[INFO] Resuming from checkpoint: {resume_path}")
 
     log_dir = os.path.dirname(resume_path)
 
