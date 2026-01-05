@@ -368,6 +368,12 @@ class ObservationsCfg:
         """Observations for last action group."""
 
         motion_id = ObsTerm(func=mdp.motion_id, params={"command_name": "motion"})
+    
+    @configclass
+    class MotionGroupCfg(ObsGroup):  # 不带噪声的上一个动作观测组
+        """Observations for last action group."""
+
+        motion_group = ObsTerm(func=mdp.motion_group, params={"command_name": "motion"})
 
     # # observation groups
     # policy: PolicyCfg = PolicyCfg()
@@ -391,6 +397,7 @@ class ObservationsCfg:
     command_wo_privilege: CommandWOPrivilegeCfg = CommandWOPrivilegeCfg()
     last_action: LastActionCfg = LastActionCfg()
     motion_id: MotionIdCfg = MotionIdCfg()
+    motion_group: MotionGroupCfg = MotionGroupCfg()
 
 
 @configclass

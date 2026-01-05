@@ -6,7 +6,7 @@ import torch
 from collections.abc import Sequence
 from dataclasses import MISSING
 from typing import TYPE_CHECKING
-
+from typing import Dict, List
 from isaaclab.assets import Articulation
 from isaaclab.managers import CommandTerm, CommandTermCfg
 from isaaclab.markers import VisualizationMarkers, VisualizationMarkersCfg
@@ -53,26 +53,14 @@ def get_run_name(mf: str) -> str | None:
 class MotionLoader:
     def __init__(
         self,
-        motion_file: str | Sequence[str],
+        motion_file_group: Dict[str, List[str]],
         body_indexes: Sequence[int],
         device: str = "cpu",
     ):
-        # 支持单个字符串或列表，统一转换为列表
-        if isinstance(motion_file, str):
-            self.motion_file = [motion_file]
-            print(f"[INFO] load motion file: {motion_file}")
-        else:
-            self.motion_file = motion_file
-            print(f"[INFO] load motion file: {motion_file}")
-        for file in self.motion_file:
-            assert os.path.isfile(file), f"Invalid file path: {file}"
-        self.extracted_list = [
-            extract_part(p) for p in self.motion_file if extract_part(p) is not None
-        ]
-        self.run_names = [get_run_name(p) for p in self.motion_file]
-        print(f"[INFO] run names: {self.run_names}")
-        self.num_motions = len(self.motion_file)
-        assert self.num_motions > 0, "At least one motion file is required."
+        self.group_names = []
+        self.extracted_list = []
+        self.num_motions = 0
+        motion_file_group_index = 0
 
         # Load and concatenate data from all files
         joint_pos_list = []
@@ -82,40 +70,63 @@ class MotionLoader:
         body_lin_vel_w_list = []
         body_ang_vel_w_list = []
         motion_id_list = []
+        motion_group_list = []
         self.motion_lengths = []  # Length of each motion segment
         self.fps = None  # Assume all files have the same fps
 
-        # for _file in self.motion_file:
-        for i , _file in enumerate(self.motion_file):
-            data = np.load(_file)
-            if self.fps is None:
-                self.fps = data["fps"]
-            else:
-                assert (
-                    self.fps == data["fps"]
-                ), "All motion files must have the same fps."
+        for group_name, paths in motion_file_group.items():
+            print(f"\nGroup: {group_name}")
+            print(f"[INFO] Loading {len(paths)} motion files for training.")
 
-            joint_pos_list.append(
-                torch.tensor(data["joint_pos"], dtype=torch.float32, device=device)
-            )
-            joint_vel_list.append(
-                torch.tensor(data["joint_vel"], dtype=torch.float32, device=device)
-            )
-            body_pos_w_list.append(
-                torch.tensor(data["body_pos_w"], dtype=torch.float32, device=device)
-            )
-            body_quat_w_list.append(
-                torch.tensor(data["body_quat_w"], dtype=torch.float32, device=device)
-            )
-            body_lin_vel_w_list.append(
-                torch.tensor(data["body_lin_vel_w"], dtype=torch.float32, device=device)
-            )
-            body_ang_vel_w_list.append(
-                torch.tensor(data["body_ang_vel_w"], dtype=torch.float32, device=device)
-            )
-            motion_id_list.append(torch.tensor(i, dtype=torch.float32, device=device) * torch.ones(data["joint_pos"].shape[0],1, dtype=torch.float32, device=device))
-            self.motion_lengths.append(data["joint_pos"].shape[0])
+            # 支持单个字符串或列表，统一转换为列表
+            if isinstance(paths, str):
+                paths = [paths]
+            print(f"[INFO] load motion file: {paths}")
+            for file in paths:
+                assert os.path.isfile(file), f"Invalid file path: {file}"
+            extracted_list = [
+                extract_part(p) for p in paths if extract_part(p) is not None
+            ]
+            num_motions = len(extracted_list)
+            assert num_motions > 0, "At least one motion file is required."
 
+            
+            # for _file in self.motion_file:
+            for i , _file in enumerate(paths):
+                data = np.load(_file)
+                if self.fps is None:
+                    self.fps = data["fps"]
+                else:
+                    assert (
+                        self.fps == data["fps"]
+                    ), "All motion files must have the same fps."
+
+                joint_pos_list.append(
+                    torch.tensor(data["joint_pos"], dtype=torch.float32, device=device)
+                )
+                joint_vel_list.append(
+                    torch.tensor(data["joint_vel"], dtype=torch.float32, device=device)
+                )
+                body_pos_w_list.append(
+                    torch.tensor(data["body_pos_w"], dtype=torch.float32, device=device)
+                )
+                body_quat_w_list.append(
+                    torch.tensor(data["body_quat_w"], dtype=torch.float32, device=device)
+                )
+                body_lin_vel_w_list.append(
+                    torch.tensor(data["body_lin_vel_w"], dtype=torch.float32, device=device)
+                )
+                body_ang_vel_w_list.append(
+                    torch.tensor(data["body_ang_vel_w"], dtype=torch.float32, device=device)
+                )
+                motion_group_list.append(torch.tensor(motion_file_group_index, dtype=torch.float32, device=device) * torch.ones(data["joint_pos"].shape[0], 1, dtype=torch.float32, device=device))
+                motion_id_list.append(torch.tensor(self.num_motions + i, dtype=torch.float32, device=device) * torch.ones(data["joint_pos"].shape[0],1, dtype=torch.float32, device=device))
+                self.motion_lengths.append(data["joint_pos"].shape[0])
+            motion_file_group_index += 1
+            self.extracted_list.extend(extracted_list)
+            print(self.extracted_list)
+            self.num_motions += num_motions
+            self.group_names.append(group_name)
         # Concatenate along time dimension (dim=0)
         self.joint_pos = torch.cat(joint_pos_list, dim=0)
         self.joint_vel = torch.cat(joint_vel_list, dim=0)
@@ -124,6 +135,7 @@ class MotionLoader:
         self._body_lin_vel_w = torch.cat(body_lin_vel_w_list, dim=0)
         self._body_ang_vel_w = torch.cat(body_ang_vel_w_list, dim=0)
         self._motion_id = torch.cat(motion_id_list, dim=0)
+        self._motion_group = torch.cat(motion_group_list, dim=0)
 
         self._body_indexes = body_indexes
         self.time_step_total = self.joint_pos.shape[0]
@@ -202,7 +214,7 @@ class MotionCommand(CommandTerm):
         )
         self.load_motion(self.cfg.motion_file)
         
-    def load_motion(self, motion_file: str | Sequence[str]):
+    def load_motion(self, motion_file: Dict[str, List[str]]):
         self.motion = MotionLoader(
             motion_file, self.body_indexes, device=self.device
         )
@@ -238,6 +250,10 @@ class MotionCommand(CommandTerm):
     @property
     def motion_id(self) -> torch.Tensor:
         return self.motion._motion_id[self.time_steps]
+
+    @property
+    def motion_group(self) -> torch.Tensor:
+        return self.motion._motion_group[self.time_steps]
 
     @property
     def command(
