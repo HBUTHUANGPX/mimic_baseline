@@ -105,7 +105,7 @@ class RslRlDistillationStudentTeacher_CVAECfg(RslRlDistillationStudentTeacherCfg
     encoder_hidden_dims: tuple[int] | list[int] = [256, 256, 256],
 
 @configclass  # 对有特权信息训练的教师网络进行蒸馏
-class Q1FlatDistillationStudentTeacherCfg(RslRlDistillationRunnerCfg):
+class Q1FlatCVAEDistillationStudentMultiTeacherCfg(RslRlDistillationRunnerCfg):
     num_steps_per_env = 24
     max_iterations = 90001
     # obs_groups = (
@@ -161,5 +161,83 @@ class Q1FlatDistillationStudentTeacherCfg(RslRlDistillationRunnerCfg):
         gradient_length=15,
         num_learning_epochs=5,
         class_name="MultiTeacherDistillation",
+        max_grad_norm=1.0,
+    )
+
+@configclass  # 对有特权信息训练的教师网络进行蒸馏
+class Q1FlatDistillationStudentMultiTeacherCfg(RslRlDistillationRunnerCfg):
+    num_steps_per_env = 24
+    max_iterations = 90001
+    obs_groups = (
+        {
+            "policy": [
+                "command_wo_privilege",
+                "proprioception_wo_privilege",
+                "last_action",
+            ],  # 映射到环境提供的 'policy' 观测组，用于演员网络
+            "teacher": [
+                "command",
+                "proprioception",
+                "last_action",
+            ],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
+            "motion_id": ["motion_id"],  # 新增 motion_id 观测组
+        },
+    )
+    save_interval = 500
+    experiment_name = "q1_flat_distillation"
+    class_name: str = "MultiTeacherDistillationRunner"
+    policy = RslRlDistillationStudentTeacherCfg(
+        class_name="StudentMultiTeacher",
+        init_noise_std=0.8,
+        teacher_hidden_dims=[512, 256, 128],
+        student_hidden_dims=[512, 256, 128],
+        activation="elu",
+        student_obs_normalization=True,
+        teacher_obs_normalization=True,
+    )
+    algorithm = RslRlDistillationAlgorithmCfg(
+        learning_rate=1.0e-3,
+        gradient_length=15,
+        num_learning_epochs=5,
+        class_name="MultiTeacherDistillation",
+        max_grad_norm=1.0,
+    )
+
+@configclass  # 对有特权信息训练的教师网络进行蒸馏
+class Q1FlatDistillationStudentTeacherCfg(RslRlDistillationRunnerCfg):
+    num_steps_per_env = 24
+    max_iterations = 90001
+    obs_groups = (
+        {
+            "policy": [
+                "command_wo_privilege",
+                "proprioception_wo_privilege",
+                "last_action",
+            ],  # 映射到环境提供的 'policy' 观测组，用于演员网络
+            "teacher": [
+                "command",
+                "proprioception",
+                "last_action",
+            ],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
+            "motion_id": ["motion_id"],  # 新增 motion_id 观测组
+        },
+    )
+    save_interval = 500
+    experiment_name = "q1_flat_distillation"
+    class_name: str = "DistillationRunner"
+    policy = RslRlDistillationStudentTeacherCfg(
+        class_name="StudentTeacher",
+        init_noise_std=0.8,
+        teacher_hidden_dims=[512, 256, 128],
+        student_hidden_dims=[512, 256, 128],
+        activation="elu",
+        student_obs_normalization=True,
+        teacher_obs_normalization=True,
+    )
+    algorithm = RslRlDistillationAlgorithmCfg(
+        learning_rate=1.0e-3,
+        gradient_length=15,
+        num_learning_epochs=5,
+        class_name="Distillation",
         max_grad_norm=1.0,
     )
