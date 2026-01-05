@@ -2,7 +2,8 @@
 file_name: [
   "artifacts/lafan_bvh/walk/walk1_subject1.npz",
   "artifacts/lafan_bvh/walk/walk2_subject4.npz",
-  "artifacts/lafan_bvh/walk/walk3_subject1.npz",]
+  "artifacts/lafan_bvh/walk/walk3_subject1.npz",
+]
 # folder_name: ["artifacts/Q1_251021_01_slowly_walk_120Hz:v0"]
 # folder_name: [ "artifacts/lafan_bvh/walk"]
 # folder_name: []

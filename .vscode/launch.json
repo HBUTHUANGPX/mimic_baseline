@@ -85,7 +85,7 @@
             "program": "/home/hpx/HPX_LOCO_2/mimic_baseline/scripts/rsl_rl/play_multi_teacher_student.py",
             "console": "integratedTerminal",
             "args": [
-                "--task", "Diss-Tracking-Flat-Q1-v0",
+                "--task", "DissMT-Tracking-Flat-Q1-v0",
                 "--num_envs", "2",
                 "--domain_randomization"
             ]
