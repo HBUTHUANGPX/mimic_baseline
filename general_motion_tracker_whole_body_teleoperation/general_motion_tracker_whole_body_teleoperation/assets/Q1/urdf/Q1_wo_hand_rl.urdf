@@ -12,9 +12,9 @@
 <!-- pelvis -->
   <link name="pelvis_link">
     <inertial>
-      <origin xyz="-0.073896 1.65E-05 -0.056743" rpy="0 0 0" />
-      <mass value="4.9667" />
-      <inertia ixx="0.068073" ixy="-2.7E-06" ixz="-0.0008014" iyy="0.012482" iyz="-4E-07" izz="0.06714" />
+      <origin xyz="-0.0611013 0.0000136 -0.0521130" rpy="0 0 0" />
+      <mass value="6.0067291" />
+      <inertia ixx="0.0694156" ixy="-0.0000016" ixz="-0.002508" iyy="0.0185207" iyz="0.0" izz="0.726675" />
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
