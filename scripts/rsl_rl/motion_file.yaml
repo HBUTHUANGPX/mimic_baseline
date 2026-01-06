@@ -1,17 +1,13 @@
-file_name: []
-folder_name: [ "artifacts/lafan_bvh/walk"]
-wo_file_name: []
-wo_folder_name: []
-
-
 motion_group:
   walk:
-    file_name: []
-    folder_name: ["artifacts/lafan_bvh/walk"]
+    file_name: ["artifacts/Q1_251021_01_slowly_walk_120Hz:v0/motion.npz"]
+    # file_name: []
+    folder_name: []
+    # folder_name: ["artifacts/lafan_bvh/walk"]
     wo_file_name: []
     wo_folder_name: []
-  run:
-    file_name: []
-    folder_name: ["artifacts/lafan_bvh/run"]
-    wo_file_name: []
-    wo_folder_name: []
+  # run:
+  #   file_name: []
+  #   folder_name: ["artifacts/lafan_bvh/run"]
+  #   wo_file_name: []
+  #   wo_folder_name: []
