@@ -131,73 +131,7 @@ from general_motion_tracker_whole_body_teleoperation.utils.exporter import (
 )
 
 # PLACEHOLDER: Extension template (do not remove this comment)
-
-import yaml  # 导入PyYAML库
-
-
-def read_yaml_file(file_path):
-    try:
-        with open(file_path, "r", encoding="utf-8") as file:
-            data = yaml.safe_load(file)
-        return data
-    except FileNotFoundError:
-        print(f"文件 {file_path} 不存在。")
-        return None
-    except yaml.YAMLError as exc:
-        print(f"YAML解析错误: {exc}")
-        return None
-
-def collect_npz_paths(yaml_path: str = "motion_file.yaml") -> List[str]:
-    """
-    从指定的YAML文件中读取配置，收集NPZ文件路径列表。
-    - 先添加file_name中指定的NPZ文件路径。
-    - 然后添加folder_name中每个文件夹下的所有NPZ文件路径，但避免与file_name中文件名的重复（基于文件名）。
-    - 最后剔除wo_file_name中指定的文件路径和wo_folder_name中文件夹下的所有NPZ文件路径。
-    
-    :param yaml_path: YAML文件的路径，默认为"motion_file.yaml"。
-    :return: 收集后的NPZ文件路径列表。
-    """
-    data = read_yaml_file(yaml_path)
-    if data is None:
-        return []
-
-    # 提取配置
-    file_names = data.get('file_name', [])
-    folder_names = data.get('folder_name', [])
-    wo_file_names = data.get('wo_file_name', [])
-    wo_folder_names = data.get('wo_folder_name', [])  # 假设为wo_folder_name，修正可能的拼写错误
-
-    # 使用集合存储路径，以避免重复
-    npz_paths = set()
-    existing_basenames = set()
-
-    # 第一步：添加file_name中的NPZ文件路径，并记录其basename
-    for path in file_names:
-        if path.endswith('.npz') and os.path.exists(path):
-            npz_paths.add(path)
-            existing_basenames.add(os.path.basename(path))
-
-    # 第二步：添加folder_name中每个文件夹下的NPZ文件路径，避免与现有basename重复
-    for folder in folder_names:
-        if os.path.isdir(folder):
-            for npz_file in glob.glob(os.path.join(folder, '*.npz')):
-                basename = os.path.basename(npz_file)
-                if basename not in existing_basenames:
-                    npz_paths.add(npz_file)
-                    existing_basenames.add(basename)  # 更新basename集合，避免后续重复
-
-    # 第三步：剔除wo_file_name中的指定文件路径
-    for wo_path in wo_file_names:
-        npz_paths.discard(wo_path)
-
-    # 第四步：剔除wo_folder_name中每个文件夹下的所有NPZ文件路径
-    for wo_folder in wo_folder_names:
-        if os.path.isdir(wo_folder):
-            for npz_file in glob.glob(os.path.join(wo_folder, '*.npz')):
-                npz_paths.discard(npz_file)
-
-    # 返回排序后的列表，便于一致性
-    return sorted(list(npz_paths))
+from load_motion_file import collect_npz_paths
 
 @hydra_task_config(args_cli.task, args_cli.agent)
 def main(
@@ -256,9 +190,12 @@ def main(
 
     # set the log directory for the environment (works for all environment types)
     env_cfg.log_dir = log_dir
-    motion_file = collect_npz_paths(args_cli.motion_file_path)
-    print(f"[INFO] Collected {len(motion_file)} motion files for play.")
-    env_cfg.commands.motion.motion_file = motion_file
+    motion_file_group = collect_npz_paths(args_cli.motion_file_path)
+    for group_name, paths in motion_file_group.items():
+        print(f"\nGroup: {group_name}")
+        print(f"[INFO] Collected {len(paths)} motion files for training.")
+    # print(motion_file)
+    env_cfg.commands.motion.motion_file = motion_file_group
     # create isaac environment
     env = gym.make(
         args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None
@@ -297,7 +234,7 @@ def main(
         print("[INFO]: Creating MultiTeacherDistillationRunner")
         motion_run_names = env.unwrapped.command_manager._terms[
             "motion"
-        ].motion.run_names
+        ].motion.group_names
         runner = MultiTeacherDistillationRunner(
             env,
             agent_cfg.to_dict(),

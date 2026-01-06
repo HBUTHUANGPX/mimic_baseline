@@ -88,8 +88,6 @@ class MotionLoader:
                 extract_part(p) for p in paths if extract_part(p) is not None
             ]
             num_motions = len(extracted_list)
-            assert num_motions > 0, "At least one motion file is required."
-
             
             # for _file in self.motion_file:
             for i , _file in enumerate(paths):
@@ -127,6 +125,7 @@ class MotionLoader:
             print(self.extracted_list)
             self.num_motions += num_motions
             self.group_names.append(group_name)
+        assert self.num_motions > 0, "At least one motion file is required."
         # Concatenate along time dimension (dim=0)
         self.joint_pos = torch.cat(joint_pos_list, dim=0)
         self.joint_vel = torch.cat(joint_vel_list, dim=0)

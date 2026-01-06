@@ -98,7 +98,7 @@ class PureQ1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
 @configclass
 class RslRlDistillationStudentTeacher_CVAECfg(RslRlDistillationStudentTeacherCfg):
     latent_dim: int = 64                            # 潜在空间维度
-    beta_kl: float = 0.1                            # KL 散度权重
+    beta_kl: float = 0.0001                            # KL 散度权重
     class_name: str = "StudentTeacher_CVAE"         # 新类名（将在 modules 中定义）
     normalize_mu=True,  # 新参数：启用对 mu 的 EmpiricalNormalization
     z_scale_factor: float = 1.0,  # z 的缩放因子
@@ -144,14 +144,14 @@ class Q1FlatCVAEDistillationStudentMultiTeacherCfg(RslRlDistillationRunnerCfg):
     class_name: str = "MultiTeacherDistillationRunner"
     policy = RslRlDistillationStudentTeacher_CVAECfg(
         class_name="StudentTeacher_CVAE",
-        init_noise_std=0.8,
+        init_noise_std=1e-3,
         teacher_hidden_dims=[512, 256, 128],
         student_hidden_dims=[1024, 512, 256, 128],
         activation="elu",
         student_obs_normalization=True,
         teacher_obs_normalization=True,
         latent_dim=64,
-        beta_kl=0.0001,
+        beta_kl=0.0002,
         normalize_mu=False,
         z_scale_factor=0.05,
         prior_hidden_dims = [1024, 512, 128],
