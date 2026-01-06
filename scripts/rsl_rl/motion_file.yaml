@@ -6,10 +6,10 @@ motion_group:
     # folder_name: ["artifacts/lafan_bvh/walk"]
     wo_file_name: []
     wo_folder_name: []
-  run:
-    file_name: []
-    # file_name: ["artifacts/Q1_251021_01_slowly_walk_120Hz:v0/motion.npz"]
-    # folder_name: ["artifacts/lafan_bvh/run"]
-    folder_name: []
-    wo_file_name: []
-    wo_folder_name: []
+  # run:
+  #   file_name: []
+  #   # file_name: ["artifacts/Q1_251021_01_slowly_walk_120Hz:v0/motion.npz"]
+  #   folder_name: ["artifacts/lafan_bvh/run"]
+  #   # folder_name: []
+  #   wo_file_name: []
+  #   wo_folder_name: []

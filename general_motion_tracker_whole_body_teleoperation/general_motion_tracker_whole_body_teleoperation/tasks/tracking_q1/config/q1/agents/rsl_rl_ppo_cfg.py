@@ -144,6 +144,7 @@ class Q1FlatCVAEDistillationStudentMultiTeacherCfg(RslRlDistillationRunnerCfg):
     class_name: str = "MultiTeacherDistillationRunner"
     policy = RslRlDistillationStudentTeacher_CVAECfg(
         class_name="StudentTeacher_CVAE",
+        # init_noise_std=0.8,
         init_noise_std=1e-3,
         teacher_hidden_dims=[512, 256, 128],
         student_hidden_dims=[1024, 512, 256, 128],

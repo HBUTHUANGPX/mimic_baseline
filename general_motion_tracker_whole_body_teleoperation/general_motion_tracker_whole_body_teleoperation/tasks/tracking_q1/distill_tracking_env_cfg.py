@@ -262,7 +262,7 @@ class ObservationsCfg:
 
         def __post_init__(self):
             self.enable_corruption = True
-            # self.history_length = 24
+            self.history_length = 24
 
     @configclass
     class CommandWithNoiseCfg(ObsGroup):  # 带噪声的指令观测组
@@ -562,8 +562,8 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the locomotion velocity-tracking environment."""
 
     # Scene settings
-    scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
-    # scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
+    # scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
+    scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
