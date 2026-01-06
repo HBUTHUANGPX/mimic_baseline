@@ -13,7 +13,7 @@ from isaaclab_rl.rsl_rl import (
 class Q1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
     max_iterations = 90001
-    save_interval = 1500
+    save_interval = 1000
     obs_groups = (
         {
             "policy": ["policy"],  # 映射到环境提供的 'policy' 观测组，用于演员网络
@@ -145,7 +145,7 @@ class Q1FlatCVAEDistillationStudentMultiTeacherCfg(RslRlDistillationRunnerCfg):
     policy = RslRlDistillationStudentTeacher_CVAECfg(
         class_name="StudentTeacher_CVAE",
         # init_noise_std=0.8,
-        init_noise_std=1e-3,
+        init_noise_std=0.3,
         teacher_hidden_dims=[512, 256, 128],
         student_hidden_dims=[1024, 512, 256, 128],
         activation="elu",
