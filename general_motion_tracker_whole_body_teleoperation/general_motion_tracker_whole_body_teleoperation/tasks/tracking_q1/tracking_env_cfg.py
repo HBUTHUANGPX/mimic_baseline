@@ -279,8 +279,13 @@ class RewardsCfg:
     )
     motion_body_pos = RewTerm(
         func=mdp.motion_relative_body_position_error_exp,
-        weight=5.0,
-        params={"command_name": "motion", "std": 0.081},
+        weight=1.0,
+        params={"command_name": "motion", "std": 0.3},
+    )
+    knee_motion_body_pos = RewTerm(
+        func=mdp.motion_relative_body_position_error_exp,
+        weight=2.0,
+        params={"command_name": "motion", "std": 0.081, "body_names":["L_knee_link","L_ankle_roll_link", "R_knee_link","R_ankle_roll_link"]},
     )
     motion_body_ori = RewTerm(
         func=mdp.motion_relative_body_orientation_error_exp,
@@ -297,7 +302,7 @@ class RewardsCfg:
         weight=1.0,
         params={"command_name": "motion", "std": 3.14},
     )
-    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.095)
+    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.1)
     joint_limit = RewTerm(
         func=mdp.joint_pos_limits,
         weight=-10.0,
