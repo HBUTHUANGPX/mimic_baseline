@@ -150,8 +150,8 @@ Y2──────────|
 - Va: Velocity at which the friction is fully activated
 """
 
-
-@configclass
+pi = 3.141592653589793
+@configclass # 废弃
 class EncosActuatorCfg_EC_A8112(TNDelayedActuatorCfg):
     X1 = 16.231562044  # 额定转速
     X2 = 16.441001554  # 峰值转速
@@ -164,8 +164,21 @@ class EncosActuatorCfg_EC_A8112(TNDelayedActuatorCfg):
     Fd = 1/16  # Dynamic friction coefficient """
     Va = 0.001  # Velocity at which the friction is fully activated
 
-
 @configclass
+class EncosActuatorCfg_EC_A8116(TNDelayedActuatorCfg):
+    X1 = 16.231562044  # 额定转速
+    X2 = 16.441001554  # 峰值转速
+    Y1 = 50.0  # 额定扭矩
+    Y2 = 66.0 * 1.2  # 峰值扭矩
+
+    armature = 61370 * 1e-6
+
+    Fs = 1.0  # Static friction coefficient """
+    Fd = 1/16  # Dynamic friction coefficient """
+    Va = 0.001  # Velocity at which the friction is fully activated
+
+
+@configclass # 废弃
 class EncosActuatorCfg_EC_A6408(TNDelayedActuatorCfg):
     X1 = 13.927727431  # 额定转速
     X2 = 15.603243513  # 峰值转速
@@ -178,13 +191,25 @@ class EncosActuatorCfg_EC_A6408(TNDelayedActuatorCfg):
     Fd = 2.5/15  # Dynamic friction coefficient """
     Va = 0.001  # Velocity at which the friction is fully activated
 
+@configclass
+class EncosActuatorCfg_EC_A6416(TNDelayedActuatorCfg):
+    X1 = 100 * 2 * pi / 60  # 额定转速
+    X2 = 120 * 2 * pi / 60  # 峰值转速
+    Y1 = 40.0  # 额定扭矩
+    Y2 = 56.0 * 1.2 # 峰值扭矩
+
+    armature = 65814 * 1e-6
+
+    Fs = 1.1  # Static friction coefficient """
+    Fd = 2.5/15  # Dynamic friction coefficient """
+    Va = 0.001  # Velocity at which the friction is fully activated
 
 @configclass
-class EncosActuatorCfg_EC_A10020(TNDelayedActuatorCfg):
-    X1 = 12.042771839  # 额定转速
-    X2 = 12.88052988  # 峰值转速
+class EncosActuatorCfg_EC_A10020_24(TNDelayedActuatorCfg):
+    X1 = 120 * 2 * pi / 60  # 额定转速
+    X2 = 120 * 2 * pi / 60  # 峰值转速
     Y1 = 100.0  # 额定扭矩
-    Y2 = 130.0  # 峰值扭矩
+    Y2 = 138.0 * 1.2  # 峰值扭矩
 
     armature = 277376 * 1e-6
 
@@ -193,6 +218,19 @@ class EncosActuatorCfg_EC_A10020(TNDelayedActuatorCfg):
     Va = 0.001  # Velocity at which the friction is fully activated
 
 @configclass
+class EncosActuatorCfg_EC_A10020_12(TNDelayedActuatorCfg):
+    X1 = 120 * 2 * pi / 60  # 额定转速
+    X2 = 140 * 2 * pi / 60  # 峰值转速
+    Y1 = 54.0  # 额定扭矩
+    Y2 = 74.0  # 峰值扭矩
+
+    armature = 70017 * 1e-6
+
+    Fs = 1.0  # Static friction coefficient """
+    Fd = 2.3/12  # Dynamic friction coefficient """
+    Va = 0.001  # Velocity at which the friction is fully activated
+
+@configclass # 废弃
 class EncosActuatorCfg_EC_A4310(TNDelayedActuatorCfg):
     X1 = 7.853981634  # 额定转速
     X2 = 9.320058206  # 峰值转速
@@ -205,7 +243,7 @@ class EncosActuatorCfg_EC_A4310(TNDelayedActuatorCfg):
     Fd = 1.6/9  # Dynamic friction coefficient """
     Va = 0.001  # Velocity at which the friction is fully activated
 
-@configclass
+@configclass # 废弃
 class EncosActuatorCfg_EC_A4315(TNDelayedActuatorCfg):
     X1 = 7.853981634  # 额定转速
     X2 = 9.320058206  # 峰值转速

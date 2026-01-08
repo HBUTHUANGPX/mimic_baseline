@@ -7,11 +7,10 @@ from general_motion_tracker_whole_body_teleoperation.robots import (
     tn_delayed_pd_actuators,
 )
 from general_motion_tracker_whole_body_teleoperation.robots.tn_delayed_pd_actuators import (
-    EncosActuatorCfg_EC_A8112,
-    EncosActuatorCfg_EC_A6408,
-    EncosActuatorCfg_EC_A10020,
-    EncosActuatorCfg_EC_A4310,
-    EncosActuatorCfg_EC_A4315,
+    EncosActuatorCfg_EC_A10020_12,
+    EncosActuatorCfg_EC_A8116,
+    EncosActuatorCfg_EC_A6416,
+    EncosActuatorCfg_EC_A10020_24,
     Ti5ActuatorCfg_CRA_RI60_80,
     Ti5ActuatorCfg_CRA_RI50_70,
     Ti5ActuatorCfg_CRA_RI40_52,
@@ -29,10 +28,10 @@ ImplicitActuator_actuators = {
             ".*_knee_joint",
         ],
         effort_limit_sim={
-            ".*_hip_roll_joint": 150.0, # 保守稳定运行 65.0 峰值 150.0
-            ".*_hip_yaw_joint": 120.0,# 保守稳定运行 40.0 峰值 125.0
-            ".*_hip_pitch_joint": 330.0,# 保守稳定运行 130.0 峰值 330.0
-            ".*_knee_joint": 330.0,# 保守稳定运行 130.0 峰值 330.0
+            ".*_hip_roll_joint": 1.15 * 74.0, # 保守稳定运行 65.0，临界堵转 74.0 峰值 150.0
+            ".*_hip_yaw_joint": 1.15 * 56.0,# 保守稳定运行 40.0，临界堵转 56.0  峰值 125.0
+            ".*_hip_pitch_joint": 1.15 *  138.0,# 保守稳定运行 130.0，临界堵转 138.0  峰值 330.0
+            ".*_knee_joint": 1.15 *  138.0,# 保守稳定运行 130.0，临界堵转 138.0  峰值 330.0
         },
         velocity_limit_sim={
             ".*_hip_roll_joint": 140*2*torch.pi/60,
@@ -60,7 +59,7 @@ ImplicitActuator_actuators = {
         },
     ),
     "feet": ImplicitActuatorCfg(
-        effort_limit_sim=130.0,# 保守稳定运行 40.0*2 峰值 66.0*2
+        effort_limit_sim=1.15 *  66.0,# 保守稳定运行 40.0 临界堵转 66.0 峰值 130.0
         velocity_limit_sim=140*2*torch.pi/60,
         joint_names_expr=[".*_ankle_pitch_joint", ".*_ankle_roll_joint"],
         stiffness=200.0,
@@ -299,39 +298,35 @@ IdealPDActuator_actuators = {
 }
 
 FullActuator_actuators = {
-    "EC_A8112": EncosActuatorCfg_EC_A8112(
+    "EC_A10020_12": EncosActuatorCfg_EC_A10020_12(
         joint_names_expr=[".*_hip_roll_joint"],
-        stiffness=240,
-        damping=2.5,
+        stiffness=300,
+        damping=3.0,
         friction=0.01,
-        effort_limit_sim=52,
     ),
-    "EC_A6408": EncosActuatorCfg_EC_A6408(
+    "EC_A6416": EncosActuatorCfg_EC_A6416(
         joint_names_expr=[".*_hip_yaw_joint"],
-        stiffness=240,
+        stiffness=200,
         damping=1.5,
         friction=0.01,
-        effort_limit_sim=40,
     ),
-    "EC_A10020": EncosActuatorCfg_EC_A10020(
+    "EC_A10020_24": EncosActuatorCfg_EC_A10020_24(
         joint_names_expr=[
             ".*_hip_pitch_joint",
             ".*_knee_joint",
         ],
-        stiffness=430,
+        stiffness=300,
         damping=3.0,
         friction=0.01,
-        effort_limit_sim=130,
     ),
-    "EC_A4310": EncosActuatorCfg_EC_A4315(
+    "EC_A8116": EncosActuatorCfg_EC_A8116(
         joint_names_expr=[
             ".*_ankle_roll_joint",
             ".*_ankle_pitch_joint",
         ],
         stiffness=70,
-        damping=1.5,
+        damping=2.0,
         friction=0.01,
-        effort_limit_sim=40,
     ),
     "CRA_RI60_80_shoulder": Ti5ActuatorCfg_CRA_RI60_80(
         joint_names_expr=[
@@ -341,7 +336,6 @@ FullActuator_actuators = {
         stiffness=70,
         damping=1.5,
         friction=0.01,
-        effort_limit_sim=42,
     ),
     "CRA_RI60_80_pelvis": Ti5ActuatorCfg_CRA_RI60_80(
         joint_names_expr=[
@@ -350,7 +344,6 @@ FullActuator_actuators = {
         stiffness=280,
         damping=1.5,
         friction=0.01,
-        effort_limit_sim=42,
     ),
     "CRA_RI50_70": Ti5ActuatorCfg_CRA_RI50_70(
         joint_names_expr=[
@@ -360,7 +353,6 @@ FullActuator_actuators = {
         stiffness=70,
         damping=2.0,
         friction=0.01,
-        effort_limit_sim=23,
     ),
     "CRA_RI40_52": Ti5ActuatorCfg_CRA_RI40_52(
         joint_names_expr=[
@@ -369,7 +361,6 @@ FullActuator_actuators = {
         stiffness=20,
         damping=1.0,
         friction=0.01,
-        effort_limit_sim=8.3,
     ),
     "CRA_RI30_40": Ti5ActuatorCfg_CRA_RI30_40(
         joint_names_expr=[
@@ -379,7 +370,6 @@ FullActuator_actuators = {
         stiffness=20,
         damping=1.0,
         friction=0.01,
-        effort_limit_sim=3.3,
     ),
     "HT_DMS_6015_2": HTActuatorCfg_DMS_6015_2(
         joint_names_expr=[
@@ -388,7 +378,6 @@ FullActuator_actuators = {
         stiffness=3.0,
         damping=0.6,
         friction=0.01,
-        effort_limit_sim=1.26 * 2,
     ),
     "HT_DMS_6015": HTActuatorCfg_DMS_6015(
         joint_names_expr=[
@@ -397,9 +386,9 @@ FullActuator_actuators = {
         stiffness=1.5,
         damping=0.3,
         friction=0.01,
-        effort_limit_sim=1.26,
     ),
 }
+
 Q1_CYLINDER_CFG = ArticulationCfg(
     spawn=sim_utils.UrdfFileCfg(
         fix_base=False,
@@ -448,6 +437,7 @@ Q1_CYLINDER_CFG = ArticulationCfg(
 
 Q1_ACTION_SCALE = {}
 for a in Q1_CYLINDER_CFG.actuators.values():
+    # e = a.Y1
     e = a.effort_limit_sim
     s = a.stiffness
     names = a.joint_names_expr
