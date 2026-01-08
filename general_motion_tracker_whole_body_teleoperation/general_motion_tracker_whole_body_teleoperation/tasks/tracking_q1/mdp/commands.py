@@ -476,7 +476,18 @@ class MotionCommand(CommandTerm):
 
     def _update_command(self):
         self.time_steps += 1
-        env_ids = torch.where(self.time_steps >= self.motion.time_step_total)[0]
+        
+        overflow_mask = self.time_steps >= self.motion.time_step_total # 溢出掩码
+        valid_mask = ~overflow_mask  # 有效索引掩码 (time_steps < time_step_total)
+        cross_mask = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)  # 跨越掩码初始化
+        if valid_mask.any():  # 仅对有效部分检查 new_data_flag
+            valid_ids = torch.nonzero(valid_mask, as_tuple=False).squeeze(-1)  # 获取有效 env_ids
+            cross_flags = self.motion.new_data_flag[self.time_steps[valid_ids]]  # 检查对应 time_steps 的 flag
+            cross_mask[valid_ids] = cross_flags  # 更新跨越掩码
+        
+        total_mask = overflow_mask | cross_mask  # 合并掩码：溢出或跨越
+        env_ids = torch.nonzero(total_mask, as_tuple=False).squeeze(-1)  # 获取需要重采样的 env_ids
+
         for i in range(self.motion.num_motions):
             start, end = self.motion.motion_indices[i]
             map = (self.time_steps >= start) & (self.time_steps < end)
