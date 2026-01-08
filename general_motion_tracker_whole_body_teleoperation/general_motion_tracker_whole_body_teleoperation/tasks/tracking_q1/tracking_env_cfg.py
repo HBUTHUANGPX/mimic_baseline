@@ -308,6 +308,11 @@ class RewardsCfg:
         weight=-10.0,
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*"])},
     )
+    joint_limit = RewTerm(
+        func=mdp.joint_torques_l2,
+        weight=-0.1,
+        params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*"])},
+    )
     undesired_contacts = RewTerm(
         func=mdp.undesired_contacts,
         weight=-0.1,
@@ -372,7 +377,7 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the locomotion velocity-tracking environment."""
 
     # Scene settings
-    scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
+    scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
     # scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
