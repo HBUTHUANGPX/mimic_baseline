@@ -308,7 +308,7 @@ class RewardsCfg:
         weight=-10.0,
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*"])},
     )
-    joint_limit = RewTerm(
+    joint_torques_limit = RewTerm(
         func=mdp.joint_torques_l2,
         weight=-0.1,
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*"])},
