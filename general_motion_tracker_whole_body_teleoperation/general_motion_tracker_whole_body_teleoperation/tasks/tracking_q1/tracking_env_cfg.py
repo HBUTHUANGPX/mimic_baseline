@@ -279,13 +279,13 @@ class RewardsCfg:
     )
     motion_body_pos = RewTerm(
         func=mdp.motion_relative_body_position_error_exp,
-        weight=1.0,
+        weight=0.5,
         params={"command_name": "motion", "std": 0.3},
     )
-    knee_motion_body_pos = RewTerm(
+    extern_motion_body_pos = RewTerm(
         func=mdp.motion_relative_body_position_error_exp,
-        weight=2.0,
-        params={"command_name": "motion", "std": 0.081, "body_names":["L_knee_link","L_ankle_roll_link", "R_knee_link","R_ankle_roll_link"]},
+        weight=0.5,
+        params={"command_name": "motion", "std": 0.081},
     )
     motion_body_ori = RewTerm(
         func=mdp.motion_relative_body_orientation_error_exp,
@@ -310,7 +310,7 @@ class RewardsCfg:
     )
     joint_torques_limit = RewTerm(
         func=mdp.joint_torques_l2,
-        weight=-0.1,
+        weight=-2e-5,
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*"])},
     )
     undesired_contacts = RewTerm(
