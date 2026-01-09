@@ -3,13 +3,13 @@ from __future__ import annotations
 import torch
 from dataclasses import MISSING
 
-from isaaclab.actuators import DelayedPDActuator, DelayedPDActuatorCfg
+from isaaclab.actuators import IdealPDActuator, IdealPDActuatorCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.types import ArticulationActions
 
 pi = 3.141592653589793
 
-class TNDelayedPDActuator(DelayedPDActuator):
+class TNDelayedPDActuator(IdealPDActuator):
     """with TN limits Delayed actuator class that implements a torque-speed curve for the actuators.
 
     The torque-speed curve is defined as follows:
@@ -95,7 +95,7 @@ class TNDelayedPDActuator(DelayedPDActuator):
 
 
 @configclass
-class TNDelayedActuatorCfg(DelayedPDActuatorCfg):
+class TNDelayedActuatorCfg(IdealPDActuatorCfg):
     """
     Configuration for Unitree actuators.
     """

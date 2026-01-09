@@ -142,7 +142,7 @@ class ObservationsCfg:
             func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2)
         )
         joint_pos = ObsTerm(
-            func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01)
+            func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.043, n_max=0.043)
         )
         joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.5, n_max=0.5))
         actions = ObsTerm(func=mdp.last_action)
@@ -197,11 +197,21 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=[".*"]),
-            "pos_distribution_params": (-0.01, 0.01),
+            "pos_distribution_params": (-0.043, 0.043),
             "operation": "add",
         },
     )
 
+    collider_offsets = EventTerm(
+        func=mdp.randomize_rigid_body_collider_offsets,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=".*"),
+            "rest_offset_distribution_params": (0, 5*1e-3),
+            "contact_offset_distribution_params": (6*1e-3, 10*1e-3),
+        },
+    )
+    
     base_com = EventTerm(
         func=mdp.randomize_rigid_body_com,
         mode="startup",
@@ -377,8 +387,8 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the locomotion velocity-tracking environment."""
 
     # Scene settings
-    scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
-    # scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
+    # scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
+    scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
@@ -395,11 +405,11 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
         # self.decimation = 4
         # self.sim.dt = 0.005
 
-        # self.decimation = 10
-        # self.sim.dt = 0.002
+        self.decimation = 1
+        self.sim.dt = 0.02
 
-        self.decimation = 20
-        self.sim.dt = 0.001
+        # self.decimation = 20
+        # self.sim.dt = 0.001
 
         self.episode_length_s = 10.0
         # simulation settings
