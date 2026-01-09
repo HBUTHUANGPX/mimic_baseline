@@ -377,7 +377,7 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the locomotion velocity-tracking environment."""
 
     # Scene settings
-    scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
+    scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
     # scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
@@ -398,8 +398,8 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
         # self.decimation = 10
         # self.sim.dt = 0.002
 
-        self.decimation = 1
-        self.sim.dt = 0.02
+        self.decimation = 20
+        self.sim.dt = 0.001
 
         self.episode_length_s = 10.0
         # simulation settings

@@ -7,6 +7,7 @@ from isaaclab.actuators import DelayedPDActuator, DelayedPDActuatorCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.types import ArticulationActions
 
+pi = 3.141592653589793
 
 class TNDelayedPDActuator(DelayedPDActuator):
     """with TN limits Delayed actuator class that implements a torque-speed curve for the actuators.
@@ -62,7 +63,6 @@ class TNDelayedPDActuator(DelayedPDActuator):
         # save current joint vel
         self._joint_vel[:] = joint_vel
         # calculate the desired joint torques
-        control_action = super().compute(control_action, joint_pos, joint_vel)
 
         # apply friction model on the torque
         self.applied_effort -= (
@@ -150,7 +150,6 @@ Y2──────────|
 - Va: Velocity at which the friction is fully activated
 """
 
-pi = 3.141592653589793
 @configclass # 废弃
 class EncosActuatorCfg_EC_A8112(TNDelayedActuatorCfg):
     X1 = 16.231562044  # 额定转速
@@ -206,8 +205,8 @@ class EncosActuatorCfg_EC_A6416(TNDelayedActuatorCfg):
 
 @configclass
 class EncosActuatorCfg_EC_A10020_24(TNDelayedActuatorCfg):
-    X1 = 120 * 2 * pi / 60  # 额定转速
-    X2 = 120 * 2 * pi / 60  # 峰值转速
+    X1 = 115 * 2 * pi / 60  # 额定转速
+    X2 = 123 * 2 * pi / 60  # 峰值转速
     Y1 = 100.0  # 额定扭矩
     Y2 = 138.0 * 1.2  # 峰值扭矩
 
@@ -222,7 +221,7 @@ class EncosActuatorCfg_EC_A10020_12(TNDelayedActuatorCfg):
     X1 = 120 * 2 * pi / 60  # 额定转速
     X2 = 140 * 2 * pi / 60  # 峰值转速
     Y1 = 54.0  # 额定扭矩
-    Y2 = 74.0  # 峰值扭矩
+    Y2 = 74.0 * 1.2 # 峰值扭矩
 
     armature = 70017 * 1e-6
 
