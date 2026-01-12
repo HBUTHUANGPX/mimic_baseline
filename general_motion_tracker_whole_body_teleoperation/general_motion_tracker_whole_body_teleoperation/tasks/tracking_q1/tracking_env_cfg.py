@@ -28,8 +28,8 @@ import general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp as 
 ##
 
 VELOCITY_RANGE = {
-    "x": (-0.8, 0.8),
-    "y": (-0.5, 0.5),
+    "x": (-1.2, 1.2),
+    "y": (-0.8, 0.8),
     "z": (-0.2, 0.2),
     "roll": (-0.52, 0.52),
     "pitch": (-0.52, 0.52),
@@ -100,8 +100,8 @@ class CommandsCfg:
             "x": (-0.1, 0.1),
             "z": (-0.0, 0.2),
             "y": (-0.1, 0.1),
-            "roll": (-0.1, 0.1),
-            "pitch": (-0.1, 0.1),
+            "roll": (-0.2, 0.2),
+            "pitch": (-0.2, 0.2),
             "yaw": (-0.2, 0.2),
         },
         velocity_range=VELOCITY_RANGE,
@@ -185,8 +185,8 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names=".*"),
-            "static_friction_range": (0.1, 1.6),
-            "dynamic_friction_range": (0.1, 1.2),
+            "static_friction_range": (0.1, 0.6),
+            "dynamic_friction_range": (0.1, 0.4),
             "restitution_range": (0.0, 0.5),
             "num_buckets": 64,
         },
@@ -197,18 +197,8 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=[".*"]),
-            "pos_distribution_params": (-0.043, 0.043),
+            "pos_distribution_params": (-0.053, 0.053),
             "operation": "add",
-        },
-    )
-
-    collider_offsets = EventTerm(
-        func=mdp.randomize_rigid_body_collider_offsets,
-        mode="startup",
-        params={
-            "asset_cfg": SceneEntityCfg("robot", body_names=".*"),
-            "rest_offset_distribution_params": (0, 5*1e-3),
-            "contact_offset_distribution_params": (6*1e-3, 10*1e-3),
         },
     )
     
@@ -217,7 +207,7 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names="torso_link"),
-            "com_range": {"x": (-0.06, 0.06), "y": (-0.025, 0.025), "z": (0.01, 0.05)},
+            "com_range": {"x": (-0.06, 0.06), "y": (-0.045, 0.045), "z": (-0.01, 0.05)},
         },
     )
     pelvis_com = EventTerm(
@@ -225,7 +215,7 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names="pelvis_link"),
-            "com_range": {"x": (-0.01, 0.01), "y": (-0.02, 0.02), "z": (0.01, 0.01)},
+            "com_range": {"x": (-0.03, 0.03), "y": (-0.03, 0.03), "z": (0.01, 0.01)},
         },
     )
     knee_link_com = EventTerm(
@@ -233,7 +223,7 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names=["L_knee_link", "R_knee_link"]),
-            "com_range": {"x": (-0.01, 0.01), "y": (-0.01, 0.01), "z": (0.03, 0.03)},
+            "com_range": {"x": (-0.02, 0.02), "y": (-0.02, 0.02), "z": (-0.03, 0.03)},
         },
     )
     robot_scale_mass = EventTerm(
@@ -241,7 +231,7 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names=".*"),
-            "mass_distribution_params": (0.92, 1.08),
+            "mass_distribution_params": (0.90, 1.1),
             "operation": "scale",
         },
     )
@@ -250,10 +240,10 @@ class EventCfg:
         mode="startup", # startup 和 reset 的训练结构没什么区别，反而 reset 会增加训练时间
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
-            "stiffness_distribution_params": (0.5, 2.0),
+            "stiffness_distribution_params": (0.3, 3.0),
             "damping_distribution_params": (0.7, 1.5),
             "operation": "scale",
-            "distribution": "log_uniform",
+            "distribution": "uniform",
         },
     )
     # interval
@@ -336,6 +326,20 @@ class RewardsCfg:
             "threshold": 1.0,
         },
     )
+    foot_contact_velocity = RewTerm(
+        func=mdp.foot_contact_velocity,
+        weight=-0.1,
+        params={
+            "threshold": 1.0,
+            "sensor_cfg": SceneEntityCfg(
+                "contact_forces",
+                body_names=[".*_ankle_roll_link"],
+            ),
+            "command_name": "motion",
+            "clip": 2.0**2,
+            "body_names": ["L_ankle_roll_link", "R_ankle_roll_link"],
+        },
+    )
 
 
 @configclass
@@ -402,11 +406,11 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
     def __post_init__(self):
         """Post initialization."""
         # general settings
-        # self.decimation = 4
-        # self.sim.dt = 0.005
+        self.decimation = 4
+        self.sim.dt = 0.005
 
-        self.decimation = 1
-        self.sim.dt = 0.02
+        # self.decimation = 1
+        # self.sim.dt = 0.02
 
         # self.decimation = 20
         # self.sim.dt = 0.001

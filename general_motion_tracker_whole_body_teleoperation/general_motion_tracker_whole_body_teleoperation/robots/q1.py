@@ -64,7 +64,7 @@ ImplicitActuator_actuators = {
         effort_limit_sim=scale *  66.0,# 保守稳定运行 40.0 临界堵转 66.0 峰值 130.0
         velocity_limit_sim=140*2*torch.pi/60,
         joint_names_expr=[".*_ankle_pitch_joint", ".*_ankle_roll_joint"],
-        stiffness=200.0,
+        stiffness=70.0,
         damping=1.5,
         armature=61370 * 1e-6,
     ),
