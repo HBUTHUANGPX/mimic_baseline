@@ -29,6 +29,12 @@ git clone https://github.com/HBUTHUANGPX/rsl_rl_v320.git
 
 cd rsl_rl_v320/ && pip install -e .
 
+# this repo install by git
+
+git clone https://github.com/HBUTHUANGPX/mimic_baseline.git
+
+cd general_motion_tracker_whole_body_teleoperation/ && pip install -e .
+
 # deploy install by pip
 pip install mujoco==3.2.7
 pip install onnxruntime==1.22.1
