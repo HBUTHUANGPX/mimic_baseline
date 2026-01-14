@@ -449,5 +449,6 @@ for a in Q1_CYLINDER_CFG.actuators.values():
         s = {n: s for n in names}
     for n in names:
         if n in e and n in s and s[n]:
-            Q1_ACTION_SCALE[n] = 0.25 * e[n] / s[n]
+            Q1_ACTION_SCALE[n] = 0.25 #* e[n] / s[n]
+            #是否使用这种action scale的计算方式，具体考量需要参考个人调试笔记12月20日记录
 print("Q1_ACTION_SCALE:",Q1_ACTION_SCALE)

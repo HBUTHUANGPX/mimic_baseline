@@ -15,3 +15,4 @@ MUJOCO_LOG.TXT
 lafan_Q1/*
 artifacts/lafan_bvh/*
 .vscode/*
+MJMODEL.TXT

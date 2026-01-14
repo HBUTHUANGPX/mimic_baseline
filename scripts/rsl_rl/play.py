@@ -174,8 +174,8 @@ def main(
                 "[INFO] Unfortunately a pre-trained checkpoint is currently unavailable for this task."
             )
             return
-    elif args_cli.checkpoint:
-        resume_path = retrieve_file_path(args_cli.checkpoint)
+    # elif args_cli.checkpoint:
+    #     resume_path = retrieve_file_path(args_cli.checkpoint)
     else:
         if args.other_dirs is not None:
             resume_path = get_checkpoint_path(
@@ -185,7 +185,7 @@ def main(
             resume_path = get_checkpoint_path(
                 log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint
             )
-        print(f"[INFO] Resuming from checkpoint: {resume_path}")
+    print(f"[INFO] Resuming from checkpoint: {resume_path}")
 
     log_dir = os.path.dirname(resume_path)
 
