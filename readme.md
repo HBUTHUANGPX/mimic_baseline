@@ -34,8 +34,14 @@ pip install mujoco==3.2.7
 pip install onnxruntime==1.22.1
 conda install pinocchio -c conda-forge
 
+# train scripts
 
-python scripts/rsl_rl/train.py  --task=Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Q1_slowly_walk
+1. python scripts/rsl_rl/train.py  --task=Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Q1_slowly_walk
+
+# eval scripts
+
+1. python scripts/rsl_rl/play.py --task Tracking-Flat-Q1-v0 --num_envs 2 --domain_randomization
+
 
 python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/rsl_rl/train.py  --task=Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Q1_slowly_walk  --distributed
 https://isaac-sim.github.io/IsaacLab/main/source/features/multi_gpu.html#multi-gpu-training
