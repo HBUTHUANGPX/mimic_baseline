@@ -142,7 +142,7 @@ class ObservationsCfg:
             func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2)
         )
         joint_pos = ObsTerm(
-            func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.043, n_max=0.043)
+            func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.06, n_max=0.06)
         )
         joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.5, n_max=0.5))
         actions = ObsTerm(func=mdp.last_action)

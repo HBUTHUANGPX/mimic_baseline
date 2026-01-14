@@ -150,6 +150,7 @@ Y2──────────|
 - Va: Velocity at which the friction is fully activated
 """
 
+scale = 1.15
 @configclass # 废弃
 class EncosActuatorCfg_EC_A8112(TNDelayedActuatorCfg):
     X1 = 16.231562044  # 额定转速
@@ -168,7 +169,7 @@ class EncosActuatorCfg_EC_A8116(TNDelayedActuatorCfg):
     X1 = 16.231562044  # 额定转速
     X2 = 16.441001554  # 峰值转速
     Y1 = 50.0  # 额定扭矩
-    Y2 = 66.0 * 1.2  # 峰值扭矩
+    Y2 = 66.0 * scale  # 峰值扭矩
 
     armature = 61370 * 1e-6
 
@@ -195,7 +196,7 @@ class EncosActuatorCfg_EC_A6416(TNDelayedActuatorCfg):
     X1 = 100 * 2 * pi / 60  # 额定转速
     X2 = 120 * 2 * pi / 60  # 峰值转速
     Y1 = 40.0  # 额定扭矩
-    Y2 = 56.0 * 1.2 # 峰值扭矩
+    Y2 = 56.0 * scale # 峰值扭矩
 
     armature = 65814 * 1e-6
 
@@ -208,7 +209,7 @@ class EncosActuatorCfg_EC_A10020_24(TNDelayedActuatorCfg):
     X1 = 115 * 2 * pi / 60  # 额定转速
     X2 = 123 * 2 * pi / 60  # 峰值转速
     Y1 = 100.0  # 额定扭矩
-    Y2 = 138.0 * 1.2  # 峰值扭矩
+    Y2 = 138.0 * scale  # 峰值扭矩
 
     armature = 277376 * 1e-6
 
@@ -221,7 +222,7 @@ class EncosActuatorCfg_EC_A10020_12(TNDelayedActuatorCfg):
     X1 = 120 * 2 * pi / 60  # 额定转速
     X2 = 140 * 2 * pi / 60  # 峰值转速
     Y1 = 54.0  # 额定扭矩
-    Y2 = 74.0 * 1.2 # 峰值扭矩
+    Y2 = 74.0 * scale # 峰值扭矩
 
     armature = 70017 * 1e-6
 

@@ -303,14 +303,14 @@ FullActuator_actuators = {
     "EC_A10020_12": EncosActuatorCfg_EC_A10020_12(
         joint_names_expr=[".*_hip_roll_joint"],
         stiffness=300,
-        damping=3.0,
-        effort_limit_sim = 74.0 * 1.2  # 峰值扭矩
+        damping=2.5,
+        effort_limit_sim = 74.0 * scale  # 峰值扭矩
     ),
     "EC_A6416": EncosActuatorCfg_EC_A6416(
         joint_names_expr=[".*_hip_yaw_joint"],
         stiffness=200,
         damping=2.5,
-        effort_limit_sim = 56.0 * 1.2 # 峰值扭矩
+        effort_limit_sim = 56.0 * scale # 峰值扭矩
     ),
     "EC_A10020_24": EncosActuatorCfg_EC_A10020_24(
         joint_names_expr=[
@@ -319,7 +319,7 @@ FullActuator_actuators = {
         ],
         stiffness=300,
         damping=3.0,
-        effort_limit_sim = 138.0 * 1.2  # 峰值扭矩
+        effort_limit_sim = 138.0 * scale  # 峰值扭矩
     ),
     "EC_A8116": EncosActuatorCfg_EC_A8116(
         joint_names_expr=[
@@ -328,7 +328,7 @@ FullActuator_actuators = {
         ],
         stiffness=70,
         damping=2.0,
-        effort_limit_sim = 66.0 * 1.2  # 峰值扭矩
+        effort_limit_sim = 66.0 * scale  # 峰值扭矩
     ),
     "CRA_RI60_80_shoulder": Ti5ActuatorCfg_CRA_RI60_80(
         joint_names_expr=[
@@ -344,7 +344,7 @@ FullActuator_actuators = {
             "pelvis_joint",
         ],
         stiffness=280,
-        damping=1.5,
+        damping=4.5,
         effort_limit_sim = 42.0  # 峰值扭矩
     ),
     "CRA_RI50_70": Ti5ActuatorCfg_CRA_RI50_70(
@@ -449,6 +449,6 @@ for a in Q1_CYLINDER_CFG.actuators.values():
         s = {n: s for n in names}
     for n in names:
         if n in e and n in s and s[n]:
-            Q1_ACTION_SCALE[n] = 0.25 #* e[n] / s[n]
+            Q1_ACTION_SCALE[n] = 0.25 * e[n] / s[n]
             #是否使用这种action scale的计算方式，具体考量需要参考个人调试笔记12月20日记录
 print("Q1_ACTION_SCALE:",Q1_ACTION_SCALE)
