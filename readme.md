@@ -64,14 +64,15 @@ python -m torch.distributed.run --nnodes=1 --nproc_per_node=8 scripts/rsl_rl/tra
 - #### teacher policy train command
   单卡训练：
   ```
-  python scripts/rsl_rl/train_multi_teach.py  --task=Pure-Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Pure_Q1_slowly_walk
+  python scripts/rsl_rl/train_multi_teacher.py  --task=Pure-Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Pure_Q1_slowly_walk
   ```
   多卡训练：
   ```
-  python -m torch.distributed.run --nnodes=1 --nproc_per_node=8 scripts/rsl_rl/train_multi_teach.py  --task=Pure-Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Pure_Q1_slowly_walk --distributed
+  python -m torch.distributed.run --nnodes=1 --nproc_per_node=8 scripts/rsl_rl/train_multi_teacher.py  --task=Pure-Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Pure_Q1_slowly_walk --distributed
   ```
 - #### teacher policy eval command
   - `--other_dirs` 表示 `load_run`下的子文件夹，名字与`motion_file.yaml`中描述的 motion_group name一致
   ```
   python scripts/rsl_rl/play.py --task Pure-Tracking-Flat-Q1-v0 --num_envs 2 --load_run 2026_01_05_22_27_Pure_Q1 --other_dirs run
   ```
+  smb://shfile.huaqin.com/机器人软件共享盘

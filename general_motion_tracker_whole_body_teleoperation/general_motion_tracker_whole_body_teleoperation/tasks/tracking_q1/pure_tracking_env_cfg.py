@@ -30,7 +30,7 @@ import general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp as 
 VELOCITY_RANGE = {
     "x": (-0.8, 0.8),
     "y": (-0.5, 0.5),
-    "z": (-0.2, 0.8),
+    "z": (-0.2, 0.2),
     "roll": (-0.52, 0.52),
     "pitch": (-0.52, 0.52),
     "yaw": (-0.78, 0.78),
@@ -136,10 +136,10 @@ class ObservationsCfg:
             func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2)
         )
         joint_pos = ObsTerm(
-            func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.015, n_max=0.015)
+            func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01)
         )
         joint_vel = ObsTerm(
-            func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.55, n_max=0.55)
+            func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.5, n_max=0.5)
         )
         def __post_init__(self):
             self.enable_corruption = True
@@ -303,7 +303,7 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=[".*"]),
-            "pos_distribution_params": (-0.015, 0.015),
+            "pos_distribution_params": (-0.01, 0.01),
             "operation": "add",
         },
     )
@@ -312,7 +312,7 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names="torso_link"),
-            "com_range": {"x": (-0.08, 0.08), "y": (-0.045, 0.045), "z": (-0.01, 0.05)},
+            "com_range": {"x": (-0.06, 0.06), "y": (-0.025, 0.025), "z": (-0.01, 0.05)},
         },
     )
     pelvis_com = EventTerm(
@@ -320,7 +320,7 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names="pelvis_link"),
-            "com_range": {"x": (-0.02, 0.02), "y": (-0.04, 0.04), "z": (-0.01, 0.02)},
+            "com_range": {"x": (-0.01, 0.01), "y": (-0.02, 0.02), "z": (-0.01, 0.01)},
         },
     )
     knee_link_com = EventTerm(
@@ -330,7 +330,7 @@ class EventCfg:
             "asset_cfg": SceneEntityCfg(
                 "robot", body_names=["L_knee_link", "R_knee_link"]
             ),
-            "com_range": {"x": (-0.02, 0.02), "y": (-0.02, 0.02), "z": (-0.04, 0.04)},
+            "com_range": {"x": (-0.01, 0.01), "y": (-0.01, 0.01), "z": (-0.03, 0.03)},
         },
     )
     robot_scale_mass = EventTerm(
@@ -338,7 +338,7 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names=".*"),
-            "mass_distribution_params": (0.88, 1.12),
+            "mass_distribution_params": (0.92, 1.08),
             "operation": "scale",
         },
     )
@@ -347,11 +347,18 @@ class EventCfg:
         mode="startup",  # startup 和 reset 的训练结构没什么区别，反而 reset 会增加训练时间
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
-            "stiffness_distribution_params": (1.0, 1.0),
-            "damping_distribution_params": (1.0, 1.0),
+            "stiffness_distribution_params": (1/1.3, 1.3),
+            "damping_distribution_params": (1/1.3, 1.3),
             "operation": "scale",
-            "distribution": "log_uniform",
+            "distribution": "uniform",
         },
+    )
+    # interval
+    push_robot = EventTerm(
+        func=mdp.push_by_setting_velocity,
+        mode="interval",
+        interval_range_s=(1.0, 3.0),
+        params={"velocity_range": VELOCITY_RANGE},
     )
     # reset robot
     reset_robot = EventTerm(
@@ -379,8 +386,13 @@ class RewardsCfg:
     )
     motion_body_pos = RewTerm(
         func=mdp.motion_relative_body_position_error_exp,
-        weight=1.0,
+        weight=0.5,
         params={"command_name": "motion", "std": 0.3},
+    )
+    extern_motion_body_pos = RewTerm(
+        func=mdp.motion_relative_body_position_error_exp,
+        weight=1.0,
+        params={"command_name": "motion", "std": 0.081},
     )
     motion_body_ori = RewTerm(
         func=mdp.motion_relative_body_orientation_error_exp,
@@ -403,6 +415,11 @@ class RewardsCfg:
         weight=-10.0,
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*"])},
     )
+    joint_torques_limit = RewTerm(
+        func=mdp.joint_torques_l2,
+        weight=-2e-5,
+        params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*"])},
+    )
     undesired_contacts = RewTerm(
         func=mdp.undesired_contacts,
         weight=-0.1,
@@ -414,6 +431,20 @@ class RewardsCfg:
                 ],
             ),
             "threshold": 1.0,
+        },
+    )
+    foot_contact_velocity = RewTerm(
+        func=mdp.foot_contact_velocity,
+        weight=-0.1,
+        params={
+            "threshold": 1.0,
+            "sensor_cfg": SceneEntityCfg(
+                "contact_forces",
+                body_names=[".*_ankle_roll_link"],
+            ),
+            "command_name": "motion",
+            "clip": 2.0**2,
+            "body_names": ["L_ankle_roll_link", "R_ankle_roll_link"],
         },
     )
 
