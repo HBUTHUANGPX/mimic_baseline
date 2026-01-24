@@ -3,7 +3,7 @@ motion_group:
     # file_name: ["artifacts/Xsens/251203/02_midium_forward_walk_120Hz.npz"]
     file_name: ["artifacts/Q1_251021_01_slowly_walk_120Hz:v0/motion.npz"]
     # file_name: []
-    folder_name: []
+    # folder_name: []
     # folder_name: ["artifacts/lafan_bvh/walk"]
     wo_file_name: []
     wo_folder_name: []
