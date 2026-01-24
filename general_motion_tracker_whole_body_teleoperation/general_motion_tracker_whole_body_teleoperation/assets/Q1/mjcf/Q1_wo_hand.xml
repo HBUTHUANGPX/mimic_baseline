@@ -42,7 +42,7 @@
 
   <worldbody>
     <body name="pelvis_link" pos="0 0 0.992">
-      <inertial pos="-0.073896 1.65e-05 -0.056743" quat="0.683168 0.683182 0.182389 -0.182421" mass="6.0067291" diaginertia="0.0694156 0.0185207 0.0726675"/>
+      <inertial pos="-0.0611013 1.36e-05 -0.052113" quat="0.36143 0.361412 -0.607768 0.607756" mass="6.00673" diaginertia="0.0740305 0.0680526 0.0185207"/>
       <joint name="floating_base_joint" type="free" limited="false" actuatorfrclimited="false"/>
       <geom type="mesh" contype="0" conaffinity="0" group="1" density="0" rgba="0.79216 0.81961 0.93333 1" mesh="pelvis_link"/>
       <geom size="0.04 0.175 0.05" pos="-0.1 0 -0.05" type="box" rgba="0.79216 0.81961 0.93333 1"/>
