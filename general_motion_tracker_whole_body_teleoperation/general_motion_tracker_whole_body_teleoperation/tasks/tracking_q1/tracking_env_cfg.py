@@ -240,8 +240,8 @@ class EventCfg:
         mode="startup", # startup 和 reset 的训练结构没什么区别，反而 reset 会增加训练时间
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
-            "stiffness_distribution_params": (1/1.3, 1.3),
-            "damping_distribution_params": (1/1.3, 1.3),
+            "stiffness_distribution_params": (1/1.1, 1.1),
+            "damping_distribution_params": (1/1.1, 1.1),
             "operation": "scale",
             "distribution": "uniform",
         },
