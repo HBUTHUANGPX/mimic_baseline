@@ -48,10 +48,10 @@ ImplicitActuator_actuators = {
             ".*_knee_joint": 300,
         },
         damping={
-            ".*_hip_roll_joint": 40.0,
+            ".*_hip_roll_joint": 6.0,
             ".*_hip_yaw_joint": 2.5,
-            ".*_hip_pitch_joint": 40.0,
-            ".*_knee_joint": 20.0,
+            ".*_hip_pitch_joint": 12.0,
+            ".*_knee_joint": 6.0,
         },
         armature={
             ".*_hip_roll_joint": 70017 * 1e-6,

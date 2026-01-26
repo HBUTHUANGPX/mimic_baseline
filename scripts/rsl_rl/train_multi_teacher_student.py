@@ -341,7 +341,7 @@ def main(
         env = multi_agent_to_single_agent(env)
 
     # save resume path before creating a new log_dir
-    if agent_cfg.resume or agent_cfg.algorithm.class_name == "MultiTeacherDistillation":
+    if agent_cfg.resume or agent_cfg.algorithm.class_name == "PPO_Distil":
         resume_path = get_checkpoint_path(
             "/home/hpx/HPX_LOCO_2/mimic_baseline/logs/rsl_rl/pure_q1_flat",
             agent_cfg.load_run,
@@ -393,7 +393,7 @@ def main(
     # write git state to logs
     runner.add_git_repo_to_log(__file__)
     # load the checkpoint
-    if agent_cfg.resume or agent_cfg.algorithm.class_name == "MultiTeacherDistillation":
+    if agent_cfg.resume or agent_cfg.algorithm.class_name == "PPO_Distil":
         print(f"[INFO]: Loading model checkpoint from: {resume_path}")
         # load previously trained model
         runner.load(resume_path, map_location=agent_cfg.device)
