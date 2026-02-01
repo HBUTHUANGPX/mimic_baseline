@@ -14,7 +14,7 @@ from typing import Literal
 class Q1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
     max_iterations = 90001
-    save_interval = 1000
+    save_interval = 500
     obs_groups = (
         {
             "policy": ["policy"],  # 映射到环境提供的 'policy' 观测组，用于演员网络
