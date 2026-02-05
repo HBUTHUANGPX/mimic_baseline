@@ -44,7 +44,7 @@ done
 # 注意：原命令中 --group_name "\$motion" 会将字面字符串 "$motion" 传递给参数
 # 如果您希望传递 motion 变量的实际值，请将下面一行改为 --group_name "$MOTION"
 
-python scripts/rsl_rl/train_multi_teacher_motion_group_one_by_one_gpu.py \
+CUDA_VISIBLE_DEVICES=$GPU python scripts/rsl_rl/train_multi_teacher_motion_group_one_by_one_gpu.py \
     --task=Pure-Tracking-Flat-Q1-v0 \
     --headless \
     --logger wandb \
@@ -52,4 +52,4 @@ python scripts/rsl_rl/train_multi_teacher_motion_group_one_by_one_gpu.py \
     --run_name Q1_lafan \
     --group_name "$MOTION" \
     --time_stamp "$TIMESTAMP" \
-    --device=cuda:$GPU
+    # --device=cuda:$GPU

@@ -43,7 +43,6 @@ active_gpus=0
 
 # 遍历每个 GPU，分配任务并启动终端
 for ((gpu=0; gpu<gpu_num; gpu++)); do
-    sleep 15
     start=$((gpu * per_gpu))
     if (( start >= total )); then
         break
@@ -82,6 +81,7 @@ for ((gpu=0; gpu<gpu_num; gpu++)); do
             read -r ;
             exec bash
         " &
+    sleep 15
     ((active_gpus++))
 done
 
