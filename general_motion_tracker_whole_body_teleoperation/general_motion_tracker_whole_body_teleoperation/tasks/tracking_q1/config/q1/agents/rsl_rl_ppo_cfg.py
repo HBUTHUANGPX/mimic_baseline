@@ -76,8 +76,8 @@ class PureQ1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         init_noise_std=0.8,
         actor_obs_normalization=True,
         critic_obs_normalization=True,
-        actor_hidden_dims=[512, 256, 128],
-        critic_hidden_dims=[512, 256, 128],
+        actor_hidden_dims=[1024, 512, 256, 128],
+        critic_hidden_dims=[1024, 512, 256, 128],
         activation="elu",
     )
     algorithm = RslRlPpoAlgorithmCfg(
@@ -191,7 +191,7 @@ class Q1FlatCVAEDistillationStudentMultiTeacherCfg(RslRlDistillationRunnerCfg):
         init_noise_std=0.8,
         actor_hidden_dims=[1024, 512, 256, 128],
         critic_hidden_dims=[1024, 512, 256, 128],
-        teacher_hidden_dims=[512, 256, 128],
+        teacher_hidden_dims=[1024, 512, 256, 128],
         prior_hidden_dims = [1024, 512, 128],
         encoder_hidden_dims = [512, 256, 128],
         activation="elu",

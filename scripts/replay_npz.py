@@ -67,7 +67,7 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     # Define simulation stepping
     sim_dt = sim.get_physics_dt()
 
-    motion_file = "artifacts/Xsens/251203/02_midium_forward_walk_120Hz.npz"
+    motion_file = "artifacts/Q1/xsens_bvh/251203/dance_01_120Hz.npz"
     motion_file_group ={"replay_motion": motion_file}
     motion = MotionLoader(
         motion_file_group,

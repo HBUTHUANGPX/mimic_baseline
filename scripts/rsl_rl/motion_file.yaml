@@ -1,24 +1,21 @@
 motion_group:
-  # walk_lafan:
-  #   file_name: []
-  #   folder_name: ["artifacts/lafan_bvh/walk"]
-  #   wo_file_name: []
-  #   wo_folder_name: []
-
-  walk_xsens_kunfu_boy:
-    file_name: ["artifacts/Q1_251021_01_slowly_walk_120Hz:v0/motion.npz"]
-    folder_name: []
+  xsens_bvh_251014_single_action:
+    file_name: []
+    folder_name: ["artifacts/Q1/xsens_bvh/251014_single_action"]
     wo_file_name: []
     wo_folder_name: []
-  
-  # walk_xsens_dance_girl:
-  #   file_name: ["artifacts/Xsens/251203/02_midium_forward_walk_120Hz.npz"]
-  #   folder_name: []
-  #   wo_file_name: []
-  #   wo_folder_name: []
-
-  # run_lafan:
-  #   file_name: []
-  #   folder_name: ["artifacts/lafan_bvh/run"]
-  #   wo_file_name: []
-  #   wo_folder_name: []
+  xsens_bvh_251020_21:
+    file_name: []
+    folder_name: ["artifacts/Q1/xsens_bvh/251020_21"]
+    wo_file_name: []
+    wo_folder_name: []
+  xsens_bvh_251202:
+    file_name: []
+    folder_name: ["artifacts/Q1/xsens_bvh/251202"]
+    wo_file_name: []
+    wo_folder_name: []
+  xsens_bvh_251203:
+    file_name: []
+    folder_name: ["artifacts/Q1/xsens_bvh/251203"]
+    wo_file_name: []
+    wo_folder_name: []
