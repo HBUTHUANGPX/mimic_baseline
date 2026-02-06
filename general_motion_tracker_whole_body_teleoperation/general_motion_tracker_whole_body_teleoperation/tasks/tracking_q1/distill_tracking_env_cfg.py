@@ -101,7 +101,7 @@ class CommandsCfg:
         pose_range={
             "x": (-0.0, 0.0),
             "y": (-0.0, 0.0),
-            "z": (-0.0, 0.0),
+            "z": (0.05, 0.1),
             "roll": (-0., 0.),
             "pitch": (-0., 0.),
             "yaw": (-0., 0.),
@@ -474,8 +474,13 @@ class RewardsCfg:
     )
     motion_body_pos = RewTerm(
         func=mdp.motion_relative_body_position_error_exp,
-        weight=1.0,
+        weight=0.5,
         params={"command_name": "motion", "std": 0.3},
+    )
+    extern_motion_body_pos = RewTerm(
+        func=mdp.motion_relative_body_position_error_exp,
+        weight=1.0,
+        params={"command_name": "motion", "std": 0.081},
     )
     motion_body_ori = RewTerm(
         func=mdp.motion_relative_body_orientation_error_exp,
@@ -498,6 +503,11 @@ class RewardsCfg:
         weight=-10.0,
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*"])},
     )
+    joint_torques_limit = RewTerm(
+        func=mdp.joint_torques_l2,
+        weight=-2e-5,
+        params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*"])},
+    )
     undesired_contacts = RewTerm(
         func=mdp.undesired_contacts,
         weight=-0.1,
@@ -509,6 +519,20 @@ class RewardsCfg:
                 ],
             ),
             "threshold": 1.0,
+        },
+    )
+    foot_contact_velocity = RewTerm(
+        func=mdp.foot_contact_velocity,
+        weight=-0.1,
+        params={
+            "threshold": 1.0,
+            "sensor_cfg": SceneEntityCfg(
+                "contact_forces",
+                body_names=[".*_ankle_roll_link"],
+            ),
+            "command_name": "motion",
+            "clip": 2.0**2,
+            "body_names": ["L_ankle_roll_link", "R_ankle_roll_link"],
         },
     )
 
@@ -536,10 +560,10 @@ class TerminationsCfg:
             "command_name": "motion",
             "threshold": 0.25,
             "body_names": [
-                "left_ankle_roll_link",
-                "right_ankle_roll_link",
-                "left_wrist_pitch_link",
-                "right_wrist_pitch_link",
+                "L_ankle_roll_link",
+                "R_ankle_roll_link",
+                "L_wrist_pitch_link",
+                "R_wrist_pitch_link",
             ],
         },
     )
@@ -562,8 +586,8 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the locomotion velocity-tracking environment."""
 
     # Scene settings
-    scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
-    # scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
+    # scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
+    scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
