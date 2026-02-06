@@ -86,6 +86,10 @@ python -m torch.distributed.run --nnodes=1 --nproc_per_node=8 scripts/rsl_rl/tra
    ```
    python scripts/rsl_rl/train_multi_teacher_student.py  --task=CVAEDissMT-Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Q1_Diss  --load_run 2026_0124_1721_Q1_lafan
    ```
+  - 多卡
+  ```
+  python -m torch.distributed.run --nnodes=1 --nproc_per_node=8 scripts/rsl_rl/train_multi_teacher_student.py  --task=CVAEDissMT-Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Q1_Diss  --load_run 2026_0202_2314_Q1_lafan --distributed
+  ```
 
 
 python scripts/rsl_rl/train_multi_teacher_motion_group_one_by_one_gpu.py     --task=Pure-Tracking-Flat-Q1-v0     --headless     --logger wandb     --log_project_name bydmmc     --run_name Q1_lafan     --group_name "walk_lafan"     --time_stamp "2026_0128_1423"     --device=cuda:0
@@ -94,7 +98,8 @@ python scripts/rsl_rl/train_multi_teacher_motion_group_one_by_one_gpu.py     --t
 
 
 # 报错解决
-1. 考虑缓存清理：删除Omniverse缓存rm -rf ~/.cache/ov并重试
+## 1. 考虑缓存清理：删除Omniverse缓存rm -rf ~/.cache/ov并重试
+
   ```shell
 Traceback (most recent call last):
   File "/home/hpx/miniconda3/envs/mimic_baseline/lib/python3.11/site-packages/gymnasium/envs/registration.py", line 734, in make
