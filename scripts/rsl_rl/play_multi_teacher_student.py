@@ -132,6 +132,69 @@ from general_motion_tracker_whole_body_teleoperation.utils.exporter import (
 
 # PLACEHOLDER: Extension template (do not remove this comment)
 from load_motion_file import collect_npz_paths
+import onnxruntime as ort
+import numpy as np
+
+def _run_onnx_inference(session, obs, time_step):
+    # 转换为numpy array并确保数据类型正确
+    if isinstance(obs, torch.Tensor):
+        obs = obs.detach().cpu().numpy()
+    if isinstance(time_step, torch.Tensor):
+        time_step = time_step.detach().cpu().numpy()
+    # 获取输入名称
+    obs_name = session.get_inputs()[0].name
+    time_step_name = session.get_inputs()[1].name
+
+    # 运行推理
+    (
+        actions,
+        joint_pos,
+        joint_vel,
+        body_pos_w,
+        body_quat_w,
+        body_lin_vel_w,
+        body_ang_vel_w,
+    ) = session.run(
+        None,
+        {
+            obs_name: obs.reshape(1, 1557),
+            # obs_name: obs.reshape(1, 247),
+            time_step_name: time_step.reshape(1, 1),
+        },
+    )
+    return (
+        actions,
+        joint_pos,
+        joint_vel,
+        body_pos_w,
+        body_quat_w,
+        body_lin_vel_w,
+        body_ang_vel_w,
+    )  # 默认返回第一个输出
+
+def _onnx_policy_reasoning(obs, onnx_policy):
+    if isinstance(obs, torch.Tensor):
+        obs = obs.detach().cpu().numpy()
+    (
+        act,
+        r_joint_pos,
+        r_joint_vel,
+        r_body_pos_w,
+        r_body_quat_w,
+        r_body_lin_vel_w,
+        r_body_ang_vel_w,
+    ) = _run_onnx_inference(
+        onnx_policy, obs.astype(np.float32), np.ones(1, dtype=np.float32)
+    )
+    return act
+
+
+def _load_onnx_model(onnx_path, device="cpu"):
+    providers = (
+        ["CPUExecutionProvider"] if device == "cpu" else ["CUDAExecutionProvider"]
+    )
+    session = ort.InferenceSession(onnx_path, providers=providers)
+    return session
 
 @hydra_task_config(args_cli.task, args_cli.agent)
 def main(
@@ -272,14 +335,17 @@ def main(
     # export policy to onnx/jit
     export_model_dir = os.path.join(os.path.dirname(resume_path), "exported")
 
-    # export_motion_policy_as_onnx(
-    #     env.unwrapped,
-    #     policy_nn,
-    #     normalizer=normalizer,
-    #     path=export_model_dir,
-    #     filename="policy.onnx",
-    # )
-    
+    export_motion_policy_as_onnx(
+        env.unwrapped,
+        policy_nn,
+        normalizer=normalizer,
+        path=export_model_dir,
+        filename="policy.onnx",
+        cvae_multi_teacher=True,
+    )
+    onnx_policy = _load_onnx_model(
+        os.path.join(export_model_dir, "policy.onnx")
+    )
     dt = env.unwrapped.step_dt
 
     # reset environment
@@ -292,6 +358,9 @@ def main(
         with torch.inference_mode():
             # agent stepping
             actions = policy(obs)
+            
+            act = _onnx_policy_reasoning(policy_nn.get_actor_obs(obs)[0, :], onnx_policy)
+            actions[0, :] = torch.from_numpy(act)
             # env stepping
             obs, _, dones, _ = env.step(actions)
             # reset recurrent states for episodes that have terminated

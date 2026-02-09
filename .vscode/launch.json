@@ -17,25 +17,25 @@
 //         }
 //     ]
 // }
-{
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Python Debugger: Current File with Arguments",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "/home/hpx/HPX_LOCO_2/mimic_baseline/scripts/rsl_rl/train_multi_teacher_student.py",
-            "console": "integratedTerminal",
-            "args": [
-                "--task","CVAEDissMT-Tracking-Flat-Q1-v0",
-                "--headless",
-                "--log_project_name", "bydmmc",
-                "--run_name", "Q1_Diss",
-                "--load_run", "2026_0124_1721_Q1_lafan",
-            ]
-        }
-    ]
-}
+// {
+//     "version": "0.2.0",
+//     "configurations": [
+//         {
+//             "name": "Python Debugger: Current File with Arguments",
+//             "type": "debugpy",
+//             "request": "launch",
+//             "program": "/home/hpx/HPX_LOCO_2/mimic_baseline/scripts/rsl_rl/train_multi_teacher_student.py",
+//             "console": "integratedTerminal",
+//             "args": [
+//                 "--task","CVAEDissMT-Tracking-Flat-Q1-v0",
+//                 "--headless",
+//                 "--log_project_name", "bydmmc",
+//                 "--run_name", "Q1_Diss",
+//                 "--load_run", "2026_0124_1721_Q1_lafan",
+//             ]
+//         }
+//     ]
+// }
 // {
 //     "version": "0.2.0",
 //     "configurations": [
@@ -72,20 +72,20 @@
 //         }
 //     ]
 // }
-// {
-//     "version": "0.2.0",
-//     "configurations": [
-//         {
-//             "name": "Python Debugger: Current File with Arguments",
-//             "type": "debugpy",
-//             "request": "launch",
-//             "program": "/home/hpx/HPX_LOCO_2/mimic_baseline/scripts/rsl_rl/play_multi_teacher_student.py",
-//             "console": "integratedTerminal",
-//             "args": [
-//                 "--task", "DissMT-Tracking-Flat-Q1-v0",
-//                 "--num_envs", "2",
-//                 "--domain_randomization"
-//             ]
-//         }
-//     ]
-// }
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Current File with Arguments",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/home/hpx/HPX_LOCO_2/mimic_baseline/scripts/rsl_rl/play_multi_teacher_student.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--task", "CVAEDissMT-Tracking-Flat-Q1-v0",
+                "--num_envs", "2",
+                "--domain_randomization"
+            ]
+        }
+    ]
+}

@@ -5,6 +5,7 @@
 
 import os
 import torch
+import copy
 
 import onnx
 
@@ -22,10 +23,14 @@ def export_motion_policy_as_onnx(
     normalizer: object | None = None,
     filename="policy.onnx",
     verbose=False,
+    cvae_multi_teacher: bool = False,
 ):
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
-    policy_exporter = _OnnxMotionPolicyExporter(env, actor_critic, normalizer, verbose)
+    if cvae_multi_teacher:
+        policy_exporter = _OnnxCVAEMTMotionPolicyExporter(env, actor_critic, normalizer, verbose)
+    else:
+        policy_exporter = _OnnxMotionPolicyExporter(env, actor_critic, normalizer, verbose)
     policy_exporter.export(path, filename)
 
 
@@ -35,6 +40,90 @@ def export_policy_as_jit(
     policy_exporter = _TorchPolicyExporter(policy, normalizer)
     policy_exporter.export(path, filename)
 
+class _OnnxCVAEMTMotionPolicyExporter(torch.nn.Module):
+    def __init__(
+        self, env: ManagerBasedRLEnv, actor_critic, normalizer=None, verbose=False
+    ):
+        super().__init__()
+        self.verbose = verbose
+        self.is_cvae = True
+        # copy policy parameters
+        if hasattr(actor_critic, "prior_network"):
+            self.prior_network = copy.deepcopy(actor_critic.prior_network)
+        if hasattr(actor_critic, "actor"):
+            self.actor = copy.deepcopy(actor_critic.actor)
+        if hasattr(actor_critic, "z_scale_factor"):
+            self.z_scale_factor = copy.deepcopy(actor_critic.z_scale_factor)
+        if hasattr(actor_critic, "latent_dim"):
+            self.latent_dim = copy.deepcopy(actor_critic.latent_dim)
+        if normalizer:
+            self.normalizer = copy.deepcopy(normalizer)
+        else:
+            self.normalizer = torch.nn.Identity()
+
+        cmd: MotionCommand = env.command_manager.get_term("motion")
+
+        self.joint_pos = cmd.motion.joint_pos.to("cpu")
+        self.joint_vel = cmd.motion.joint_vel.to("cpu")
+        self.body_pos_w = cmd.motion.body_pos_w.to("cpu")
+        self.body_quat_w = cmd.motion.body_quat_w.to("cpu")
+        self.body_lin_vel_w = cmd.motion.body_lin_vel_w.to("cpu")
+        self.body_ang_vel_w = cmd.motion.body_ang_vel_w.to("cpu")
+        self.time_step_total = self.joint_pos.shape[0]
+
+    def forward(self, x, time_step):
+        """CVAE 前向传播（用于 ONNX 导出，仅使用先验分布）。
+        
+        Args:
+            x: 输入观测（部署观测）。
+        
+        Returns:
+            动作均值。
+        """
+        obs = self.normalizer(x)  # 规范化输入观测
+        # 计算先验参数
+        prior_out = self.prior_network(obs)
+        mu_p, _ = prior_out.split(self.latent_dim, dim=-1)
+        # 使用均值作为 z（确定性推理，避免随机性）
+        z = mu_p * self.z_scale_factor  # 应用缩放因子
+        # 连接观测和 z 输入解码器
+        decoder_input = torch.cat([obs, z], dim=-1)
+        time_step_clamped = torch.clamp(
+            time_step.long().squeeze(-1), max=self.time_step_total - 1
+        )
+        return (
+            self.actor(decoder_input),
+            self.joint_pos[time_step_clamped],
+            self.joint_vel[time_step_clamped],
+            self.body_pos_w[time_step_clamped],
+            self.body_quat_w[time_step_clamped],
+            self.body_lin_vel_w[time_step_clamped],
+            self.body_ang_vel_w[time_step_clamped],
+        )
+    
+    def export(self, path, filename):
+        self.to("cpu")
+        obs = torch.zeros(1, self.prior_network[0].in_features)  # dummy 输入（学生观测维度）
+        time_step = torch.zeros(1, 1)
+        torch.onnx.export(
+            self,
+            (obs, time_step),
+            os.path.join(path, filename),
+            export_params=True,
+            opset_version=11,
+            verbose=self.verbose,
+            input_names=["obs", "time_step"],
+            output_names=[
+                "actions",
+                "joint_pos",
+                "joint_vel",
+                "body_pos_w",
+                "body_quat_w",
+                "body_lin_vel_w",
+                "body_ang_vel_w",
+            ],
+            dynamic_axes={},
+        )
 
 class _OnnxMotionPolicyExporter(_OnnxPolicyExporter):
     def __init__(
@@ -57,39 +146,6 @@ class _OnnxMotionPolicyExporter(_OnnxPolicyExporter):
         )
         return (
             self.actor(self.normalizer(x)),
-            self.joint_pos[time_step_clamped],
-            self.joint_vel[time_step_clamped],
-            self.body_pos_w[time_step_clamped],
-            self.body_quat_w[time_step_clamped],
-            self.body_lin_vel_w[time_step_clamped],
-            self.body_ang_vel_w[time_step_clamped],
-        )
-
-    def forward_cvae(self, x, time_step):
-        """CVAE 前向传播（用于 ONNX 导出，仅使用先验分布）。
-        
-        Args:
-            x: 输入观测（部署观测）。
-        
-        Returns:
-            动作均值。
-        """
-        obs = self.normalizer(x)  # 规范化输入观测
-        # 计算先验参数
-        mu_p = self.prior_mu(obs)
-        logvar_p = self.prior_logvar(obs)
-        # 规范化 mu（如果启用）
-        if self.normalize_mu:
-            mu_p = self.mu_normalizer(mu_p)
-        # 使用均值作为 z（确定性推理，避免随机性）
-        z = mu_p * self.z_scale_factor  # 应用缩放因子
-        # 连接观测和 z 输入解码器
-        decoder_input = torch.cat([obs, z], dim=-1)
-        time_step_clamped = torch.clamp(
-            time_step.long().squeeze(-1), max=self.time_step_total - 1
-        )
-        return (
-            self.decoder(decoder_input),
             self.joint_pos[time_step_clamped],
             self.joint_vel[time_step_clamped],
             self.body_pos_w[time_step_clamped],
