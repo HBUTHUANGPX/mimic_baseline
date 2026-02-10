@@ -16,3 +16,5 @@ lafan_Q1/*
 artifacts/lafan_bvh/*
 .vscode/*
 MJMODEL.TXT
+deploy_mujoco/artifacts/*
+deploy_mujoco/deploy_policy/*

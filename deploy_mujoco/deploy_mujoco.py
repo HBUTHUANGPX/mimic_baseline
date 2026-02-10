@@ -27,11 +27,11 @@ from pinocchio.robot_wrapper import RobotWrapper
 from math_func import *
 from motion_loader import MotionLoader
 from video_recorder import VideoRecorder
-
+from observation_manager import SimpleObservationManager, TermCfg, GroupCfg
+from urdf_graph import UrdfGraph
 np.set_printoptions(precision=16, linewidth=100, threshold=np.inf, suppress=True)
 
 current_path = os.getcwd()
-
 
 # export PYTHONPATH=""
 class pin_mj:
@@ -99,8 +99,7 @@ class cfg:
     policy_type = "onnx"  # torch or onnx
     policy_path = (
         current_path
-        + "/deploy_mujoco/deploy_policy/Q1/"
-        + "2025-12-17_22-02-29_Q1_slowly_walk_big_torque_90000/"
+        + "/deploy_mujoco/deploy_policy/Q1/2026-02-05_17-08-57_Q1_Diss_21500/"
         # + "2025-11-12_17-43-09_Q1_251021_03_saw_120Hz_60000"
         + "policy.onnx"
     )
@@ -110,11 +109,8 @@ class cfg:
     motion_file = (
         current_path
         + "/deploy_mujoco/artifacts/Q1/"
-        # + "Q1_251021_05_xingyiquan_120Hz:v0"
-        # + "Q1_251021_04_boxing_120Hz:v0"
-        # + "Q1_251021_03_saw_120Hz:v0"
-        + "Q1_251021_01_slowly_walk_120Hz:v0"
-        + "/motion.npz"
+        + "xsens_bvh/251020_21/251021_05_xingyiquan_120Hz.npz"
+        # + "xsens_bvh/251020_21/251021_04_boxing_120Hz.npz"
     )
     only_leg_flag = False  # True, False
     with_wrist_flag = True  # True, False
@@ -122,13 +118,13 @@ class cfg:
     ###################################################
     # stiffness damping and joint maximum torqueparam #
     ###################################################
-    leg_P_gains = [240, 240, 380, 380, 70, 70] * 2
-    leg_tq_max = [90.0, 60.0, 330.0, 330.0, 72.0, 72.0] * (2)
-    leg_D_gains = [2.5, 1.5, 3.0, 3.0, 1.5, 1.5] * 2
+    leg_P_gains = [350, 50, 450, 300, 70.0, 70.0] * 2
+    leg_tq_max = [85.1, 64.4, 158.7, 158.7, 75.9, 75.9] * (2)
+    leg_D_gains = [6.0, 2.5, 12.0, 6.0, 1.5, 1.5] * 2
 
     pelvis_P_gains = [280.0]
     pelvis_tq_max = [42.0]
-    pelvis_D_gains = [1.5]
+    pelvis_D_gains = [4.5]
 
     arm_P_gains = [70.0, 70.0, 70.0, 70.0, 20.0, 20.0, 20.0] * (2)
     arm_tq_max = [42.0, 42.0, 23.0, 23.0, 8.3, 3.3, 3.3] * (2)
@@ -172,7 +168,7 @@ class cfg:
     # obs param #
     #############
     frame_stack = 1
-    num_single_obs = 154
+    num_single_obs = 1557
 
     ####################
     # motion play mode #
@@ -192,70 +188,10 @@ class cfg:
     ###########################################
     # Data conversion of isaac sim and mujoco #
     ###########################################
-    isaac_sim_joint_name = [
-        "L_hip_roll_joint",
-        "R_hip_roll_joint",
-        "pelvis_joint",
-        "L_hip_yaw_joint",
-        "R_hip_yaw_joint",
-        "L_shoulder_pitch_joint",
-        "R_shoulder_pitch_joint",
-        "head_yaw_joint",
-        "L_hip_pitch_joint",
-        "R_hip_pitch_joint",
-        "L_shoulder_roll_joint",
-        "R_shoulder_roll_joint",
-        "head_pitch_joint",
-        "L_knee_joint",
-        "R_knee_joint",
-        "L_shoulder_yaw_joint",
-        "R_shoulder_yaw_joint",
-        "L_ankle_pitch_joint",
-        "R_ankle_pitch_joint",
-        "L_elbow_joint",
-        "R_elbow_joint",
-        "L_ankle_roll_joint",
-        "R_ankle_roll_joint",
-        "L_forearm_yaw_joint",
-        "R_forearm_yaw_joint",
-        "L_wrist_roll_joint",
-        "R_wrist_roll_joint",
-        "L_wrist_pitch_joint",
-        "R_wrist_pitch_joint",
-    ]
+    urdf_graph = UrdfGraph(urdf_path)
+    isaac_sim_joint_name = urdf_graph.bfs_joint_order()
 
-    isaac_sim_link_name = [
-        "pelvis_link",
-        "L_hip_roll_link",
-        "R_hip_roll_link",
-        "torso_link",
-        "L_hip_yaw_link",
-        "R_hip_yaw_link",
-        "L_shoulder_pitch_link",
-        "R_shoulder_pitch_link",
-        "head_yaw_link",
-        "L_hip_pitch_link",
-        "R_hip_pitch_link",
-        "L_shoulder_roll_link",
-        "R_shoulder_roll_link",
-        "head_pitch_link",
-        "L_knee_link",
-        "R_knee_link",
-        "L_shoulder_yaw_link",
-        "R_shoulder_yaw_link",
-        "L_ankle_pitch_link",
-        "R_ankle_pitch_link",
-        "L_elbow_link",
-        "R_elbow_link",
-        "L_ankle_roll_link",
-        "R_ankle_roll_link",
-        "L_forearm_yaw_link",
-        "R_forearm_yaw_link",
-        "L_wrist_roll_link",
-        "R_wrist_roll_link",
-        "L_wrist_pitch_link",
-        "R_wrist_pitch_link",
-    ]  # env.unwrapped.scene["robot"].body_names
+    isaac_sim_link_name = urdf_graph.bfs_link_order() # env.unwrapped.scene["robot"].body_names
 
     motion_body_names = [
         "pelvis_link",
@@ -276,6 +212,24 @@ class cfg:
     ]
 
     motion_reference_body = "torso_link"
+
+
+
+
+
+class ObsCfg:
+    """观测总配置：每个属性是一个 GroupCfg 实例。"""
+
+    class PolicyCfg(GroupCfg):
+        motion_joint_pos_command = TermCfg()
+        motion_joint_vel_command = TermCfg()
+        motion_ref_ori_b = TermCfg()
+        base_ang_vel = TermCfg(history_length=24)
+        joint_pos = TermCfg(history_length=24)
+        joint_vel = TermCfg(history_length=24)
+        actions = TermCfg()
+
+    policy = PolicyCfg()
 
 
 class simulator:
@@ -306,6 +260,8 @@ class simulator:
             compress=False,
         )
         self.data_save = []
+        self.obs_manager = SimpleObservationManager(ObsCfg(), self)
+        to = self.obs_manager.compute_group("policy", update_history=True)
         with open(
             "/home/hpx/HPX_LOCO_2/whole_body_tracking/my_variable.pkl", "rb"
         ) as f:
@@ -556,6 +512,46 @@ class simulator:
         self.viewer.sync()
         self.update_vel_geom()
 
+    def _obs_motion_joint_pos_command(self):
+        return np.copy(self.motion.joint_pos[self.time_step])
+
+    def _obs_motion_joint_vel_command(self):
+        return np.copy(self.motion.joint_vel[self.time_step])
+
+    def _obs_motion_ref_ori_b(self):
+        self.pin.mujoco_to_pinocchio(
+            self.d.qpos[7:],
+            base_pos=self.d.qpos[0:3],
+            base_quat=self.d.qpos[3:7][[1, 2, 3, 0]],
+        )
+        _quat = self.pin.get_link_quaternion(cfg.motion_reference_body)
+        self.robot_ref_quat_w = torch.from_numpy(_quat).unsqueeze(0)  # shape [n,4]
+        self.ref_quat_w = self.motion.body_quat_w[
+            self.time_step, cfg.motion_body_names.index(cfg.motion_reference_body), :
+        ]  # shape [n,4]
+        q01 = self.robot_ref_quat_w
+        q02 = self.ref_quat_w
+        q10 = quat_inv(q01)
+        if q02 is not None:
+            q12 = quat_mul(q10, q02)
+        else:
+            q12 = q10
+        mat = matrix_from_quat(q12)
+        motion_ref_ori_b = mat[..., :2].reshape(mat.shape[0], -1)  # shape [n,6]
+        return motion_ref_ori_b
+
+    def _obs_base_ang_vel(self):
+        return self.d.qvel[3:6]
+
+    def _obs_joint_pos(self):
+        return (self.d.qpos[7:] - self.default_pos)[self.mujoco2isaac_sim_index]
+    
+    def _obs_joint_vel(self):
+        return self.d.qvel[6:][self.mujoco2isaac_sim_index]
+    
+    def _obs_actions(self):
+        return self.action
+    
     def update_obs(self, time_step):
         """
         +----------------------------------------------------------+
@@ -608,32 +604,32 @@ class simulator:
         #################
         self.single_obs[58:64] = np.copy(motion_ref_ori_b)
         #################
-        # base_ang_vel 3
+        # base_ang_vel 3 * history_length
         #################
         self.single_obs[64:67] = self.d.qvel[3:6]
         #################
-        # joint_pos 29
+        # joint_pos 29 * history_length
         #################
         self.single_obs[67:96] = (self.d.qpos[7:] - self.default_pos)[
             self.mujoco2isaac_sim_index
         ]
         #################
-        # joint_vel 29
+        # joint_vel 29 * history_length
         #################
         self.single_obs[96:125] = self.d.qvel[6:][self.mujoco2isaac_sim_index]
         #################
         # actions 29
         #################
         self.single_obs[125:154] = self.action  # / self.action_scale
-
-        self.obs = (
-            torch.tensor(np.concatenate([self.single_obs] * cfg.frame_stack, axis=-1))
-            .clamp(-10, 10)
-            .unsqueeze(0)
-            .detach()
-            .cpu()
-            .numpy()
-        )
+        self.obs = self.obs_manager.compute_group("policy", update_history=True).clamp(-10, 10).numpy()
+        # self.obs = (
+        #     torch.tensor(np.concatenate([self.single_obs] * cfg.frame_stack, axis=-1))
+        #     .clamp(-10, 10)
+        #     .unsqueeze(0)
+        #     .detach()
+        #     .cpu()
+        #     .numpy()
+        # )
 
     def _policy_reasoning(self):
 

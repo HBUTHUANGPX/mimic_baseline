@@ -75,21 +75,18 @@ python -m torch.distributed.run --nnodes=1 --nproc_per_node=8 scripts/rsl_rl/tra
   ```
 - #### teacher policy eval command
   - `--other_dirs` 表示 `load_run`下的子文件夹，名字与`motion_file.yaml`中描述的 motion_group name一致
-  ```
-  python scripts/rsl_rl/play.py --task Pure-Tracking-Flat-Q1-v0 --num_envs 2 --load_run 2026_01_05_22_27_Pure_Q1 --other_dirs run
-  ```
-  smb://shfile.huaqin.com/机器人软件共享盘
+  ```  python scripts/rsl_rl/play.py --task Pure-Tracking-Flat-Q1-v0 --num_envs 2 --load_run 2026_01_05_22_27_Pure_Q1 --other_dirs run  ```
 
 - #### multi teacher ppo distil
   - 训练命令
-  - 单卡
-   ```
-   python scripts/rsl_rl/train_multi_teacher_student.py  --task=CVAEDissMT-Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Q1_Diss  --load_run 2026_0124_1721_Q1_lafan
-   ```
-  - 多卡
-  ```
-  python -m torch.distributed.run --nnodes=1 --nproc_per_node=8 scripts/rsl_rl/train_multi_teacher_student.py  --task=CVAEDissMT-Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Q1_Diss  --load_run 2026_0202_2314_Q1_lafan --distributed
-  ```
+    - 单卡
+  ```python scripts/rsl_rl/train_multi_teacher_student.py  --task=CVAEDissMT-Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Q1_Diss  --load_run 2026_0124_1721_Q1_lafan ```
+
+    - 多卡
+  ```python -m torch.distributed.run --nnodes=1 --nproc_per_node=8 scripts/rsl_rl/train_multi_teacher_student.py  --task=CVAEDissMT-Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Q1_Diss  --load_run 2026_0202_2314_Q1_lafan --distributed ```
+
+  - 测试命令
+  ```python scripts/rsl_rl/play_multi_teacher_student.py --num_envs 2 --domain_randomization --task=CVAEDissMT-Tracking-Flat-Q1-v0 ```
 
 
 python scripts/rsl_rl/train_multi_teacher_motion_group_one_by_one_gpu.py     --task=Pure-Tracking-Flat-Q1-v0     --headless     --logger wandb     --log_project_name bydmmc     --run_name Q1_lafan     --group_name "walk_lafan"     --time_stamp "2026_0128_1423"     --device=cuda:0
