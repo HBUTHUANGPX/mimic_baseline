@@ -310,7 +310,7 @@ def main(
         )
     else:
         raise ValueError(f"Unsupported runner class: {agent_cfg.class_name}")
-    runner.load(resume_path, is_eval=True)
+    runner.load(resume_path, is_eval=True, map_location="cuda:0")
 
     # obtain the trained policy for inference
     policy = runner.get_inference_policy(device=env.unwrapped.device)

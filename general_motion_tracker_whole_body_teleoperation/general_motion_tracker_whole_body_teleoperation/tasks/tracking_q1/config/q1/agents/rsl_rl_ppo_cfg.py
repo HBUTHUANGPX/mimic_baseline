@@ -168,7 +168,7 @@ class Q1FlatCVAEDistillationStudentMultiTeacherCfg(RslRlDistillationRunnerCfg):
         {
             "policy": [
                 "command_wo_privilege",
-                "proprioception_wo_privilege",
+                "proprioception_with_noise_wo_privilege",
                 "last_action",
             ],  # 映射到环境提供的 'policy' 观测组，用于演员网络
             "critic": ["command",
