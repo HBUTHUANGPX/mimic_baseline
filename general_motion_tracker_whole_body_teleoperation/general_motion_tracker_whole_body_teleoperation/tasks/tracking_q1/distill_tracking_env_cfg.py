@@ -345,12 +345,21 @@ class ObservationsCfg:
     class CommandWOPrivilegeCfg(ObsGroup):  # 带噪声的指令观测组
         """Observations for command group with noise."""
 
-        command = ObsTerm(
-            func=mdp.generated_commands,
+        # command = ObsTerm(
+        #     func=mdp.generated_commands,
+        #     params={"command_name": "motion"},
+        # )
+        # motion_ref_ori_b = ObsTerm(
+        #     func=mdp.motion_ref_ori_b,
+        #     params={"command_name": "motion"},
+        # )
+        robot_ref_vx_vy_w = ObsTerm(
+            func=mdp.robot_ref_vx_vy_w,
             params={"command_name": "motion"},
         )
-        motion_ref_ori_b = ObsTerm(
-            func=mdp.motion_ref_ori_b,
+
+        robot_ref_wz_w = ObsTerm(
+            func=mdp.robot_ref_wz_w,
             params={"command_name": "motion"},
         )
 
@@ -586,6 +595,7 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the locomotion velocity-tracking environment."""
 
     # Scene settings
+    # scene: MySceneCfg = MySceneCfg(num_envs=128, env_spacing=2.5)
     # scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
     scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
     # Basic settings

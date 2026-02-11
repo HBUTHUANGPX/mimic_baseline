@@ -35,6 +35,15 @@ def robot_ref_ang_vel_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor
 
     return command.robot_ref_vel_w[:, 3:6].view(env.num_envs, -1)
 
+def robot_ref_vx_vy_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    command: MotionCommand = env.command_manager.get_term(command_name)
+
+    return command.robot_ref_lin_vel_w[:, 0:2].view(env.num_envs, -1)
+
+def robot_ref_wz_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    command: MotionCommand = env.command_manager.get_term(command_name)
+
+    return command.robot_ref_ang_vel_w[:, 5:6].view(env.num_envs, -1)
 
 def robot_body_pos_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
