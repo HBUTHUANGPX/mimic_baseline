@@ -161,7 +161,10 @@ class MotionLoader:
             )
             start = end
 
-        # New: motion_distribution (1, num_motions), initialized uniformly
+        # 动态平衡采样: 记录“当前被采样到的 motion 比例”
+        # - 形状: (1, num_motions)
+        # - 初始均匀分布，后续在 _update_command 中按当前 time_steps 统计更新
+        # - 用于 _resample_command 中与 target_dist 计算权重，避免某些 motion 被过度采样
         self.motion_distribution = torch.full(
             (1, self.num_motions),
             1.0 / self.num_motions,
@@ -169,7 +172,9 @@ class MotionLoader:
             device=device,
         )  # torch.Size([1, num_motions])
 
-        # Target distribution based on lengths
+        # 动态平衡采样: 目标分布（按 motion 长度占比）
+        # - 长序列在时间维度上覆盖更多步数，因此目标分布按长度归一化
+        # - 采样时希望“当前分布”逼近该目标分布
         total_length = sum(self.motion_lengths)
         self.target_dist = torch.tensor(
             [length / total_length for length in self.motion_lengths],
@@ -388,20 +393,24 @@ class MotionCommand(CommandTerm):
         if len(env_ids) == 0:
             return
 
-        # Compute adjusted probabilities for balancing based on current distribution
+        # 动态平衡采样核心:
+        # 1) current_dist: 当前 time_steps 覆盖的 motion 分布（由 _update_command 统计）
+        # 2) target_dist: 期望分布（按 motion 长度占比）
+        # 3) 权重 = target / current，当某个 motion 被“采少了”，权重会变大
+        # 4) 对权重再归一化，得到采样概率 probs
         epsilon = 1e-6
 
-        current_dist = self.motion.motion_distribution.squeeze(0)  # (num_motions,)
-        target_dist = self.motion.target_dist.squeeze(0)  # (num_motions,)
+        current_dist = self.motion.motion_distribution.squeeze(0)
+        target_dist = self.motion.target_dist.squeeze(0) 
         weights = target_dist / (current_dist + epsilon)
         probs = weights / weights.sum()  # Normalized probabilities for dynamic balance
 
-        # Sample motion indices based on adjusted probs
+        # 按动态平衡后的 probs 采样 motion id（每个 env 独立采样）
         motion_ids = torch.multinomial(
             probs, len(env_ids), replacement=True
         )  # (len(env_ids),)
 
-        # For each env, sample local phase in the selected motion
+        # 对每个 env 在“选中的 motion 区间”内再采样局部相位（时间步）
         selected_starts = self.motion.motion_indices[motion_ids, 0]  # (len(env_ids),)
         selected_lengths = torch.tensor(
             [self.motion.motion_lengths[mid.item()] for mid in motion_ids],
@@ -488,6 +497,9 @@ class MotionCommand(CommandTerm):
         total_mask = overflow_mask | cross_mask  # 合并掩码：溢出或跨越
         env_ids = torch.nonzero(total_mask, as_tuple=False).squeeze(-1)  # 获取需要重采样的 env_ids
 
+        # 动态平衡采样统计:
+        # 遍历每个 motion 区间，统计当前 time_steps 落在该区间的 env 数
+        # counts / num_envs 即当前分布 motion_distribution
         for i in range(self.motion.num_motions):
             start, end = self.motion.motion_indices[i]
             map = (self.time_steps >= start) & (self.time_steps < end)
@@ -495,6 +507,7 @@ class MotionCommand(CommandTerm):
             self.counts[i] = map.sum().float()
         self.motion.motion_distribution = (self.counts / self.num_envs).unsqueeze(0)
 
+        # 根据动态平衡策略为需要重采样的 env 重新分配 time_steps
         self._resample_command(env_ids)
 
         ref_pos_w_repeat = self.ref_pos_w[:, None, :].repeat(

@@ -99,9 +99,9 @@ class cfg:
     policy_type = "onnx"  # torch or onnx
     policy_path = (
         current_path
-        + "/deploy_mujoco/deploy_policy/Q1/2026-02-05_17-08-57_Q1_Diss_21500/"
-        # + "2025-11-12_17-43-09_Q1_251021_03_saw_120Hz_60000"
-        + "policy.onnx"
+        + "/"
+        + "deploy_mujoco/deploy_policy/Q1/2026-02-11_22-00-23_Q1_Diss_14000"
+        + "/policy.onnx"
     )
     asset_path = "/deploy_mujoco/assets/Q1"
     mjcf_path = current_path + asset_path + "/mjcf/Q1_wo_hand.xml"
@@ -109,8 +109,8 @@ class cfg:
     motion_file = (
         current_path
         + "/deploy_mujoco/artifacts/Q1/"
-        + "xsens_bvh/251020_21/251021_05_xingyiquan_120Hz.npz"
-        # + "xsens_bvh/251020_21/251021_04_boxing_120Hz.npz"
+        # + "xsens_bvh/251020_21/251021_05_xingyiquan_120Hz.npz"
+        + "xsens_bvh/251020_21/251021_04_boxing_120Hz.npz"
     )
     only_leg_flag = False  # True, False
     with_wrist_flag = True  # True, False
