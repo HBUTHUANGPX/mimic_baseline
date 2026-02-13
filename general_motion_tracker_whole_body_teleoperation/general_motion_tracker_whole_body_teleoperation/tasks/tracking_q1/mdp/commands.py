@@ -21,7 +21,7 @@ from isaaclab.utils.math import (
     sample_uniform,
     yaw_quat,
 )
-
+import math
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 import re
@@ -225,6 +225,23 @@ class MotionCommand(CommandTerm):
         self.counts = torch.zeros(
             self.motion.num_motions, dtype=torch.float32, device=self.device
         )
+        # 全局时间轴失败优先:
+        # - 将所有 motion 拼接后的全局时间轴划分为若干 bin
+        # - 失败发生时按 time_step 落入的 bin 累加计数
+        # - 采样时按失败计数（加下限）进行抽样，保证短片段不被忽视
+        self._bin_size = max(
+            1, int(1 / (self._env.cfg.decimation * self._env.cfg.sim.dt))
+        )
+        self._bin_count = int(
+            math.ceil(self.motion.time_step_total / float(self._bin_size))
+        )
+        self._bin_failed = torch.zeros(
+            self._bin_count, dtype=torch.float32, device=self.device
+        )
+        # 指数衰减: 用于累积当前步的失败统计，然后进行 EMA 更新
+        self._current_bin_failed = torch.zeros(
+            self._bin_count, dtype=torch.float32, device=self.device
+        )
         self.time_steps = torch.zeros(
             self.num_envs, dtype=torch.long, device=self.device
         )
@@ -393,32 +410,32 @@ class MotionCommand(CommandTerm):
         if len(env_ids) == 0:
             return
 
-        # 动态平衡采样核心:
-        # 1) current_dist: 当前 time_steps 覆盖的 motion 分布（由 _update_command 统计）
-        # 2) target_dist: 期望分布（按 motion 长度占比）
-        # 3) 权重 = target / current，当某个 motion 被“采少了”，权重会变大
-        # 4) 对权重再归一化，得到采样概率 probs
+        # 全局时间轴失败优先采样:
+        # - 失败计数全为 0 时使用均匀采样
+        # - 否则失败计数归一化，并设置下限避免短片段被忽视
         epsilon = 1e-6
+        uniform_bin_prob = 1.0 / float(self._bin_count)
+        min_bin_prob = 0.1 * uniform_bin_prob
 
-        current_dist = self.motion.motion_distribution.squeeze(0)
-        target_dist = self.motion.target_dist.squeeze(0) 
-        weights = target_dist / (current_dist + epsilon)
-        probs = weights / weights.sum()  # Normalized probabilities for dynamic balance
+        if self._bin_failed.sum() <= epsilon:
+            bin_probs = torch.full(
+                (self._bin_count,), uniform_bin_prob, device=self.device
+            )
+        else:
+            bin_probs = self._bin_failed / self._bin_failed.sum()
+            bin_probs = torch.clamp(bin_probs, min=min_bin_prob)
+            bin_probs = bin_probs / bin_probs.sum()
 
-        # 按动态平衡后的 probs 采样 motion id（每个 env 独立采样）
-        motion_ids = torch.multinomial(
-            probs, len(env_ids), replacement=True
-        )  # (len(env_ids),)
-
-        # 对每个 env 在“选中的 motion 区间”内再采样局部相位（时间步）
-        selected_starts = self.motion.motion_indices[motion_ids, 0]  # (len(env_ids),)
-        selected_lengths = torch.tensor(
-            [self.motion.motion_lengths[mid.item()] for mid in motion_ids],
-            device=self.device,
+        sampled_bins = torch.multinomial(
+            bin_probs, len(env_ids), replacement=True
         )
-        local_phases = torch.rand((len(env_ids),), device=self.device)  # Uniform [0,1)
-        local_steps = (local_phases * (selected_lengths - 1)).long()
-        self.time_steps[env_ids] = selected_starts + local_steps
+        local_steps = (
+            (sampled_bins + torch.rand((len(env_ids),), device=self.device))
+            * float(self._bin_size)
+        ).long()
+        self.time_steps[env_ids] = torch.clamp(
+            local_steps, 0, self.motion.time_step_total - 1
+        )
 
         root_pos = self.body_pos_w[:, 0].clone()
         root_ori = self.body_quat_w[:, 0].clone()
@@ -497,6 +514,26 @@ class MotionCommand(CommandTerm):
         total_mask = overflow_mask | cross_mask  # 合并掩码：溢出或跨越
         env_ids = torch.nonzero(total_mask, as_tuple=False).squeeze(-1)  # 获取需要重采样的 env_ids
 
+        # 全局时间轴失败统计，仅计非 timeout 的终止
+        # - terminated: 任意终止（包含超时）
+        # - time_outs: 超时终止
+        # - non_timeout: 真正失败（不包含超时）
+        terminated = self._env.termination_manager.terminated
+        non_timeout = terminated & (~self._env.termination_manager.time_outs)
+        if torch.any(non_timeout):
+            # 限制到合法时间范围，避免溢出访问
+            time_steps_clamped = torch.clamp(
+                self.time_steps, 0, self.motion.time_step_total - 1
+            )
+            term_ids = torch.nonzero(non_timeout, as_tuple=False).squeeze(-1)
+            term_steps = time_steps_clamped[term_ids]
+            # 直接按全局时间轴 bin 统计失败（先累积到 current，再做 EMA）
+            bin_ids = torch.clamp(
+                term_steps // self._bin_size, 0, self._bin_count - 1
+            )
+            ones = torch.ones_like(bin_ids, dtype=torch.float32, device=self.device)
+            self._current_bin_failed.index_put_((bin_ids,), ones, accumulate=True)
+
         # 动态平衡采样统计:
         # 遍历每个 motion 区间，统计当前 time_steps 落在该区间的 env 数
         # counts / num_envs 即当前分布 motion_distribution
@@ -506,6 +543,11 @@ class MotionCommand(CommandTerm):
             self.metrics[self.motion.extracted_list[i]] = map.clone().float()
             self.counts[i] = map.sum().float()
         self.motion.motion_distribution = (self.counts / self.num_envs).unsqueeze(0)
+
+        # 指数衰减更新失败统计
+        alpha = float(self.cfg.failed_bin_alpha)
+        self._bin_failed = alpha * self._current_bin_failed + (1.0 - alpha) * self._bin_failed
+        self._current_bin_failed.zero_()
 
         # 根据动态平衡策略为需要重采样的 env 重新分配 time_steps
         self._resample_command(env_ids)
@@ -617,6 +659,8 @@ class MotionCommandCfg(CommandTermCfg):
 
     joint_position_range: tuple[float, float] = (-0.52, 0.52)
     joint_velocity_range: tuple[float, float] = (-0.52, 0.52)
+    # 失败 bin 统计的指数衰减系数（越大越关注近期失败）
+    failed_bin_alpha: float = 0.1
 
     ref_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(
         prim_path="/Visuals/Command/pose"
