@@ -365,10 +365,10 @@ class TerminationsCfg:
             "command_name": "motion",
             "threshold": 0.25,
             "body_names": [
-                "left_ankle_roll_link",
-                "right_ankle_roll_link",
-                "left_wrist_pitch_link",
-                "right_wrist_pitch_link",
+                "L_ankle_roll_link",
+                "R_ankle_roll_link",
+                "L_wrist_pitch_link",
+                "R_wrist_pitch_link",
             ],
         },
     )
