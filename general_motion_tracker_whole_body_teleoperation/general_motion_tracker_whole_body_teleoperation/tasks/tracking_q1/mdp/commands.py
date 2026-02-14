@@ -660,7 +660,7 @@ class MotionCommandCfg(CommandTermCfg):
     joint_position_range: tuple[float, float] = (-0.52, 0.52)
     joint_velocity_range: tuple[float, float] = (-0.52, 0.52)
     # 失败 bin 统计的指数衰减系数（越大越关注近期失败）
-    failed_bin_alpha: float = 0.1
+    failed_bin_alpha: float = 0.001
 
     ref_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(
         prim_path="/Visuals/Command/pose"
