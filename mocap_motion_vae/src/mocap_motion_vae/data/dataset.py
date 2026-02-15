@@ -1,4 +1,17 @@
-"""窗口化数据集与索引器。"""
+"""窗口化数据集与索引器。
+
+本模块将 MotionBank 转为可直接训练的窗口化数据集。调用链如下：
+
+1) WindowIndex:
+   - 根据 clip_lengths、window、stride 计算可用窗口数量
+   - 将 dataset 索引映射到 (clip_index, start_index_in_clip)
+2) MotionWindowDataset:
+   - 根据 WindowIndex 找到窗口起点
+   - 使用 MotionView 在全局时间轴上批量索引
+   - 按 FeatureSpec 构建 inputs / targets / static
+
+该设计保证训练侧只需面向 Dataset 接口，而不关心底层拼接细节。
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,24 @@
-"""AMASS SMPL-X 数据解析与 MotionBank 构建工具。"""
+"""AMASS SMPL-X 数据解析与 MotionBank 构建工具。
+
+本模块负责将 AMASS 的 SMPL-X npz 文件解析为训练可用的结构化数据，
+并通过 MotionBank 统一拼接成全局时间轴。整体调用链如下：
+
+1) discover_amass_smplx_files: 扫描 AMASS 目录，得到 npz 文件列表。
+2) build_amass_smplx_bank:
+   - 遍历文件，调用 SMPLXClipParser.parse
+   - 将 SMPLXClip 转为 ClipData
+   - 交由 MotionBank.from_clips 统一拼接
+3) SMPLXClipParser.parse:
+   - 读取 npz（fps / gender / betas）
+   - 加载 SMPL-X 模型（smplx.create）
+   - 使用模型维度解析/拼接姿态字段
+   - 调用 SMPL-X 模型输出 joints / vertices / full_pose
+   - 组装 SMPLXClip 并返回
+
+注意：
+- 本模块强制依赖 SMPL-X 模型路径（smplx_model_path 或环境变量 SMPLX_MODEL_PATH）。
+- SMPLXFieldSpec 用于控制导出的帧级/静态字段。
+"""
 
 from __future__ import annotations
 

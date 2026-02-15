@@ -1,6 +1,25 @@
 from __future__ import annotations
 
-"""MotionBank 与 MotionView 的基础数据结构与视图工具。"""
+"""MotionBank 与 MotionView 的基础数据结构与视图工具。
+
+本模块提供“全局时间轴 + 批量索引视图”的核心抽象，调用链如下：
+
+1) ClipData: 表示单个动作片段（帧级字段 + 静态字段 + 元信息）。
+2) MotionBank:
+   - 将多个 ClipData 的帧级字段拼接为全局时间轴
+   - 维护 clip_indices / clip_ids / new_clip_flag 等索引结构
+3) MotionView:
+   - 接收 time_steps（可为 (T,) 或 (B, T)）
+   - 使用 tensor[time_steps] 完成批量索引
+   - concat/concat_static 会自动展平多维特征（如 joints: (T, J, 3)）
+4) FeatureSpec / MotionSample:
+   - 规定模型输入/输出字段的组织方式
+   - 为上层 Dataset 或训练循环提供统一样本结构
+
+设计目标：
+- 让训练侧仅关心“哪些字段作为输入/输出”，而不需要关心底层拼接逻辑；
+- 保持对 Tensor 索引广播/自动扩张的自然支持。
+"""
 
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union

@@ -1,8 +1,11 @@
 """最小完整示例：从 SMPL-X npz 构建 MotionBank 并采样窗口。
 
-该脚本支持两种模式：
-1) 未提供 AMASS 路径时，自动生成临时 npz 文件。
-2) 提供 AMASS 根目录时，扫描 npz 文件并构建数据集。
+调用链：
+1) 解析命令行参数（AMASS 路径 / SMPL-X 模型路径 / window / stride）
+2) 准备 npz 文件列表（可选生成临时数据）
+3) build_amass_smplx_bank 解析并构建 MotionBank
+4) MotionWindowDataset 进行窗口化采样
+5) 打印样本 shapes 作为验证
 
 注意：脚本需要可用的 SMPL-X 模型路径（--smplx-model-path 或环境变量 SMPLX_MODEL_PATH）。
 """
