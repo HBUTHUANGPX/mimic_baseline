@@ -100,7 +100,7 @@ class cfg:
     policy_path = (
         current_path
         + "/"
-        + "deploy_mujoco/deploy_policy/Q1/2026-02-11_22-00-23_Q1_Diss_14000"
+        + "deploy_mujoco/deploy_policy/Q1/2026-02-14_09-54-41_Q1_slowly_walk_25000"
         + "/policy.onnx"
     )
     asset_path = "/deploy_mujoco/assets/Q1"
@@ -168,7 +168,7 @@ class cfg:
     # obs param #
     #############
     frame_stack = 1
-    num_single_obs = 1557
+    num_single_obs = 154#1557
 
     ####################
     # motion play mode #
@@ -224,9 +224,12 @@ class ObsCfg:
         motion_joint_pos_command = TermCfg()
         motion_joint_vel_command = TermCfg()
         motion_ref_ori_b = TermCfg()
-        base_ang_vel = TermCfg(history_length=24)
-        joint_pos = TermCfg(history_length=24)
-        joint_vel = TermCfg(history_length=24)
+        # base_ang_vel = TermCfg(history_length=24)
+        # joint_pos = TermCfg(history_length=24)
+        # joint_vel = TermCfg(history_length=24)
+        base_ang_vel = TermCfg()
+        joint_pos = TermCfg()
+        joint_vel = TermCfg()
         actions = TermCfg()
 
     policy = PolicyCfg()

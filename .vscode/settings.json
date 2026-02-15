@@ -10,6 +10,7 @@
         "/home/hpx/HPX_LOCO_2/mimic_baseline/rsl_rl_v320/rsl_rl/runners",
         "/home/hpx/HPX_LOCO_2/mimic_baseline/general_motion_tracker_whole_body_teleoperation",
         "/home/hpx/HPX_LOCO_2/mimic_baseline/general_motion_tracker_whole_body_teleoperation/general_motion_tracker_whole_body_teleoperation",
+        "./mocap_motion_vae/src"
     ],
     "ROS2.distro": "humble",
     "python.autoComplete.extraPaths": [

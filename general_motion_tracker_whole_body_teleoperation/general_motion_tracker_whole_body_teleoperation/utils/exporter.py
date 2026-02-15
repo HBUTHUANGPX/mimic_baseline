@@ -156,10 +156,7 @@ class _OnnxMotionPolicyExporter(_OnnxPolicyExporter):
 
     def export(self, path, filename):
         self.to("cpu")
-        if self.is_cvae:
-            obs = torch.zeros(1, self.prior_mu[0].in_features)  # dummy 输入（学生观测维度）
-        else:
-            obs = torch.zeros(1, self.actor[0].in_features)
+        obs = torch.zeros(1, self.actor[0].in_features)
         time_step = torch.zeros(1, 1)
         torch.onnx.export(
             self,

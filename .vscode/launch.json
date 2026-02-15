@@ -72,6 +72,23 @@
 //         }
 //     ]
 // }
+// {
+//     "version": "0.2.0",
+//     "configurations": [
+//         {
+//             "name": "Python Debugger: Current File with Arguments",
+//             "type": "debugpy",
+//             "request": "launch",
+//             "program": "/home/hpx/HPX_LOCO_2/mimic_baseline/scripts/rsl_rl/play_multi_teacher_student.py",
+//             "console": "integratedTerminal",
+//             "args": [
+//                 "--task", "CVAEDissMT-Tracking-Flat-Q1-v0",
+//                 "--num_envs", "2",
+//                 "--domain_randomization"
+//             ]
+//         }
+//     ]
+// }
 {
     "version": "0.2.0",
     "configurations": [
@@ -79,12 +96,10 @@
             "name": "Python Debugger: Current File with Arguments",
             "type": "debugpy",
             "request": "launch",
-            "program": "/home/hpx/HPX_LOCO_2/mimic_baseline/scripts/rsl_rl/play_multi_teacher_student.py",
+            "program": "/home/hpx/HPX_LOCO_2/mimic_baseline/mocap_motion_vae/scripts/minimal_example.py",
             "console": "integratedTerminal",
             "args": [
-                "--task", "CVAEDissMT-Tracking-Flat-Q1-v0",
-                "--num_envs", "2",
-                "--domain_randomization"
+                "--amass-root", "../GMR/motion_data/AMASS/CMU/01/01_01_stageii.npz",
             ]
         }
     ]
