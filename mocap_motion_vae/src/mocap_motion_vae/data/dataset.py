@@ -30,7 +30,7 @@ class WindowIndex:
     """将数据集索引映射到 (clip_index, start_index_in_clip)。
 
     Attributes:
-        clip_lengths: 每个 clip 的长度。
+        clip_lengths: 每个 clip 的长度（帧数）。
         window: 窗口长度（帧数）。
         stride: 滑动步长（帧数）。
         drop_last: 是否丢弃不足窗口长度的片段。
@@ -42,7 +42,11 @@ class WindowIndex:
     drop_last: bool = True
 
     def __post_init__(self) -> None:
-        """预计算索引映射所需的累积计数。"""
+        """预计算索引映射所需的累积计数。
+
+        该过程会为每个 clip 计算可采样的窗口数量，并累积成
+        数据集索引到 clip 的映射表。
+        """
         # 预计算每个 clip 能取到的 window 数量
         if self.window <= 0:
             raise ValueError("window must be > 0.")
@@ -122,7 +126,7 @@ class MotionWindowDataset(Dataset[MotionSample]):
             raise ValueError("FeatureSpec.inputs must be non-empty.")
 
     def __len__(self) -> int:
-        """返回数据集长度。"""
+        """返回数据集长度（窗口数量）。"""
         return len(self.indexer)
 
     def __getitem__(self, index: int) -> MotionSample:
@@ -132,7 +136,7 @@ class MotionWindowDataset(Dataset[MotionSample]):
             index: 数据集索引。
 
         Returns:
-            MotionSample 样本。
+            MotionSample 样本，包含 inputs/targets/static。
         """
         # 1) 定位到具体 clip 和窗口起点
         clip_idx, start = self.indexer.locate(index)

@@ -41,7 +41,13 @@ class SMPLXFieldSpec:
 
     Attributes:
         frame_fields: 帧级字段名列表。
-            可包含 "pose_body"、"root_orient"、"trans"、"joints"、"vertices"、"full_pose" 等。
+            常用字段：
+            - "pose_body": (T, 63)
+            - "root_orient": (T, 3)
+            - "trans": (T, 3)
+            - "joints": (T, J, 3) 由 SMPL-X 模型输出
+            - "vertices": (T, V, 3) 由 SMPL-X 模型输出
+            - "full_pose": (T, D) 由 SMPL-X 模型输出
         static_fields: 静态字段名列表。
     """
 
@@ -81,7 +87,7 @@ class SMPLXClip:
             device: 张量放置设备。
 
         Returns:
-            ClipData 实例。
+            ClipData 实例（帧级字段/静态字段已转为 torch.Tensor）。
         """
         frames: Dict[str, torch.Tensor] = {}
         for name in spec.frame_fields:
@@ -109,7 +115,7 @@ class SMPLXClip:
             对应字段的 NumPy 数组。
 
         Raises:
-            KeyError: 字段不存在。
+            KeyError: 字段不存在或依赖 SMPL-X 输出但未生成。
         """
         if name == "pose_body":
             return self.pose_body
@@ -182,7 +188,7 @@ class SMPLXClipParser:
                 若为空，将尝试读取环境变量 `SMPLX_MODEL_PATH`。
             model_type: 模型类型，默认 "smplx"。
             use_pca: 是否启用 PCA 手部姿态。
-            num_betas: betas 维度（可选）。
+            num_betas: betas 维度（可选），用于覆盖 npz 中的 betas 维度。
             device: 张量与模型放置设备。
             allow_pickle: 是否允许 pickle 读取（AMASS 常用）。
         """
@@ -317,10 +323,10 @@ class SMPLXClipParser:
 
         Args:
             gender: 性别字符串。
-            num_betas: betas 维度。
+            num_betas: betas 维度（与模型参数一致）。
 
         Returns:
-            SMPL-X 模型实例。
+            SMPL-X 模型实例（已转到 device）。
 
         Raises:
             RuntimeError: 未提供模型路径。
@@ -431,7 +437,7 @@ class SMPLXClipParser:
             betas: 形体参数数组。
 
         Returns:
-            可直接喂给 SMPL-X 的输入字典。
+            可直接喂给 SMPL-X 的输入字典（包含手/脸/表情等字段）。
 
         Raises:
             KeyError: 缺失关键字段。

@@ -35,11 +35,13 @@ class ClipData:
     """单个动作片段数据（帧级字段 + 静态字段）。
 
     Attributes:
-        name: 片段名称或标识。
-        fps: 帧率（Hz）。
-        frames: 帧级字段，形状通常为 (T, D)。
-        static: 静态字段，与时间无关。
-        meta: 其他元信息。
+        name: 片段名称或标识，通常来自文件名或序号。
+        fps: 帧率（Hz），用于后续时间尺度换算。
+        frames: 帧级字段字典，键为字段名，值为张量。
+            约定所有帧级字段第一维均为时间维 T。
+        static: 静态字段字典，键为字段名，值为张量。
+            这些字段与时间无关，通常按 clip 维度存储。
+        meta: 其他元信息（例如文件路径、原始数据标记）。
     """
 
     name: str
@@ -54,11 +56,11 @@ class FeatureSpec:
     """定义如何从 MotionBank 构建模型输入/输出。
 
     Attributes:
-        inputs: 输入字段名列表（帧级）。
-        targets: 输出字段名列表（帧级）。
-        static: 静态字段名列表。
-        concat_inputs: 是否将输入字段拼接为一个张量。
-        concat_targets: 是否将输出字段拼接为一个张量。
+        inputs: 输入字段名列表（帧级），用于构建模型输入。
+        targets: 输出字段名列表（帧级），用于构建监督或重建目标。
+        static: 静态字段名列表，通常包含 betas、gender_id 等。
+        concat_inputs: 是否将输入字段在最后一维拼接为一个张量。
+        concat_targets: 是否将输出字段在最后一维拼接为一个张量。
     """
 
     inputs: Tuple[str, ...]
@@ -73,11 +75,11 @@ class MotionSample:
     """单个训练样本（inputs/targets + 元数据）。
 
     Attributes:
-        inputs: 模型输入（张量或字典）。
+        inputs: 模型输入（张量或字段名到张量的字典）。
         targets: 模型输出（张量或字典，可为空）。
-        static: 静态字段（字典）。
-        time_indices: 全局时间轴索引。
-        clip_index: 所属片段索引。
+        static: 静态字段字典，已按样本索引展开。
+        time_indices: 全局时间轴索引（形状与窗口长度对应）。
+        clip_index: 所属片段索引（在 MotionBank 中的序号）。
     """
 
     inputs: Union[TensorLike, Dict[str, TensorLike]]
@@ -90,8 +92,11 @@ class MotionSample:
 class MotionBank:
     """将多个动作片段拼接到全局时间轴的 Bank。
 
-    该类负责将多个 clip 的帧级字段拼接成单一时间轴，并提供
-    clip 索引、起止区间等辅助信息。
+    该类负责将多个 clip 的帧级字段拼接成单一时间轴，并提供：
+    - clip 起止区间（clip_indices）
+    - 每帧所属 clip 的索引（clip_ids）
+    - 新片段起始标记（new_clip_flag）
+    这些索引信息用于高效采样与批量索引。
     """
 
     def __init__(
@@ -106,11 +111,11 @@ class MotionBank:
         """构建 MotionBank。
 
         Args:
-            frames: 帧级字段字典，必须包含相同的总帧数。
+            frames: 帧级字段字典，所有字段需共享相同的总帧数。
             clip_lengths: 每个片段的长度（帧数）。
-            clip_names: 每个片段的名称。
-            clip_fps: 每个片段的帧率。
-            static: 静态字段字典（按片段堆叠）。
+            clip_names: 每个片段的名称（与 clip_lengths 对齐）。
+            clip_fps: 每个片段的帧率（与 clip_lengths 对齐）。
+            static: 静态字段字典（按片段堆叠，shape: (num_clips, D)）。
             device: 张量放置设备。
 
         Raises:
@@ -182,14 +187,14 @@ class MotionBank:
         """从 ClipData 列表构建 MotionBank。
 
         Args:
-            clips: ClipData 列表。
+            clips: ClipData 列表，要求帧级字段与静态字段键一致。
             device: 张量放置设备。
 
         Returns:
             MotionBank 实例。
 
         Raises:
-            ValueError: clips 为空或字段不一致。
+            ValueError: clips 为空、字段不一致或帧长不一致。
         """
         # 统一帧级/静态字段名
         if len(clips) == 0:
@@ -245,7 +250,8 @@ class MotionView:
     """基于 time_steps 的批量视图（核心：Tensor 索引自动扩张）。
 
     通过 time_steps 对 MotionBank 的帧级字段进行索引，
-    自动支持 (T,) 或 (B, T) 等索引形状。
+    自动支持 (T,) 或 (B, T) 等索引形状。该类是训练时的
+    “批量切片接口”，用于统一构建模型输入输出。
     """
 
     def __init__(self, bank: MotionBank, time_steps: TensorLike) -> None:
@@ -253,7 +259,7 @@ class MotionView:
 
         Args:
             bank: MotionBank 实例。
-            time_steps: 全局时间轴索引。
+            time_steps: 全局时间轴索引，可为 (T,) 或 (B, T)。
         """
         self.bank = bank
         self.time_steps = time_steps
@@ -265,10 +271,10 @@ class MotionView:
         """按 time_steps 维度保留前缀维度，其余维度展平为特征维。
 
         Args:
-            tensor: 输入张量。
+            tensor: 输入张量，前缀维度与 time_steps 对齐。
 
         Returns:
-            展平后的张量。
+            展平后的张量，保持 time_steps 的前缀维度不变。
         """
         lead_dims = int(self.time_steps.ndim)
         if tensor.ndim <= lead_dims + 1:
@@ -279,10 +285,10 @@ class MotionView:
         """读取帧级字段（会按 time_steps 取 batch）。
 
         Args:
-            name: 字段名。
+            name: 字段名（帧级字段）。
 
         Returns:
-            索引后的张量。
+            索引后的张量，形状与 time_steps 对齐。
 
         Raises:
             KeyError: 字段名不存在。
@@ -298,7 +304,7 @@ class MotionView:
             name: 静态字段名。
 
         Returns:
-            索引后的静态张量。
+            索引后的静态张量，按 clip_id 映射后对齐 time_steps。
 
         Raises:
             KeyError: 字段名不存在。
@@ -315,7 +321,7 @@ class MotionView:
             *names: 帧级字段名列表。
 
         Returns:
-            拼接后的张量。
+            拼接后的张量，自动展平多维特征后再拼接。
 
         Raises:
             ValueError: names 为空。
@@ -334,7 +340,7 @@ class MotionView:
             *names: 静态字段名列表。
 
         Returns:
-            拼接后的张量。
+            拼接后的张量，自动展平多维特征后再拼接。
 
         Raises:
             ValueError: names 为空。
@@ -348,10 +354,10 @@ class MotionView:
 
     @property
     def clip_id(self) -> TensorLike:
-        """当前 time_steps 对应的 clip id。"""
+        """当前 time_steps 对应的 clip id（与 time_steps 同形状）。"""
         return self._index(self.bank.clip_ids)
 
     @property
     def new_clip_flag(self) -> TensorLike:
-        """当前 time_steps 对应的新片段起始标记。"""
+        """当前 time_steps 对应的新片段起始标记（True 表示新片段起点）。"""
         return self._index(self.bank.new_clip_flag)
