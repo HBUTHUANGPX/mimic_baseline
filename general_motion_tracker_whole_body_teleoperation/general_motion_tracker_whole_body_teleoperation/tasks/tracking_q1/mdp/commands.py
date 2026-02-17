@@ -479,11 +479,11 @@ class MotionCommand(CommandTerm):
             soft_joint_pos_limits[:, :, 1],
         )
 
-        # joint_vel += sample_uniform(*self.cfg.joint_velocity_range, joint_vel.shape, joint_vel.device)
-        # soft_joint_vel_limits = self.robot.data.soft_joint_vel_limits[env_ids]
-        # joint_vel[env_ids] = torch.clip(
-        #     joint_vel[env_ids], soft_joint_vel_limits[:, :, 0], soft_joint_vel_limits[:, :, 1]
-        # )
+        joint_vel += sample_uniform(*self.cfg.joint_velocity_range, joint_vel.shape, joint_vel.device)
+        soft_joint_vel_limits = self.robot.data.soft_joint_vel_limits[env_ids]
+        joint_vel[env_ids] = torch.clip(
+            joint_vel[env_ids], -soft_joint_vel_limits[:, :], soft_joint_vel_limits[:, :]
+        )
         self.robot.write_joint_state_to_sim(
             joint_pos[env_ids], joint_vel[env_ids], env_ids=env_ids
         )

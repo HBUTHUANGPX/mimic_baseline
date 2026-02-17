@@ -107,7 +107,7 @@ class CommandsCfg:
         # joint_position_range=(-0., 0.),
         # joint_velocity_range=(-0., 0.),
         joint_position_range=(-0.2, 0.2),
-        # joint_velocity_range=(-0.1, 0.1),
+        joint_velocity_range=(-8.0, 8.0),
     )
 
 
