@@ -92,10 +92,10 @@ python -m torch.distributed.run --nnodes=1 --nproc_per_node=8 scripts/rsl_rl/tra
 python scripts/rsl_rl/train_multi_teacher_motion_group_one_by_one_gpu.py     --task=Pure-Tracking-Flat-Q1-v0     --headless     --logger wandb     --log_project_name bydmmc     --run_name Q1_lafan     --group_name "walk_lafan"     --time_stamp "2026_0128_1423"     --device=cuda:0
 
 
-
+python scripts/csvs_to_npzs_2.py --input_folder retargeting_data_csv/Q1/100STYLE/ --output_folder artifacts/Q1/100STYLE/ --input_fps 60 --output_fps 50 --headless --preload_csv --async_save_npz
 
 # 报错解决
-## 1. 考虑缓存清理：删除Omniverse缓存rm -rf ~/.cache/ov并重试
+## 1. 考虑缓存清理：删除Omniverse缓存rm -rf ~/.cache/ov并重试,还不行关掉梯子或者打开梯子
 
   ```shell
 Traceback (most recent call last):

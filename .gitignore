@@ -18,3 +18,5 @@ artifacts/lafan_bvh/*
 MJMODEL.TXT
 deploy_mujoco/artifacts/*
 deploy_mujoco/deploy_policy/*
+artifacts/*
+retargeting_data_csv/*

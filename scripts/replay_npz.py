@@ -67,7 +67,7 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     # Define simulation stepping
     sim_dt = sim.get_physics_dt()
 
-    motion_file = "artifacts/Q1/xsens_bvh/251203/dance_01_120Hz.npz"
+    motion_file = "artifacts/Q1/100STYLE/LeanLeft/LeanLeft_FW.npz"
     motion_file_group ={"replay_motion": motion_file}
     motion = MotionLoader(
         motion_file_group,
@@ -95,7 +95,7 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
         scene.update(sim_dt)
 
         pos_lookat = root_states[0, :3].cpu().numpy()
-        # sim.set_camera_view(pos_lookat + np.array([3.0, 3.0, 0.5]), pos_lookat)
+        sim.set_camera_view(pos_lookat + np.array([3.0, 3.0, 0.5]), pos_lookat)
 
 
 def main():

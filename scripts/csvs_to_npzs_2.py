@@ -9,6 +9,7 @@
 import argparse
 import numpy as np
 import torch
+import torch.nn as nn
 import os
 import time
 import concurrent.futures
@@ -99,6 +100,36 @@ from isaaclab.utils.math import (
 # Pre-defined configs
 ##
 from general_motion_tracker_whole_body_teleoperation.robots.q1 import Q1_CYLINDER_CFG
+
+def build_traj_module(
+    fps: int,
+    joint_pos: torch.Tensor,
+    joint_vel: torch.Tensor,
+    body_pos_w: torch.Tensor,
+    body_quat_w: torch.Tensor,
+    body_lin_vel_w: torch.Tensor,
+    body_ang_vel_w: torch.Tensor,
+) -> nn.Module:
+    mod = nn.Module()
+    mod.register_buffer("fps", torch.tensor([fps], dtype=torch.int32))
+    mod.register_buffer("joint_pos", joint_pos)
+    mod.register_buffer("joint_vel", joint_vel)
+    mod.register_buffer("body_pos_w", body_pos_w)
+    mod.register_buffer("body_quat_w", body_quat_w)
+    mod.register_buffer("body_lin_vel_w", body_lin_vel_w)
+    mod.register_buffer("body_ang_vel_w", body_ang_vel_w)
+    return mod
+
+def traj_module_to_numpy_dict(mod: nn.Module) -> dict[str, np.ndarray]:
+    return {
+        "fps": mod.fps.cpu().numpy(),
+        "joint_pos": mod.joint_pos.cpu().numpy(),
+        "joint_vel": mod.joint_vel.cpu().numpy(),
+        "body_pos_w": mod.body_pos_w.cpu().numpy(),
+        "body_quat_w": mod.body_quat_w.cpu().numpy(),
+        "body_lin_vel_w": mod.body_lin_vel_w.cpu().numpy(),
+        "body_ang_vel_w": mod.body_ang_vel_w.cpu().numpy(),
+    }
 
 @configclass
 class ReplayMotionsSceneCfg(InteractiveSceneCfg):
@@ -413,6 +444,7 @@ def main():
         save_executor = concurrent.futures.ThreadPoolExecutor(
             max_workers=args_cli.npz_save_workers
         )
+    trajectory_modules = nn.ModuleList()
 
     preloaded_csv = {}
     if args_cli.preload_csv:
@@ -577,27 +609,27 @@ def main():
                 t_save = time.perf_counter()
                 frames = slot["frame_idx"]
                 os.makedirs(os.path.dirname(slot["npz_path"]), exist_ok=True)
-                tensordict = {
-                    "fps": args_cli.output_fps,
-                    "joint_pos": slot["bufs"]["joint_pos"][:frames].contiguous(),
-                    "joint_vel": slot["bufs"]["joint_vel"][:frames].contiguous(),
-                    "body_pos_w": slot["bufs"]["body_pos_w"][:frames].contiguous(),
-                    "body_quat_w": slot["bufs"]["body_quat_w"][:frames].contiguous(),
-                    "body_lin_vel_w": slot["bufs"]["body_lin_vel_w"][:frames].contiguous(),
-                    "body_ang_vel_w": slot["bufs"]["body_ang_vel_w"][:frames].contiguous(),
-                }
-                tensordict_cpu = {
-                    k: (v.cpu().numpy() if torch.is_tensor(v) else v)
-                    for k, v in tensordict.items()
-                }
+                traj_module = build_traj_module(
+                    fps=args_cli.output_fps,
+                    joint_pos=slot["bufs"]["joint_pos"][:frames].contiguous(),
+                    joint_vel=slot["bufs"]["joint_vel"][:frames].contiguous(),
+                    body_pos_w=slot["bufs"]["body_pos_w"][:frames].contiguous(),
+                    body_quat_w=slot["bufs"]["body_quat_w"][:frames].contiguous(),
+                    body_lin_vel_w=slot["bufs"]["body_lin_vel_w"][:frames].contiguous(),
+                    body_ang_vel_w=slot["bufs"]["body_ang_vel_w"][:frames].contiguous(),
+                )
+                trajectory_modules.append(traj_module)
+                traj_cpu = trajectory_modules[-1].to("cpu")
+                npz_payload = traj_module_to_numpy_dict(traj_cpu)
                 if save_executor is not None:
                     save_futures.append(
-                        save_executor.submit(np.savez, slot["npz_path"], **tensordict_cpu)
+                        save_executor.submit(np.savez, slot["npz_path"], **npz_payload)
                     )
                     print(f"[INFO]: Motion enqueued to {slot['npz_path']}")
                 else:
-                    np.savez(slot["npz_path"], **tensordict_cpu)
+                    np.savez(slot["npz_path"], **npz_payload)
                     print(f"[INFO]: Motion saved to {slot['npz_path']}")
+                del trajectory_modules[-1]
                 elapsed = time.perf_counter() - t_save
                 timing["save_submit"] += elapsed
                 timing["save_npz"] += elapsed
