@@ -11,6 +11,7 @@ import numpy as np
 import torch
 import os
 import time
+import concurrent.futures
 
 from isaaclab.app import AppLauncher
 
@@ -54,9 +55,15 @@ parser.add_argument(
     help="Number of parallel environments to process motions.",
 )
 parser.add_argument(
-    "--save_pt_first",
+    "--async_save_npz",
     action="store_true",
-    help="Save GPU tensors to .pt first and convert to .npz after all motions.",
+    help="Save .npz files asynchronously to avoid blocking the main loop.",
+)
+parser.add_argument(
+    "--npz_save_workers",
+    type=int,
+    default=8,
+    help="Number of background workers for async .npz saving.",
 )
 parser.add_argument(
     "--preload_csv",
@@ -395,9 +402,17 @@ def main():
         "log_copy": 0.0,
         "save_npz": 0.0,
         "preload_csv": 0.0,
+        "save_submit": 0.0,
         "steps": 0,
         "motions": 0,
     }
+
+    save_executor = None
+    save_futures = []
+    if args_cli.async_save_npz:
+        save_executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=args_cli.npz_save_workers
+        )
 
     preloaded_csv = {}
     if args_cli.preload_csv:
@@ -422,9 +437,6 @@ def main():
         rel_path = os.path.relpath(csv_path, args_cli.input_folder)
         npz_path = os.path.join(
             args_cli.output_folder, rel_path.replace(".csv", ".npz")
-        )
-        pt_path = os.path.join(
-            args_cli.output_folder, rel_path.replace(".csv", ".pt")
         )
         print(f"[INFO]: Enqueue {csv_path} -> {npz_path} on env '{env_id}'")
         t0 = time.perf_counter()
@@ -473,7 +485,6 @@ def main():
             "env_id": env_id,
             "csv_path": csv_path,
             "npz_path": npz_path,
-            "pt_path": pt_path,
             "motion": motion,
             "bufs": bufs,
             "frame_idx": 0,
@@ -566,25 +577,30 @@ def main():
                 t_save = time.perf_counter()
                 frames = slot["frame_idx"]
                 os.makedirs(os.path.dirname(slot["npz_path"]), exist_ok=True)
-                if args_cli.save_pt_first:
-                    torch.save(
-                        {
-                            "fps": args_cli.output_fps,
-                            "frames": frames,
-                            "data": {
-                                k: v[:frames].contiguous() for k, v in slot["bufs"].items()
-                            },
-                        },
-                        slot["pt_path"],
+                tensordict = {
+                    "fps": args_cli.output_fps,
+                    "joint_pos": slot["bufs"]["joint_pos"][:frames].contiguous(),
+                    "joint_vel": slot["bufs"]["joint_vel"][:frames].contiguous(),
+                    "body_pos_w": slot["bufs"]["body_pos_w"][:frames].contiguous(),
+                    "body_quat_w": slot["bufs"]["body_quat_w"][:frames].contiguous(),
+                    "body_lin_vel_w": slot["bufs"]["body_lin_vel_w"][:frames].contiguous(),
+                    "body_ang_vel_w": slot["bufs"]["body_ang_vel_w"][:frames].contiguous(),
+                }
+                tensordict_cpu = {
+                    k: (v.cpu().numpy() if torch.is_tensor(v) else v)
+                    for k, v in tensordict.items()
+                }
+                if save_executor is not None:
+                    save_futures.append(
+                        save_executor.submit(np.savez, slot["npz_path"], **tensordict_cpu)
                     )
-                    print(f"[INFO]: Motion saved to {slot['pt_path']}")
+                    print(f"[INFO]: Motion enqueued to {slot['npz_path']}")
                 else:
-                    log = {"fps": [args_cli.output_fps]}
-                    for k, buf in slot["bufs"].items():
-                        log[k] = buf[:frames].contiguous().cpu().numpy()
-                    np.savez(slot["npz_path"], **log)
+                    np.savez(slot["npz_path"], **tensordict_cpu)
                     print(f"[INFO]: Motion saved to {slot['npz_path']}")
-                timing["save_npz"] += time.perf_counter() - t_save
+                elapsed = time.perf_counter() - t_save
+                timing["save_submit"] += elapsed
+                timing["save_npz"] += elapsed
                 env_slots[i] = start_next_motion(env_id)
         timing["log_copy"] += time.perf_counter() - t_log
 
@@ -607,25 +623,17 @@ def main():
         f"log_copy_s={timing['log_copy']:.3f} "
         f"save_npz_s={timing['save_npz']:.3f}"
     )
+    if timing["save_submit"] > 0:
+        print(f"[TIMING]: save_submit_s={timing['save_submit']:.3f}")
     if timing["preload_csv"] > 0:
         print(f"[TIMING]: preload_csv_s={timing['preload_csv']:.3f}")
 
-    if args_cli.save_pt_first:
-        print("[INFO]: Converting .pt files to .npz...")
-        pt_files = []
-        for root, _, files in os.walk(args_cli.output_folder):
-            for file in files:
-                if file.endswith(".pt"):
-                    pt_files.append(os.path.join(root, file))
-        for pt_path in pt_files:
-            npz_path = pt_path.replace(".pt", ".npz")
-            payload = torch.load(pt_path, map_location="cpu")
-            frames = payload["frames"]
-            log = {"fps": [payload["fps"]]}
-            for k, v in payload["data"].items():
-                log[k] = v[:frames].contiguous().numpy()
-            np.savez(npz_path, **log)
-        print(f"[INFO]: Converted {len(pt_files)} .pt files to .npz.")
+    if save_executor is not None:
+        print("[INFO]: Waiting for async .npz saves to finish...")
+        for fut in concurrent.futures.as_completed(save_futures):
+            fut.result()
+        save_executor.shutdown(wait=True)
+        print(f"[INFO]: Async .npz saves finished: {len(save_futures)} files.")
 
     # Close sim app
 
