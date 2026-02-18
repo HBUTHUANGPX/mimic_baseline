@@ -159,7 +159,12 @@ class RslRlDistillationStudentTeacher_CVAECfg(RslRlDistillationStudentTeacherCfg
     z_scale_factor: float = 1.0,  # z 的缩放因子
     prior_hidden_dims: tuple[int] | list[int] = [256, 256, 256],
     encoder_hidden_dims: tuple[int] | list[int] = [256, 256, 256],
-
+@configclass
+class KLSchedule:
+    start : float = 0.0001
+    end : float = 0.01
+    start_iteration : int = 0
+    end_iteration : int = 90000
 @configclass  # 对有特权信息训练的教师网络进行蒸馏
 class Q1FlatCVAEDistillationStudentMultiTeacherCfg(RslRlDistillationRunnerCfg):
     num_steps_per_env = 24
@@ -186,6 +191,18 @@ class Q1FlatCVAEDistillationStudentMultiTeacherCfg(RslRlDistillationRunnerCfg):
     save_interval = 500
     experiment_name = "q1_flat_distillation"
     class_name: str = "MultiTeacherDistillationRunner"
+    beta_kl_schedule=KLSchedule(
+        start=0.0002,
+        end=0.1,
+        start_iteration=0,
+        end_iteration=90000
+    )
+    bc_kl_coef_schedule=KLSchedule(
+        start=0.01,
+        end=0.001,
+        start_iteration=0,
+        end_iteration=90000
+    )
     policy = RslRlPpoActorCritic_Distil_CVAECfg(
         class_name="ActorCritic_CVAE",
         init_noise_std=0.8,
