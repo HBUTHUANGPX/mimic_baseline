@@ -53,10 +53,11 @@ def collect_npz_paths(yaml_path: str = "motion_file.yaml") -> Dict[str, List[str
                 npz_paths.add(path)
                 existing_basenames.add(os.path.basename(path))
 
-        # 第二步：添加folder_name中每个文件夹下的NPZ文件路径，避免与现有basename重复
+        # 第二步：添加folder_name中每个文件夹及其子目录下的NPZ文件路径，避免与现有basename重复
         for folder in folder_names:
             if os.path.isdir(folder):
-                for npz_file in glob.glob(os.path.join(folder, '*.npz')):
+                pattern = os.path.join(folder, '**', '*.npz')
+                for npz_file in glob.glob(pattern, recursive=True):
                     basename = os.path.basename(npz_file)
                     if basename not in existing_basenames:
                         npz_paths.add(npz_file)
@@ -66,10 +67,11 @@ def collect_npz_paths(yaml_path: str = "motion_file.yaml") -> Dict[str, List[str
         for wo_path in wo_file_names:
             npz_paths.discard(wo_path)
 
-        # 第四步：剔除wo_folder_name中每个文件夹下的所有NPZ文件路径
+        # 第四步：剔除wo_folder_name中每个文件夹及其子目录下的所有NPZ文件路径
         for wo_folder in wo_folder_names:
             if os.path.isdir(wo_folder):
-                for npz_file in glob.glob(os.path.join(wo_folder, '*.npz')):
+                pattern = os.path.join(wo_folder, '**', '*.npz')
+                for npz_file in glob.glob(pattern, recursive=True):
                     npz_paths.discard(npz_file)
 
         # 保存排序后的列表
