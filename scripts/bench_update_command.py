@@ -126,7 +126,8 @@ class BenchModule:
         # Clamp to valid range to avoid overflow after increment.
         ts = torch.clamp(self.time_steps, 0, self.motion.time_step_total - 1)
         # For variable lengths, use bucketize on end indices.
-        motion_ids = torch.bucketize(ts, self._motion_ends, right=False)
+        # Use right=True so that ts == end goes to next motion (intervals are [start, end))
+        motion_ids = torch.bucketize(ts, self._motion_ends, right=True)
         counts = torch.bincount(motion_ids, minlength=self.motion.num_motions).float()
         self.counts.copy_(counts)
         self.motion.motion_distribution = (self.counts / self.num_envs).unsqueeze(0)

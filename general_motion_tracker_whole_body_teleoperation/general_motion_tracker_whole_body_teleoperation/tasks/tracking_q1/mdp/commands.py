@@ -222,6 +222,8 @@ class MotionCommand(CommandTerm):
         self.motion = MotionLoader(
             motion_file, self.body_indexes, device=self.device
         )
+        # Cache motion end indices for vectorized distribution counting
+        self._motion_ends = self.motion.motion_indices[:, 1].contiguous()
         self.counts = torch.zeros(
             self.motion.num_motions, dtype=torch.float32, device=self.device
         )
@@ -267,6 +269,29 @@ class MotionCommand(CommandTerm):
         self.metrics["error_joint_vel"] = torch.zeros(self.num_envs, device=self.device)
         for name in self.motion.extracted_list:
             self.metrics[name] = torch.zeros(self.num_envs, device=self.device)
+
+    def _update_distribution_loop(self):
+        # Original per-motion loop (reference implementation)
+        for i in range(self.motion.num_motions):
+            start, end = self.motion.motion_indices[i]
+            mask = (self.time_steps >= start) & (self.time_steps < end)
+            if self.cfg.distribution_metrics:
+                self.metrics[self.motion.extracted_list[i]] = mask.clone().float()
+            self.counts[i] = mask.sum().float()
+        self.motion.motion_distribution = (self.counts / self.num_envs).unsqueeze(0)
+
+    def _update_distribution_vectorized(self):
+        # Vectorized: map time_steps to motion id, then bincount
+        ts = torch.clamp(self.time_steps, 0, self.motion.time_step_total - 1)
+        # Intervals are [start, end); right=True ensures ts==end maps to next motion
+        motion_ids = torch.bucketize(ts, self._motion_ends, right=True)
+        counts = torch.bincount(motion_ids, minlength=self.motion.num_motions).float()
+        self.counts.copy_(counts)
+        self.motion.motion_distribution = (self.counts / self.num_envs).unsqueeze(0)
+        if self.cfg.distribution_metrics:
+            # Update per-motion metrics as 0/1 mask
+            for i in range(self.motion.num_motions):
+                self.metrics[self.motion.extracted_list[i]] = (motion_ids == i).float()
     
     @property
     def motion_id(self) -> torch.Tensor:
@@ -537,12 +562,10 @@ class MotionCommand(CommandTerm):
         # 动态平衡采样统计:
         # 遍历每个 motion 区间，统计当前 time_steps 落在该区间的 env 数
         # counts / num_envs 即当前分布 motion_distribution
-        for i in range(self.motion.num_motions):
-            start, end = self.motion.motion_indices[i]
-            map = (self.time_steps >= start) & (self.time_steps < end)
-            self.metrics[self.motion.extracted_list[i]] = map.clone().float()
-            self.counts[i] = map.sum().float()
-        self.motion.motion_distribution = (self.counts / self.num_envs).unsqueeze(0)
+        if self.cfg.distribution_vectorized:
+            self._update_distribution_vectorized()
+        else:
+            self._update_distribution_loop()
 
         # 指数衰减更新失败统计
         alpha = float(self.cfg.failed_bin_alpha)
@@ -661,6 +684,10 @@ class MotionCommandCfg(CommandTermCfg):
     joint_velocity_range: tuple[float, float] = (-0.52, 0.52)
     # 失败 bin 统计的指数衰减系数（越大越关注近期失败）
     failed_bin_alpha: float = 0.001
+    # 是否使用向量化分布统计（bucketize + bincount）
+    distribution_vectorized: bool = True
+    # 是否更新 per-motion metrics（用于日志，开销较大）
+    distribution_metrics: bool = False
 
     ref_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(
         prim_path="/Visuals/Command/pose"
