@@ -49,7 +49,7 @@ CUDA_VISIBLE_DEVICES=$GPU python scripts/rsl_rl/train_multi_teacher_motion_group
     --headless \
     --logger wandb \
     --log_project_name bydmmc \
-    --run_name Q1_lafan \
+    --run_name Q1_pure \
     --group_name "$MOTION" \
     --time_stamp "$TIMESTAMP" \
     # --device=cuda:$GPU

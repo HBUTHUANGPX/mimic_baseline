@@ -50,12 +50,6 @@ class Q1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
 class PureQ1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24
     max_iterations = 90001
-    # max_iterations = 10001
-    # max_iterations = 3001
-    # obs_groups ={
-    #     "policy": ["policy"],  # 映射到环境提供的 'policy' 观测组，用于演员网络
-    #     "critic": ["critic"],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
-    # },
     obs_groups = (
         {
             "policy": [
@@ -151,14 +145,6 @@ class RslRlPpoActorCritic_Distil_CVAECfg():
     normalize_mu: bool = False,  
     """Whether to normalize the mu of the CVAE."""
 
-class RslRlDistillationStudentTeacher_CVAECfg(RslRlDistillationStudentTeacherCfg):
-    latent_dim: int = 64                            # 潜在空间维度
-    beta_kl: float = 0.0001                            # KL 散度权重
-    class_name: str = "StudentTeacher_CVAE"         # 新类名（将在 modules 中定义）
-    normalize_mu=True,  # 新参数：启用对 mu 的 EmpiricalNormalization
-    z_scale_factor: float = 1.0,  # z 的缩放因子
-    prior_hidden_dims: tuple[int] | list[int] = [256, 256, 256],
-    encoder_hidden_dims: tuple[int] | list[int] = [256, 256, 256],
 @configclass
 class KLSchedule:
     start : float = 0.0001
@@ -235,82 +221,4 @@ class Q1FlatCVAEDistillationStudentMultiTeacherCfg(RslRlDistillationRunnerCfg):
         value_loss_coef=1.0,
         use_clipped_value_loss=True,
         clip_param=0.2,
-    )
-
-@configclass  # 对有特权信息训练的教师网络进行蒸馏
-class Q1FlatDistillationStudentMultiTeacherCfg(RslRlDistillationRunnerCfg):
-    num_steps_per_env = 24
-    max_iterations = 90001
-    obs_groups = (
-        {
-            "policy": [
-                "command_wo_privilege",
-                "proprioception_wo_privilege",
-                "last_action",
-            ],  # 映射到环境提供的 'policy' 观测组，用于演员网络
-            "teacher": [
-                "command",
-                "proprioception",
-                "last_action",
-            ],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
-            "motion_group": ["motion_group"],  # 新增 motion_group 观测组
-        },
-    )
-    save_interval = 500
-    experiment_name = "q1_flat_distillation"
-    class_name: str = "MultiTeacherDistillationRunner"
-    policy = RslRlDistillationStudentTeacherCfg(
-        class_name="StudentMultiTeacher",
-        init_noise_std=0.8,
-        teacher_hidden_dims=[512, 256, 128],
-        student_hidden_dims=[512, 256, 128],
-        activation="elu",
-        student_obs_normalization=True,
-        teacher_obs_normalization=True,
-    )
-    algorithm = RslRlDistillationAlgorithmCfg(
-        learning_rate=1.0e-3,
-        gradient_length=15,
-        num_learning_epochs=5,
-        class_name="MultiTeacherDistillation",
-        max_grad_norm=1.0,
-    )
-
-@configclass  # 对有特权信息训练的教师网络进行蒸馏
-class Q1FlatDistillationStudentTeacherCfg(RslRlDistillationRunnerCfg):
-    num_steps_per_env = 24
-    max_iterations = 90001
-    obs_groups = (
-        {
-            "policy": [
-                "command_wo_privilege",
-                "proprioception_wo_privilege",
-                "last_action",
-            ],  # 映射到环境提供的 'policy' 观测组，用于演员网络
-            "teacher": [
-                "command",
-                "proprioception",
-                "last_action",
-            ],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
-            "motion_group": ["motion_group"],  # 新增 motion_group 观测组
-        },
-    )
-    save_interval = 500
-    experiment_name = "q1_flat_distillation"
-    class_name: str = "DistillationRunner"
-    policy = RslRlDistillationStudentTeacherCfg(
-        class_name="StudentTeacher",
-        init_noise_std=0.8,
-        teacher_hidden_dims=[512, 256, 128],
-        student_hidden_dims=[512, 256, 128],
-        activation="elu",
-        student_obs_normalization=True,
-        teacher_obs_normalization=True,
-    )
-    algorithm = RslRlDistillationAlgorithmCfg(
-        learning_rate=1.0e-3,
-        gradient_length=15,
-        num_learning_epochs=5,
-        class_name="Distillation",
-        max_grad_norm=1.0,
     )

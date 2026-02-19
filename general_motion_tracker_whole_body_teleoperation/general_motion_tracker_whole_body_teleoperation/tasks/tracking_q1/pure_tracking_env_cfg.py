@@ -157,8 +157,8 @@ class ObservationsCfg:
     class CommandCfg(ObsGroup):  # 不带噪声的指令观测组
         """Observations for command group."""
 
-        command = ObsTerm(
-            func=mdp.generated_commands, params={"command_name": "motion"}
+        joint_pos_delta = ObsTerm(
+            func=mdp.joint_pos_delta, params={"command_name": "motion"}
         )
         motion_ref_pos_b = ObsTerm(
             func=mdp.motion_ref_pos_b, params={"command_name": "motion"}
@@ -173,9 +173,10 @@ class ObservationsCfg:
     class CommandWithNoiseCfg(ObsGroup):  # 带噪声的指令观测组
         """Observations for command group with noise."""
 
-        command = ObsTerm(
-            func=mdp.generated_commands,
+        joint_pos_delta = ObsTerm(
+            func=mdp.joint_pos_delta,
             params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.02, n_max=0.02),
         )
         motion_ref_pos_b = ObsTerm(
             func=mdp.motion_ref_pos_b,
@@ -206,75 +207,7 @@ class ObservationsCfg:
 
         actions = ObsTerm(func=mdp.last_action)
 
-    @configclass
-    class PolicyCfg(ObsGroup):
-        """Observations for policy group."""
-
-        # observation terms (order preserved)
-        command = ObsTerm(
-            func=mdp.generated_commands,
-            params={"command_name": "motion"},
-        )
-        motion_ref_pos_b = ObsTerm(
-            func=mdp.motion_ref_pos_b,
-            params={"command_name": "motion"},
-            noise=Unoise(n_min=-0.02, n_max=0.02),
-        )
-        motion_ref_ori_b = ObsTerm(
-            func=mdp.motion_ref_ori_b,
-            params={"command_name": "motion"},
-            noise=Unoise(n_min=-0.05, n_max=0.05),
-        )
-        body_pos = ObsTerm(
-            func=mdp.robot_body_pos_b,
-            params={"command_name": "motion"},
-            noise=Unoise(n_min=-0.005, n_max=0.005),
-        )
-        body_ori = ObsTerm(
-            func=mdp.robot_body_ori_b,
-            params={"command_name": "motion"},
-            noise=Unoise(n_min=-0.01, n_max=0.01),
-        )
-        base_lin_vel = ObsTerm(
-            func=mdp.base_lin_vel, noise=Unoise(n_min=-0.25, n_max=0.25)
-        )
-        base_ang_vel = ObsTerm(
-            func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2)
-        )
-        joint_pos = ObsTerm(
-            func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.015, n_max=0.015)
-        )
-        joint_vel = ObsTerm(
-            func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.55, n_max=0.55)
-        )
-        actions = ObsTerm(func=mdp.last_action)
-
-        def __post_init__(self):
-            self.enable_corruption = True
-            self.concatenate_terms = True
-
-    @configclass
-    class PrivilegedCfg(ObsGroup):
-        command = ObsTerm(
-            func=mdp.generated_commands, params={"command_name": "motion"}
-        )
-        motion_ref_pos_b = ObsTerm(
-            func=mdp.motion_ref_pos_b, params={"command_name": "motion"}
-        )
-        motion_ref_ori_b = ObsTerm(
-            func=mdp.motion_ref_ori_b, params={"command_name": "motion"}
-        )
-        body_pos = ObsTerm(func=mdp.robot_body_pos_b, params={"command_name": "motion"})
-        body_ori = ObsTerm(func=mdp.robot_body_ori_b, params={"command_name": "motion"})
-        base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
-        base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
-        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
-        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
-        actions = ObsTerm(func=mdp.last_action)
-
     # observation groups
-    policy: PolicyCfg = PolicyCfg()
-    critic: PrivilegedCfg = PrivilegedCfg()
     last_action: LastActionCfg = LastActionCfg()
     proprioception_with_noise: ProprioceptionWithNoiseCfg = ProprioceptionWithNoiseCfg()
     proprioception: ProprioceptionCfg = ProprioceptionCfg()
@@ -472,10 +405,10 @@ class TerminationsCfg:
             "command_name": "motion",
             "threshold": 0.25,
             "body_names": [
-                "left_ankle_roll_link",
-                "right_ankle_roll_link",
-                "left_wrist_pitch_link",
-                "right_wrist_pitch_link",
+                "L_ankle_roll_link",
+                "R_ankle_roll_link",
+                "L_wrist_pitch_link",
+                "R_wrist_pitch_link",
             ],
         },
     )

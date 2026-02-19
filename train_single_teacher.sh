@@ -9,7 +9,7 @@ yaml_file="scripts/rsl_rl/motion_file.yaml"
 
 # 检查 yq 是否可用
 if ! command -v yq >/dev/null 2>&1; then
-    echo "错误: 未找到 yq 命令，请先安装 yq" >&2
+    echo "错误: 未找到 yq 命令，请先安装 yq :sudo snap install yq" >&2
     exit 1
 fi
 

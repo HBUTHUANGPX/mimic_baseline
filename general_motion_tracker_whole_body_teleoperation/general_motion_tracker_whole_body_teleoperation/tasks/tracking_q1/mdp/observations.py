@@ -6,10 +6,20 @@ from typing import TYPE_CHECKING
 from isaaclab.utils.math import matrix_from_quat, subtract_frame_transforms
 
 from general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp.commands import MotionCommand
+from isaaclab.managers import SceneEntityCfg
+from isaaclab.assets import Articulation, RigidObject
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedEnv
-
+from isaaclab.envs.utils.io_descriptors import (
+    generic_io_descriptor,
+    record_body_names,
+    record_dtype,
+    record_joint_names,
+    record_joint_pos_offsets,
+    record_joint_vel_offsets,
+    record_shape,
+)
 def motion_id(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
     return command.motion_id
@@ -99,3 +109,8 @@ def motion_ref_ori_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     )
     mat = matrix_from_quat(ori)
     return mat[..., :2].reshape(mat.shape[0], -1)
+
+def joint_pos_delta(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    return command.joint_pos - command.robot_joint_pos
