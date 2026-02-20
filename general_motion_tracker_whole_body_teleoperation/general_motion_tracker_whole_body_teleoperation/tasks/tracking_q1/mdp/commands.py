@@ -427,6 +427,13 @@ class MotionCommand(CommandTerm):
         self.metrics["error_joint_vel"] = torch.norm(
             self.joint_vel - self.robot_joint_vel, dim=-1
         )
+        # 动态平衡采样统计:
+        # 遍历每个 motion 区间，统计当前 time_steps 落在该区间的 env 数
+        # counts / num_envs 即当前分布 motion_distribution
+        if self.cfg.distribution_vectorized:
+            self._update_distribution_vectorized()
+        else:
+            self._update_distribution_loop()
 
     def _resample_command(self, env_ids: Sequence[int]):
         # phase = sample_uniform(0.0, 1.0, (len(env_ids),), device=self.device)
@@ -559,14 +566,6 @@ class MotionCommand(CommandTerm):
             ones = torch.ones_like(bin_ids, dtype=torch.float32, device=self.device)
             self._current_bin_failed.index_put_((bin_ids,), ones, accumulate=True)
 
-        # 动态平衡采样统计:
-        # 遍历每个 motion 区间，统计当前 time_steps 落在该区间的 env 数
-        # counts / num_envs 即当前分布 motion_distribution
-        if self.cfg.distribution_vectorized:
-            self._update_distribution_vectorized()
-        else:
-            self._update_distribution_loop()
-
         # 指数衰减更新失败统计
         alpha = float(self.cfg.failed_bin_alpha)
         self._bin_failed = alpha * self._current_bin_failed + (1.0 - alpha) * self._bin_failed
@@ -687,7 +686,7 @@ class MotionCommandCfg(CommandTermCfg):
     # 是否使用向量化分布统计（bucketize + bincount）
     distribution_vectorized: bool = True
     # 是否更新 per-motion metrics（用于日志，开销较大）
-    distribution_metrics: bool = False
+    distribution_metrics: bool = True
 
     ref_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(
         prim_path="/Visuals/Command/pose"

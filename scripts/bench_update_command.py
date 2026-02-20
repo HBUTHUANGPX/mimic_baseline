@@ -228,8 +228,8 @@ class Timer:
 
 def main():
     parser = argparse.ArgumentParser(description="Benchmark update_command -> resample_command (truncated)")
-    parser.add_argument("--num_envs", type=int, default=4096)
-    parser.add_argument("--num_motions", type=int, default=200)
+    parser.add_argument("--num_envs", type=int, default=4096*4)
+    parser.add_argument("--num_motions", type=int, default=800)
     parser.add_argument("--frames_per_motion", type=int, default=3000)
     parser.add_argument(
         "--length_jitter",
@@ -238,12 +238,12 @@ def main():
         help="Randomize motion lengths by ±ratio around frames_per_motion (e.g., 0.2)",
     )
     parser.add_argument("--bin_size", type=int, default=50)
-    parser.add_argument("--iters", type=int, default=200)
-    parser.add_argument("--warmup", type=int, default=20)
+    parser.add_argument("--iters", type=int, default=20000)
+    parser.add_argument("--warmup", type=int, default=2000)
     parser.add_argument("--device", type=str, default="auto", choices=["auto", "cuda", "cpu"])
     parser.add_argument("--seed", type=int, default=123)
-    parser.add_argument("--terminated_prob", type=float, default=0.02)
-    parser.add_argument("--timeout_ratio", type=float, default=0.5)
+    parser.add_argument("--terminated_prob", type=float, default=0.8)
+    parser.add_argument("--timeout_ratio", type=float, default=0.1)
     parser.add_argument("--alpha", type=float, default=0.001)
     parser.add_argument(
         "--vectorized_metrics",
@@ -306,11 +306,12 @@ def main():
             valid_ids = torch.nonzero(valid_mask, as_tuple=False).squeeze(-1)
             cross_flags = bench.motion.new_data_flag[bench.time_steps[valid_ids]]
             cross_mask[valid_ids] = cross_flags
-        total_mask = overflow_mask | cross_mask
+        # In training, terminated envs also trigger resample
+        terminated = bench._env.termination_manager.terminated
+        total_mask = overflow_mask | cross_mask | terminated
         env_ids = torch.nonzero(total_mask, as_tuple=False).squeeze(-1)
         t1 = timer.stamp()
 
-        terminated = bench._env.termination_manager.terminated
         non_timeout = terminated & (~bench._env.termination_manager.time_outs)
         if torch.any(non_timeout):
             time_steps_clamped = torch.clamp(
