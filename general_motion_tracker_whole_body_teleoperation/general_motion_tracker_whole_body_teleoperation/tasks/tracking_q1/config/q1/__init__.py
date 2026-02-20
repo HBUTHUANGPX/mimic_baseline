@@ -27,30 +27,21 @@ gym.register(
 )
 
 gym.register(
-    id="Diss-Tracking-Flat-Q1-v0",
-    entry_point="isaaclab.envs:ManagerBasedRLEnv",
-    disable_env_checker=True,
-    kwargs={
-        "env_cfg_entry_point": flat_env_cfg.DissQ1FlatEnvCfg,
-        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:Q1FlatDistillationStudentTeacherCfg",
-    },
-)
-
-gym.register(
-    id="DissMT-Tracking-Flat-Q1-v0",
-    entry_point="isaaclab.envs:ManagerBasedRLEnv",
-    disable_env_checker=True,
-    kwargs={
-        "env_cfg_entry_point": flat_env_cfg.DissQ1FlatEnvCfg,
-        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:Q1FlatDistillationStudentMultiTeacherCfg",
-    },
-)
-gym.register(
     id="CVAEDissMT-Tracking-Flat-Q1-v0",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
         "env_cfg_entry_point": flat_env_cfg.DissQ1FlatEnvCfg,
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:Q1FlatCVAEDistillationStudentMultiTeacherCfg",
+    },
+)
+
+gym.register(
+    id="FSQCVAEDissMT-Tracking-Flat-Q1-v0",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": flat_env_cfg.DissQ1FlatEnvCfg,
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:Q1FlatFSQCVAEDistillationStudentMultiTeacherCfg",
     },
 )

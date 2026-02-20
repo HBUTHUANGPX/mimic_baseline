@@ -1,70 +1,121 @@
-# install conda
+### 1. install conda
+  ```
 mkdir -p ~/miniconda3
+  ```
+  ```
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda3/miniconda.sh
 bash ~/miniconda3/miniconda.sh -b -u -p ~/miniconda3
-rm ~/miniconda3/miniconda.sh
-
-source ~/miniconda3/bin/activate
-
-conda init --all
-# conda env create
-conda create -n mimic_baseline python=3.11
-
-conda activate mimic_baseline
-
-# isaacsim install by pip
-
-pip install "isaacsim[all,extscache]==5.1.0" --extra-index-url https://pypi.nvidia.com
-或
-pip install "isaacsim[all,extscache]==5.1.0" --extra-index-url https://pypi.nvidia.com -i https://pypi.tuna.tsinghua.edu.cn/simple
-# isaaclab install by git
-
-git clone https://github.com/HBUTHUANGPX/IsaacLab_v230.git
-
-cd IsaacLab_v230/ && ./isaaclab.sh --install
-
-# rsl-rl install by git
-
-git clone https://github.com/HBUTHUANGPX/rsl_rl_v320.git
-
-cd rsl_rl_v320/ && pip install -e .
-
-# this repo install by git
-
-git clone https://github.com/HBUTHUANGPX/mimic_baseline.git
-
-cd general_motion_tracker_whole_body_teleoperation/ && pip install -e .
-
-# deploy install by pip
-pip install mujoco==3.2.7
-pip install onnxruntime==1.22.1
-conda install pinocchio -c conda-forge
-
-# train scripts
-
-1. python scripts/rsl_rl/train.py  --task=Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Q1_slowly_walk
-
-# eval scripts
-
-1. python scripts/rsl_rl/play.py --task Tracking-Flat-Q1-v0 --num_envs 2 --domain_randomization
-
-
-python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 scripts/rsl_rl/train.py  --task=Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Q1_slowly_walk  --distributed
-https://isaac-sim.github.io/IsaacLab/main/source/features/multi_gpu.html#multi-gpu-training
-
-python scripts/rsl_rl/train.py  --task=Diss-Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Q1_slowly_walk --resume --load_run 2025-12-18_21-23-56_Q1_slowly_walk --checkpoint model_90000.pt
-
-python scripts/csvs_to_npzs.py --input_folder lafan_Q1/lafan_bvh/ --output_folder artifacts/lafan_bvh/ --headless
-
-
-python -m torch.distributed.run --nnodes=1 --nproc_per_node=8 scripts/rsl_rl/train.py  --task=Pure-Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Pure_Q1_slowly_walk
-
-python -m torch.distributed.run --nnodes=1 --nproc_per_node=8 scripts/rsl_rl/train_multi_teacher_student.py  --task=Diss-Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Q1_LAFAN_walk_Diss  --load_run 2025_12_29_15_00_Pure_Q1 --distributed
-- #### single policy eval
-  - ```
-  python scripts/rsl_rl/play.py --task Tracking-Flat-Q1-v0 --num_envs 2 --domain_randomization 
   ```
-- #### teacher policy train command
+  ```
+rm ~/miniconda3/miniconda.sh
+  ```
+
+  ```
+source ~/miniconda3/bin/activate
+  ```
+
+  ```
+conda init --all
+  ```
+
+---
+
+### 2. conda env create
+  ```
+conda create -n mimic_baseline python=3.11
+  ```
+
+  ```
+conda activate mimic_baseline
+  ```
+---
+
+### 3. isaacsim install by pip
+
+  ```
+pip install "isaacsim[all,extscache]==5.1.0" --extra-index-url https://pypi.nvidia.com
+  ```
+或使用国内pip源头
+  ```
+pip install "isaacsim[all,extscache]==5.1.0" --extra-index-url https://pypi.nvidia.com -i https://pypi.tuna.tsinghua.edu.cn/simple
+  ```
+
+---
+
+### 4. isaaclab install by git
+
+  ```
+git clone https://github.com/HBUTHUANGPX/IsaacLab_v230.git
+  ```
+
+  ```
+cd IsaacLab_v230/ && ./isaaclab.sh --install
+  ```
+
+---
+
+### 5. rsl-rl install by git
+
+  ```
+git clone https://github.com/HBUTHUANGPX/rsl_rl_v320.git
+  ```
+
+  ```
+cd rsl_rl_v320/ && pip install -e .
+  ```
+
+---
+
+### 6. this repo install by git
+
+  ```
+git clone https://github.com/HBUTHUANGPX/mimic_baseline.git
+  ```
+
+  ```
+cd general_motion_tracker_whole_body_teleoperation/ && pip install -e .
+  ```
+
+---
+
+### 7. deploy install by pip
+  ```
+pip install mujoco==3.2.7
+  ```
+  ```
+pip install onnxruntime==1.22.1
+  ```
+  ```
+conda install pinocchio -c conda-forge
+  ```
+
+---
+
+### base mimic train scripts
+
+  ```
+python scripts/rsl_rl/train.py  --task=Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Q1_slowly_walk
+  ```
+
+### base mimic eval scripts
+  ```
+python scripts/rsl_rl/play.py --task Tracking-Flat-Q1-v0 --num_envs 2 --domain_randomization
+  ```
+
+---
+
+### CSV to npz 批量转换
+第一版，效率较低，逐个文件进行转换
+  ```
+python scripts/csvs_to_npzs.py --input_folder lafan_Q1/lafan_bvh/ --output_folder artifacts/lafan_bvh/ --headless
+  ```
+第二版，效率高，并行进行转换，理论上的瓶颈在GPU->CPU数据搬运和保存上
+  ```
+python scripts/csvs_to_npzs_2.py --input_folder retargeting_data_csv/Q1/100STYLE/ --output_folder artifacts/Q1/100STYLE/ --input_fps 60 --output_fps 50 --headless --preload_csv --async_save_npz
+  ```
+---
+  
+### teacher policy train command
   单卡训练：
   ```
   python scripts/rsl_rl/train_multi_teacher.py  --task=Pure-Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Pure_Q1_slowly_walk
@@ -73,26 +124,52 @@ python -m torch.distributed.run --nnodes=1 --nproc_per_node=8 scripts/rsl_rl/tra
   ```
   python -m torch.distributed.run --nnodes=1 --nproc_per_node=8 scripts/rsl_rl/train_multi_teacher.py  --task=Pure-Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Pure_Q1_slowly_walk --distributed
   ```
-- #### teacher policy eval command
+  自动化多卡并行单卡训练：
+  单卡测试
+  ```
+  python scripts/rsl_rl/ \
+  train_multi_teacher_motion_group_one_by_one_gpu.py \
+  --task=Pure-Tracking-Flat-Q1-v0 \
+  --headless --logger wandb \
+  --log_project_name bydmmc \
+  --run_name Q1_lafan \
+  --group_name "walk_lafan" \
+  --time_stamp "2026_0128_1423" \
+  --device=cuda:0
+  ```
+  自动化脚本：
+  ```
+  bash train_single_teacher.sh
+  ```
+
+### teacher policy eval command
   - `--other_dirs` 表示 `load_run`下的子文件夹，名字与`motion_file.yaml`中描述的 motion_group name一致
-  ```  python scripts/rsl_rl/play.py --task Pure-Tracking-Flat-Q1-v0 --num_envs 2 --load_run 2026_01_05_22_27_Pure_Q1 --other_dirs run  ```
+  ```  
+  python scripts/rsl_rl/play.py --task Pure-Tracking-Flat-Q1-v0 --num_envs 2 --load_run 2026_01_05_22_27_Pure_Q1 --other_dirs run 
+  ```
 
-- #### multi teacher ppo distil
-  - 训练命令
-    - 单卡
-  ```python scripts/rsl_rl/train_multi_teacher_student.py  --task=CVAEDissMT-Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Q1_Diss  --load_run 2026_0202_2314_Q1_lafan ```
+### multi teacher ppo distil
+  - 单卡 训练命令
+  ```
+  python scripts/rsl_rl/train_multi_teacher_student.py  --task=CVAEDissMT-Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Q1_Diss  --load_run 2026_0202_2314_Q1_lafan
+  ```
 
-    - 多卡
-  ```python -m torch.distributed.run --nnodes=1 --nproc_per_node=8 scripts/rsl_rl/train_multi_teacher_student.py  --task=CVAEDissMT-Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Q1_Diss  --load_run 2026_0202_2314_Q1_lafan --distributed ```
+  - 多卡 训练命令
+  
+  ```
+  python -m torch.distributed.run --nnodes=1 --nproc_per_node=8 scripts/rsl_rl/train_multi_teacher_student.py  --task=CVAEDissMT-Tracking-Flat-Q1-v0 --headless --logger wandb --log_project_name bydmmc --run_name Q1_Diss  --load_run 2026_0202_2314_Q1_lafan --distributed 
+  ```
 
   - 测试命令
-  ```python scripts/rsl_rl/play_multi_teacher_student.py --num_envs 2 --domain_randomization --task=CVAEDissMT-Tracking-Flat-Q1-v0 ```
+  ```
+  python scripts/rsl_rl/play_multi_teacher_student.py --num_envs 2 --domain_randomization --task=CVAEDissMT-Tracking-Flat-Q1-v0 
+  ```
 
 
-python scripts/rsl_rl/train_multi_teacher_motion_group_one_by_one_gpu.py     --task=Pure-Tracking-Flat-Q1-v0     --headless     --logger wandb     --log_project_name bydmmc     --run_name Q1_lafan     --group_name "walk_lafan"     --time_stamp "2026_0128_1423"     --device=cuda:0
 
 
-python scripts/csvs_to_npzs_2.py --input_folder retargeting_data_csv/Q1/100STYLE/ --output_folder artifacts/Q1/100STYLE/ --input_fps 60 --output_fps 50 --headless --preload_csv --async_save_npz
+
+
 
 # 报错解决
 ## 1. 考虑缓存清理：删除Omniverse缓存rm -rf ~/.cache/ov并重试,还不行关掉梯子或者打开梯子
