@@ -67,7 +67,7 @@ class Bench:
             cross_mask[valid_ids] = cross_flags
         t2 = timer.stamp()
 
-        total_mask = overflow_mask | cross_mask
+        total_mask = overflow_mask | cross_mask | self.terminated
         env_ids = torch.nonzero(total_mask, as_tuple=False).squeeze(-1)
         t3 = timer.stamp()
 
@@ -77,18 +77,24 @@ class Bench:
             "get_nonzero": t3 - t2,
         }
 
-    def _post_update_command(self, alpha: float, timer):
+    def _post_update_command(self, alpha: float, timer, use_bincount: bool):
         t0 = timer.stamp()
         non_timeout = self.terminated
         t1 = timer.stamp()
 
         if torch.any(non_timeout):
             time_steps_clamped = torch.clamp(self.time_steps, 0, self.time_step_total - 1)
-            term_ids = torch.nonzero(non_timeout, as_tuple=False).squeeze(-1)
-            term_steps = time_steps_clamped[term_ids]
-            bin_ids = torch.clamp(term_steps // self._bin_size, 0, self._bin_count - 1)
-            ones = torch.ones_like(bin_ids, dtype=torch.float32, device=self.device)
-            self._current_bin_failed.index_put_((bin_ids,), ones, accumulate=True)
+            if use_bincount:
+                term_steps = time_steps_clamped[non_timeout]
+                bin_ids = torch.clamp(term_steps // self._bin_size, 0, self._bin_count - 1)
+                inc = torch.bincount(bin_ids, minlength=self._bin_count).float()
+                self._current_bin_failed.add_(inc)
+            else:
+                term_ids = torch.nonzero(non_timeout, as_tuple=False).squeeze(-1)
+                term_steps = time_steps_clamped[term_ids]
+                bin_ids = torch.clamp(term_steps // self._bin_size, 0, self._bin_count - 1)
+                ones = torch.ones_like(bin_ids, dtype=torch.float32, device=self.device)
+                self._current_bin_failed.index_put_((bin_ids,), ones, accumulate=True)
         t2 = timer.stamp()
 
         self._bin_failed = alpha * self._current_bin_failed + (1.0 - alpha) * self._bin_failed
@@ -110,6 +116,8 @@ class Bench:
                 "resample_empty": t1 - t0,
                 "resample_probs": 0.0,
                 "resample_sample": 0.0,
+                "resample_rand": 0.0,
+                "resample_local_steps": 0.0,
                 "resample_assign": 0.0,
             }
         epsilon = 1e-6
@@ -125,20 +133,24 @@ class Bench:
         t1 = timer.stamp()
         # ============ resample_sample ==================
         sampled_bins = torch.multinomial(bin_probs, len(env_ids), replacement=True)
-        local_steps = (
-            (sampled_bins + torch.rand((len(env_ids),), device=self.device))
-            * float(self._bin_size)
-        ).long()
         t2 = timer.stamp()
+        # ============ resample_rand ====================
+        rand_u = torch.rand((len(env_ids),), device=self.device)
+        t3 = timer.stamp()
+        # ============ resample_local_steps =============
+        local_steps = ((sampled_bins + rand_u) * float(self._bin_size)).long()
+        t4 = timer.stamp()
         # ============ resample_assign ==================
         self.time_steps[env_ids] = torch.clamp(local_steps, 0, self.time_step_total - 1)
-        t3 = timer.stamp()
+        t5 = timer.stamp()
 
         return {
             "resample_empty": 0.0,
             "resample_probs": t1 - t0,
             "resample_sample": t2 - t1,
-            "resample_assign": t3 - t2,
+            "resample_rand": t3 - t2,
+            "resample_local_steps": t4 - t3,
+            "resample_assign": t5 - t4,
         }
 
 
@@ -165,6 +177,7 @@ def main():
     p.add_argument("--seed", type=int, default=123)
     p.add_argument("--terminated_prob", type=float, default=0.98)
     p.add_argument("--alpha", type=float, default=0.001)
+    p.add_argument("--use_bincount", action="store_true", help="Use torch.bincount for bin_accum")
     args = p.parse_args()
 
     device = _device_from_arg(args.device)
@@ -185,7 +198,7 @@ def main():
         bench.update_termination(args.terminated_prob)
         bench.time_steps += 1
         env_ids, _ = bench._get_env_ids_to_resample(timer)
-        bench._post_update_command(args.alpha, timer)
+        bench._post_update_command(args.alpha, timer, args.use_bincount)
         bench._resample_adaptive_sampling(env_ids, timer)
 
     totals = {
@@ -202,6 +215,8 @@ def main():
         "resample_empty": 0.0,
         "resample_probs": 0.0,
         "resample_sample": 0.0,
+        "resample_rand": 0.0,
+        "resample_local_steps": 0.0,
         "resample_assign": 0.0,
     }
     resample_counts = []
@@ -214,7 +229,7 @@ def main():
         env_ids, t_get = bench._get_env_ids_to_resample(timer)
         t1 = timer.stamp()
 
-        t_post = bench._post_update_command(args.alpha, timer)
+        t_post = bench._post_update_command(args.alpha, timer, args.use_bincount)
         t2 = timer.stamp()
 
         t_resample = bench._resample_adaptive_sampling(env_ids, timer)
@@ -246,6 +261,7 @@ def main():
     print(f"  bin_count: {bench._bin_count}")
     print(f"  terminated_prob: {args.terminated_prob}")
     print(f"  alpha: {args.alpha}")
+    print(f"  use_bincount: {args.use_bincount}")
     print()
     print("Average per-iter time (ms):")
     print(f"  _get_env_ids_to_resample: {ms(totals['get_env_ids']):.4f}")
@@ -260,10 +276,13 @@ def main():
     print(f"    empty: {ms(totals['resample_empty']):.4f}")
     print(f"    probs: {ms(totals['resample_probs']):.4f}")
     print(f"    sample: {ms(totals['resample_sample']):.4f}")
+    print(f"    rand: {ms(totals['resample_rand']):.4f}")
+    print(f"    local_steps: {ms(totals['resample_local_steps']):.4f}")
     print(f"    assign: {ms(totals['resample_assign']):.4f}")
     print(f"  total: {ms(totals['total']):.4f}")
     print()
     print(f"Avg resample env_ids per iter: {sum(resample_counts)/len(resample_counts):.2f}")
+    print(f"Avg resample percent env_ids per iter: {(sum(resample_counts)/len(resample_counts))/args.num_envs:.5f}")
 
 
 if __name__ == "__main__":
