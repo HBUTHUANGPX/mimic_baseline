@@ -564,7 +564,13 @@ class MotionCommand(CommandTerm):
 
     def _update_command(self):
         self.time_steps += 1
+        env_ids = self._get_env_ids_to_resample()
+        self._post_update_command()
+        # 根据动态平衡策略为需要重采样的 env 重新分配 time_steps
+        self._resample_command(env_ids)
+        self._update_state_data()
 
+    def _get_env_ids_to_resample(self) -> torch.Tensor:
         overflow_mask = self.time_steps >= self.motion.time_step_total  # 溢出掩码
         valid_mask = ~overflow_mask  # 有效索引掩码 (time_steps < time_step_total)
         cross_mask = torch.zeros(
@@ -583,7 +589,9 @@ class MotionCommand(CommandTerm):
         env_ids = torch.nonzero(total_mask, as_tuple=False).squeeze(
             -1
         )  # 获取需要重采样的 env_ids
-
+        return env_ids
+    
+    def _post_update_command(self):
         # 全局时间轴失败统计，仅计非 timeout 的终止
         # - terminated: 任意终止（包含超时）
         # - time_outs: 超时终止
@@ -608,10 +616,6 @@ class MotionCommand(CommandTerm):
             alpha * self._current_bin_failed + (1.0 - alpha) * self._bin_failed
         )
         self._current_bin_failed.zero_()
-
-        # 根据动态平衡策略为需要重采样的 env 重新分配 time_steps
-        self._resample_command(env_ids)
-        self._update_state_data()
 
     def _update_state_data(self):
         ref_pos_w_repeat = self.ref_pos_w[:, None, :].repeat(
