@@ -238,8 +238,8 @@ def main():
         help="Randomize motion lengths by ±ratio around frames_per_motion (e.g., 0.2)",
     )
     parser.add_argument("--bin_size", type=int, default=50)
-    parser.add_argument("--iters", type=int, default=20000)
-    parser.add_argument("--warmup", type=int, default=2000)
+    parser.add_argument("--iters", type=int, default=2000)
+    parser.add_argument("--warmup", type=int, default=200)
     parser.add_argument("--device", type=str, default="auto", choices=["auto", "cuda", "cpu"])
     parser.add_argument("--seed", type=int, default=123)
     parser.add_argument("--terminated_prob", type=float, default=0.8)
