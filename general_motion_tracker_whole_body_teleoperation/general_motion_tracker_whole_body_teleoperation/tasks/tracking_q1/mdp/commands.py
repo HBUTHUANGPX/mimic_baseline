@@ -22,6 +22,7 @@ from isaaclab.utils.math import (
     yaw_quat,
 )
 import math
+
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 import re
@@ -37,18 +38,21 @@ def extract_part(path):
     # 假设路径以 'artifacts/' 开头，提取其后的相对路径（包括子文件夹和文件名）
     if path.startswith("artifacts/"):
         # 去除 'artifacts/' 前缀，并返回剩余部分
-        relative_path = path[len("artifacts/"):]
+        relative_path = path[len("artifacts/") :]
         # 验证是否为有效的NPZ文件路径
-        if relative_path.endswith('.npz'):
+        if relative_path.endswith(".npz"):
             return relative_path
     return None
+
+
 def get_run_name(mf: str) -> str | None:
     if mf.startswith("artifacts/"):
-        path = mf[len("artifacts/"):]
+        path = mf[len("artifacts/") :]
     path = path.replace("/", "_")
     if path.endswith(".npz"):
         path = path[:-4]
     return path
+
 
 class MotionLoader:
     def __init__(
@@ -88,9 +92,9 @@ class MotionLoader:
                 extract_part(p) for p in paths if extract_part(p) is not None
             ]
             num_motions = len(extracted_list)
-            
+
             # for _file in self.motion_file:
-            for i , _file in enumerate(paths):
+            for i, _file in enumerate(paths):
                 data = np.load(_file)
                 if self.fps is None:
                     self.fps = data["fps"]
@@ -109,16 +113,42 @@ class MotionLoader:
                     torch.tensor(data["body_pos_w"], dtype=torch.float32, device=device)
                 )
                 body_quat_w_list.append(
-                    torch.tensor(data["body_quat_w"], dtype=torch.float32, device=device)
+                    torch.tensor(
+                        data["body_quat_w"], dtype=torch.float32, device=device
+                    )
                 )
                 body_lin_vel_w_list.append(
-                    torch.tensor(data["body_lin_vel_w"], dtype=torch.float32, device=device)
+                    torch.tensor(
+                        data["body_lin_vel_w"], dtype=torch.float32, device=device
+                    )
                 )
                 body_ang_vel_w_list.append(
-                    torch.tensor(data["body_ang_vel_w"], dtype=torch.float32, device=device)
+                    torch.tensor(
+                        data["body_ang_vel_w"], dtype=torch.float32, device=device
+                    )
                 )
-                motion_group_list.append(torch.tensor(motion_file_group_index, dtype=torch.float32, device=device) * torch.ones(data["joint_pos"].shape[0], 1, dtype=torch.float32, device=device))
-                motion_id_list.append(torch.tensor(self.num_motions + i, dtype=torch.float32, device=device) * torch.ones(data["joint_pos"].shape[0],1, dtype=torch.float32, device=device))
+                motion_group_list.append(
+                    torch.tensor(
+                        motion_file_group_index, dtype=torch.float32, device=device
+                    )
+                    * torch.ones(
+                        data["joint_pos"].shape[0],
+                        1,
+                        dtype=torch.float32,
+                        device=device,
+                    )
+                )
+                motion_id_list.append(
+                    torch.tensor(
+                        self.num_motions + i, dtype=torch.float32, device=device
+                    )
+                    * torch.ones(
+                        data["joint_pos"].shape[0],
+                        1,
+                        dtype=torch.float32,
+                        device=device,
+                    )
+                )
                 self.motion_lengths.append(data["joint_pos"].shape[0])
             motion_file_group_index += 1
             self.extracted_list.extend(extracted_list)
@@ -217,11 +247,9 @@ class MotionCommand(CommandTerm):
             device=self.device,
         )
         self.load_motion(self.cfg.motion_file)
-        
+
     def load_motion(self, motion_file: Dict[str, List[str]]):
-        self.motion = MotionLoader(
-            motion_file, self.body_indexes, device=self.device
-        )
+        self.motion = MotionLoader(motion_file, self.body_indexes, device=self.device)
         # Cache motion end indices for vectorized distribution counting
         self._motion_ends = self.motion.motion_indices[:, 1].contiguous()
         self.counts = torch.zeros(
@@ -292,7 +320,7 @@ class MotionCommand(CommandTerm):
             # Update per-motion metrics as 0/1 mask
             for i in range(self.motion.num_motions):
                 self.metrics[self.motion.extracted_list[i]] = (motion_ids == i).float()
-    
+
     @property
     def motion_id(self) -> torch.Tensor:
         return self.motion._motion_id[self.time_steps]
@@ -461,9 +489,7 @@ class MotionCommand(CommandTerm):
             bin_probs = torch.clamp(bin_probs, min=min_bin_prob)
             bin_probs = bin_probs / bin_probs.sum()
 
-        sampled_bins = torch.multinomial(
-            bin_probs, len(env_ids), replacement=True
-        )
+        sampled_bins = torch.multinomial(bin_probs, len(env_ids), replacement=True)
         local_steps = (
             (sampled_bins + torch.rand((len(env_ids),), device=self.device))
             * float(self._bin_size)
@@ -471,7 +497,7 @@ class MotionCommand(CommandTerm):
         self.time_steps[env_ids] = torch.clamp(
             local_steps, 0, self.motion.time_step_total - 1
         )
-    
+
     def __resample__reset_robot_state(self, env_ids: Sequence[int]):
         root_pos = self.body_pos_w[:, 0].clone()
         root_ori = self.body_quat_w[:, 0].clone()
@@ -538,17 +564,25 @@ class MotionCommand(CommandTerm):
 
     def _update_command(self):
         self.time_steps += 1
-        
-        overflow_mask = self.time_steps >= self.motion.time_step_total # 溢出掩码
+
+        overflow_mask = self.time_steps >= self.motion.time_step_total  # 溢出掩码
         valid_mask = ~overflow_mask  # 有效索引掩码 (time_steps < time_step_total)
-        cross_mask = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)  # 跨越掩码初始化
+        cross_mask = torch.zeros(
+            self.num_envs, dtype=torch.bool, device=self.device
+        )  # 跨越掩码初始化
         if valid_mask.any():  # 仅对有效部分检查 new_data_flag
-            valid_ids = torch.nonzero(valid_mask, as_tuple=False).squeeze(-1)  # 获取有效 env_ids
-            cross_flags = self.motion.new_data_flag[self.time_steps[valid_ids]]  # 检查对应 time_steps 的 flag
+            valid_ids = torch.nonzero(valid_mask, as_tuple=False).squeeze(
+                -1
+            )  # 获取有效 env_ids
+            cross_flags = self.motion.new_data_flag[
+                self.time_steps[valid_ids]
+            ]  # 检查对应 time_steps 的 flag
             cross_mask[valid_ids] = cross_flags  # 更新跨越掩码
-        
+
         total_mask = overflow_mask | cross_mask  # 合并掩码：溢出或跨越
-        env_ids = torch.nonzero(total_mask, as_tuple=False).squeeze(-1)  # 获取需要重采样的 env_ids
+        env_ids = torch.nonzero(total_mask, as_tuple=False).squeeze(
+            -1
+        )  # 获取需要重采样的 env_ids
 
         # 全局时间轴失败统计，仅计非 timeout 的终止
         # - terminated: 任意终止（包含超时）
@@ -564,15 +598,15 @@ class MotionCommand(CommandTerm):
             term_ids = torch.nonzero(non_timeout, as_tuple=False).squeeze(-1)
             term_steps = time_steps_clamped[term_ids]
             # 直接按全局时间轴 bin 统计失败（先累积到 current，再做 EMA）
-            bin_ids = torch.clamp(
-                term_steps // self._bin_size, 0, self._bin_count - 1
-            )
+            bin_ids = torch.clamp(term_steps // self._bin_size, 0, self._bin_count - 1)
             ones = torch.ones_like(bin_ids, dtype=torch.float32, device=self.device)
             self._current_bin_failed.index_put_((bin_ids,), ones, accumulate=True)
 
         # 指数衰减更新失败统计
         alpha = float(self.cfg.failed_bin_alpha)
-        self._bin_failed = alpha * self._current_bin_failed + (1.0 - alpha) * self._bin_failed
+        self._bin_failed = (
+            alpha * self._current_bin_failed + (1.0 - alpha) * self._bin_failed
+        )
         self._current_bin_failed.zero_()
 
         # 根据动态平衡策略为需要重采样的 env 重新分配 time_steps
