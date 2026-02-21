@@ -273,7 +273,7 @@ class Q1FlatFSQCVAEDistillationStudentMultiTeacherCfg(RslRlDistillationRunnerCfg
     )
     policy = RslRlPpoActorCritic_Distil_FSQCVAECfg(
         class_name="ActorCritic_FSQ_CVAE",
-        init_noise_std=0.02,
+        init_noise_std=0.8,
         actor_hidden_dims=[1024, 512, 256, 128],
         critic_hidden_dims=[1024, 512, 256, 128],
         teacher_hidden_dims=[1024, 512, 256, 128],
