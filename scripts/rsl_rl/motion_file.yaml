@@ -4,44 +4,44 @@ motion_group:
   #   folder_name: ["artifacts/Q1/xsens_bvh"]
   #   wo_file_name: []
   #   wo_folder_name: []
-  # 100STYLE_set_1:
-  #   file_name: []
-  #   folder_name: ["artifacts/Q1/100STYLE/aa_set_1"]
-  #   wo_file_name: []
-  #   wo_folder_name: []
-  # 100STYLE_set_2:
-  #   file_name: []
-  #   folder_name: ["artifacts/Q1/100STYLE/aa_set_2"]
-  #   wo_file_name: []
-  #   wo_folder_name: []
-  # 100STYLE_set_3:
-  #   file_name: []
-  #   folder_name: ["artifacts/Q1/100STYLE/aa_set_3"]
-  #   wo_file_name: []
-  #   wo_folder_name: []
-  # 100STYLE_set_4:
-  #   file_name: []
-  #   folder_name: ["artifacts/Q1/100STYLE/aa_set_4"]
-  #   wo_file_name: []
-  #   wo_folder_name: []
+  100STYLE_set_1:
+    file_name: []
+    folder_name: ["artifacts/Q1/100STYLE/aa_set_1"]
+    wo_file_name: []
+    wo_folder_name: []
+  100STYLE_set_2:
+    file_name: []
+    folder_name: ["artifacts/Q1/100STYLE/aa_set_2"]
+    wo_file_name: []
+    wo_folder_name: []
+  100STYLE_set_3:
+    file_name: []
+    folder_name: ["artifacts/Q1/100STYLE/aa_set_3"]
+    wo_file_name: []
+    wo_folder_name: []
+  100STYLE_set_4:
+    file_name: []
+    folder_name: ["artifacts/Q1/100STYLE/aa_set_4"]
+    wo_file_name: []
+    wo_folder_name: []
 
-  xsens_bvh_251014_single_action:
-    file_name: []
-    folder_name: ["artifacts/Q1/xsens_bvh/251014_single_action"]
-    wo_file_name: []
-    wo_folder_name: []
-  xsens_bvh_251020_21:
-    file_name: []
-    folder_name: ["artifacts/Q1/xsens_bvh/251020_21"]
-    wo_file_name: []
-    wo_folder_name: []
-  xsens_bvh_251202:
-    file_name: []
-    folder_name: ["artifacts/Q1/xsens_bvh/251202"]
-    wo_file_name: []
-    wo_folder_name: []
-  xsens_bvh_251203:
-    file_name: []
-    folder_name: ["artifacts/Q1/xsens_bvh/251203"]
-    wo_file_name: []
-    wo_folder_name: []
+  # xsens_bvh_251014_single_action:
+  #   file_name: []
+  #   folder_name: ["artifacts/Q1/xsens_bvh/251014_single_action"]
+  #   wo_file_name: []
+  #   wo_folder_name: []
+  # xsens_bvh_251020_21:
+  #   file_name: []
+  #   folder_name: ["artifacts/Q1/xsens_bvh/251020_21"]
+  #   wo_file_name: []
+  #   wo_folder_name: []
+  # xsens_bvh_251202:
+  #   file_name: []
+  #   folder_name: ["artifacts/Q1/xsens_bvh/251202"]
+  #   wo_file_name: []
+  #   wo_folder_name: []
+  # xsens_bvh_251203:
+  #   file_name: []
+  #   folder_name: ["artifacts/Q1/xsens_bvh/251203"]
+  #   wo_file_name: []
+  #   wo_folder_name: []

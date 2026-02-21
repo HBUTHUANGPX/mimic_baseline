@@ -256,12 +256,13 @@ class ObservationsCfg:
             self.history_length = 24
 
     @configclass
-    class CommandWithNoiseCfg(ObsGroup):  # 带噪声的指令观测组
+    class CommandWithNoiseCfg(ObsGroup):  # 带噪声含有特权信息的指令观测组
         """Observations for command group with noise."""
 
-        command = ObsTerm(
-            func=mdp.generated_commands,
+        joint_pos_delta = ObsTerm(
+            func=mdp.joint_pos_delta, 
             params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.02, n_max=0.02),
         )
         motion_ref_pos_b = ObsTerm(
             func=mdp.motion_ref_pos_b,
@@ -288,12 +289,13 @@ class ObservationsCfg:
             self.enable_corruption = True
 
     @configclass
-    class CommandWithNoiseWOPrivilegeCfg(ObsGroup):  # 带噪声的指令观测组
+    class CommandWithNoiseWOPrivilegeCfg(ObsGroup):  # 带噪声不含特权信息的指令观测组
         """Observations for command group with noise."""
 
-        command = ObsTerm(
-            func=mdp.generated_commands,
+        joint_pos_delta = ObsTerm(
+            func=mdp.joint_pos_delta, 
             params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.02, n_max=0.02),
         )
         motion_ref_ori_b = ObsTerm(
             func=mdp.motion_ref_ori_b,
@@ -305,12 +307,11 @@ class ObservationsCfg:
             self.enable_corruption = True
 
     @configclass
-    class CommandCfg(ObsGroup):  # 带噪声的指令观测组
+    class CommandCfg(ObsGroup):  # 无噪声含有特权信息的指令观测组
         """Observations for command group with noise."""
-
-        command = ObsTerm(
-            func=mdp.generated_commands,
-            params={"command_name": "motion"},
+        joint_pos_delta = ObsTerm(
+            func=mdp.joint_pos_delta, 
+            params={"command_name": "motion"}
         )
         motion_ref_pos_b = ObsTerm(
             func=mdp.motion_ref_pos_b,
@@ -333,12 +334,12 @@ class ObservationsCfg:
             self.enable_corruption = True
 
     @configclass
-    class CommandWOPrivilegeCfg(ObsGroup):  # 带噪声的指令观测组
+    class CommandWOPrivilegeCfg(ObsGroup):  # 无噪声不含特权信息的指令观测组
         """Observations for command group with noise."""
 
-        command = ObsTerm(
-            func=mdp.generated_commands,
-            params={"command_name": "motion"},
+        joint_pos_delta = ObsTerm(
+            func=mdp.joint_pos_delta, 
+            params={"command_name": "motion"}
         )
         motion_ref_ori_b = ObsTerm(
             func=mdp.motion_ref_ori_b,
@@ -621,9 +622,9 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the locomotion velocity-tracking environment."""
 
     # Scene settings
-    scene: MySceneCfg = MySceneCfg(num_envs=128, env_spacing=2.5)
+    # scene: MySceneCfg = MySceneCfg(num_envs=128, env_spacing=2.5)
     # scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
-    # scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
+    scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
