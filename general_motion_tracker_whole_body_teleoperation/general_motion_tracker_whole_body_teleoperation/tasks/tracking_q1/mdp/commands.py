@@ -469,10 +469,10 @@ class MotionCommand(CommandTerm):
 
         if len(env_ids) == 0:
             return
-        self.__resample__adaptive_sampling(env_ids)
-        self.__resample__reset_robot_state(env_ids)
+        self._resample_adaptive_sampling(env_ids)
+        self._resample_reset_robot_state(env_ids)
 
-    def __resample__adaptive_sampling(self, env_ids: Sequence[int]):
+    def _resample_adaptive_sampling(self, env_ids: Sequence[int]):
         # 全局时间轴失败优先采样:
         # - 失败计数全为 0 时使用均匀采样
         # - 否则失败计数归一化，并设置下限避免短片段被忽视
@@ -498,7 +498,7 @@ class MotionCommand(CommandTerm):
             local_steps, 0, self.motion.time_step_total - 1
         )
 
-    def __resample__reset_robot_state(self, env_ids: Sequence[int]):
+    def _resample_reset_robot_state(self, env_ids: Sequence[int]):
         root_pos = self.body_pos_w[:, 0].clone()
         root_ori = self.body_quat_w[:, 0].clone()
         root_lin_vel = self.body_lin_vel_w[:, 0].clone()
