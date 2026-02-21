@@ -441,7 +441,10 @@ class MotionCommand(CommandTerm):
 
         if len(env_ids) == 0:
             return
+        self.__resample__adaptive_sampling(env_ids)
+        self.__resample__reset_robot_state(env_ids)
 
+    def __resample__adaptive_sampling(self, env_ids: Sequence[int]):
         # 全局时间轴失败优先采样:
         # - 失败计数全为 0 时使用均匀采样
         # - 否则失败计数归一化，并设置下限避免短片段被忽视
@@ -468,7 +471,8 @@ class MotionCommand(CommandTerm):
         self.time_steps[env_ids] = torch.clamp(
             local_steps, 0, self.motion.time_step_total - 1
         )
-
+    
+    def __resample__reset_robot_state(self, env_ids: Sequence[int]):
         root_pos = self.body_pos_w[:, 0].clone()
         root_ori = self.body_quat_w[:, 0].clone()
         root_lin_vel = self.body_lin_vel_w[:, 0].clone()
@@ -551,7 +555,7 @@ class MotionCommand(CommandTerm):
         # - time_outs: 超时终止
         # - non_timeout: 真正失败（不包含超时）
         terminated = self._env.termination_manager.terminated
-        non_timeout = terminated & (~self._env.termination_manager.time_outs)
+        non_timeout = terminated
         if torch.any(non_timeout):
             # 限制到合法时间范围，避免溢出访问
             time_steps_clamped = torch.clamp(
@@ -573,7 +577,9 @@ class MotionCommand(CommandTerm):
 
         # 根据动态平衡策略为需要重采样的 env 重新分配 time_steps
         self._resample_command(env_ids)
+        self._update_state_data()
 
+    def _update_state_data(self):
         ref_pos_w_repeat = self.ref_pos_w[:, None, :].repeat(
             1, len(self.cfg.body_names), 1
         )
