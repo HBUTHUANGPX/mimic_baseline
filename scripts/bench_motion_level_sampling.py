@@ -28,6 +28,7 @@ class MotionSamplerBench:
         length_jitter,
         device,
         seed,
+        fail_buffer_size=10,
     ):
         torch.manual_seed(seed)
         if device.type == "cuda":
@@ -84,6 +85,19 @@ class MotionSamplerBench:
             num_motions, dtype=torch.float32, device=device
         )
         self._fail_update_step = 0
+        self._fail_counts_accum = torch.zeros(
+            num_motions, dtype=torch.float32, device=device
+        )
+        # failure record buffers (per-step)
+        self._fail_buf_size = int(max(1, fail_buffer_size))
+        self._fail_buf_ptr = 0
+        self._fail_buf_count = 0
+        self._fail_term_buf = torch.zeros(
+            self._fail_buf_size, num_envs, dtype=torch.bool, device=device
+        )
+        self._fail_motion_buf = torch.zeros(
+            self._fail_buf_size, num_envs, dtype=torch.long, device=device
+        )
 
         self.terminated = torch.zeros(num_envs, dtype=torch.bool, device=device)
 
@@ -157,48 +171,64 @@ class MotionSamplerBench:
         }
 
     # ===== improved: motion-level with failure weights =====
+    def _accumulate_failures(self, timer):
+        t0 = timer.stamp()
+        # record current step terminated + motion_ids
+        self._fail_term_buf[self._fail_buf_ptr].copy_(self.terminated)
+        self._fail_motion_buf[self._fail_buf_ptr].copy_(self.motion_ids)
+        self._fail_buf_ptr = (self._fail_buf_ptr + 1) % self._fail_buf_size
+        self._fail_buf_count = min(self._fail_buf_count + 1, self._fail_buf_size)
+        t1 = timer.stamp()
+        return {"fail_record": t1 - t0}
+
     def _update_failure_weights(self, update_interval, timer, momentum=0.9):
         t0 = timer.stamp()
         if update_interval <= 0:
             t1 = timer.stamp()
-            return {"fail_gate": t1 - t0, "fail_map": 0.0, "fail_count": 0.0, "fail_ema": 0.0, "fail_norm": 0.0}
+            return {"fail_gate": t1 - t0, "fail_compute": 0.0, "fail_ema": 0.0, "fail_norm": 0.0}
         if (self._fail_update_step % update_interval) != 0:
             self._fail_update_step += 1
             t1 = timer.stamp()
-            return {"fail_gate": t1 - t0, "fail_map": 0.0, "fail_count": 0.0, "fail_ema": 0.0, "fail_norm": 0.0}
+            return {"fail_gate": t1 - t0, "fail_compute": 0.0, "fail_ema": 0.0, "fail_norm": 0.0}
         t1 = timer.stamp()
 
-        # motion_id per env
-        # ts = torch.clamp(self.time_steps, 0, self.time_step_total - 1)
-        # motion_ids = torch.bucketize(ts, self.motion_ends, right=True)
-        fail_motion_ids = self.motion_ids[self.terminated]
-        t2 = timer.stamp()
-        if fail_motion_ids.numel() > 0:
-            counts = torch.bincount(fail_motion_ids, minlength=self.num_motions).float()
+        # compute counts from recorded steps in buffer
+        if self._fail_buf_count > 0:
+            term = self._fail_term_buf[: self._fail_buf_count]
+            mids = self._fail_motion_buf[: self._fail_buf_count]
+            fail_motion_ids = mids[term]
+            if fail_motion_ids.numel() > 0:
+                counts = torch.bincount(fail_motion_ids, minlength=self.num_motions).float()
+            else:
+                counts = torch.zeros(
+                    self.num_motions, dtype=torch.float32, device=self.device
+                )
         else:
             counts = torch.zeros(
                 self.num_motions, dtype=torch.float32, device=self.device
             )
-        t3 = timer.stamp()
+        t2 = timer.stamp()
 
-        # EMA update of motion-level failure counts
+        # EMA update using accumulated failures over interval
         self.motion_fail_counts = (
             momentum * self.motion_fail_counts + (1.0 - momentum) * counts
         )
-        t4 = timer.stamp()
+        t3 = timer.stamp()
         # normalize to weights (avoid zero)
         eps = 1e-6
         w = self.motion_fail_counts + eps
         self.motion_fail_weights = w / w.mean()
+        t4 = timer.stamp()
+
+        # reset buffer window
+        self._fail_buf_count = 0
         self._fail_update_step += 1
-        t5 = timer.stamp()
 
         return {
             "fail_gate": t1 - t0,
-            "fail_map": t2 - t1,
-            "fail_count": t3 - t2,
-            "fail_ema": t4 - t3,
-            "fail_norm": t5 - t4,
+            "fail_compute": t2 - t1,
+            "fail_ema": t3 - t2,
+            "fail_norm": t4 - t3,
         }
 
     def resample_improved(self, env_ids, timer, update_interval):
@@ -209,6 +239,11 @@ class MotionSamplerBench:
                 "resample_empty": t1 - t0,
                 "resample_total": t1 - t0,
                 "fail_update": 0.0,
+                "fail_record": 0.0,
+                "fail_gate": 0.0,
+                "fail_compute": 0.0,
+                "fail_ema": 0.0,
+                "fail_norm": 0.0,
                 "probs_total": 0.0,
                 "probs_base": 0.0,
                 "probs_fail": 0.0,
@@ -217,7 +252,8 @@ class MotionSamplerBench:
                 "assign": 0.0,
             }
 
-        # low-frequency update of failure weights
+        # per-step accumulate failures, then low-frequency update of weights
+        t_accum = self._accumulate_failures(timer)
         t_fail = self._update_failure_weights(update_interval, timer)
         t1 = timer.stamp()
 
@@ -245,9 +281,9 @@ class MotionSamplerBench:
             "resample_empty": 0.0,
             "resample_total": t6 - t0,
             "fail_update": t1 - t0,
+            "fail_record": t_accum["fail_record"],
             "fail_gate": t_fail["fail_gate"],
-            "fail_map": t_fail["fail_map"],
-            "fail_count": t_fail["fail_count"],
+            "fail_compute": t_fail["fail_compute"],
             "fail_ema": t_fail["fail_ema"],
             "fail_norm": t_fail["fail_norm"],
             "probs_total": t4 - t1,
@@ -292,6 +328,7 @@ def main():
         length_jitter=args.length_jitter,
         device=device,
         seed=args.seed,
+        fail_buffer_size=args.update_interval,
     )
     timer = Timer(device)
 
@@ -320,9 +357,9 @@ def main():
     totals_imp = {
         "resample_total": 0.0,
         "fail_update": 0.0,
+        "fail_record": 0.0,
         "fail_gate": 0.0,
-        "fail_map": 0.0,
-        "fail_count": 0.0,
+        "fail_compute": 0.0,
         "fail_ema": 0.0,
         "fail_norm": 0.0,
         "probs_total": 0.0,
@@ -340,9 +377,9 @@ def main():
         t = bench.resample_improved(env_ids, timer, args.update_interval)
         totals_imp["resample_total"] += t["resample_total"]
         totals_imp["fail_update"] += t["fail_update"]
+        totals_imp["fail_record"] += t["fail_record"]
         totals_imp["fail_gate"] += t["fail_gate"]
-        totals_imp["fail_map"] += t["fail_map"]
-        totals_imp["fail_count"] += t["fail_count"]
+        totals_imp["fail_compute"] += t["fail_compute"]
         totals_imp["fail_ema"] += t["fail_ema"]
         totals_imp["fail_norm"] += t["fail_norm"]
         totals_imp["probs_total"] += t["probs_total"]
@@ -376,9 +413,9 @@ def main():
     print("Improved (motion-level + failure weights, low-freq update):")
     print(f"  resample total: {ms(totals_imp['resample_total']):.4f}")
     print(f"    fail_update: {ms(totals_imp['fail_update']):.4f}")
+    print(f"      record: {ms(totals_imp['fail_record']):.4f}")
     print(f"      gate: {ms(totals_imp['fail_gate']):.4f}")
-    print(f"      map: {ms(totals_imp['fail_map']):.4f}")
-    print(f"      count: {ms(totals_imp['fail_count']):.4f}")
+    print(f"      compute: {ms(totals_imp['fail_compute']):.4f}")
     print(f"      ema: {ms(totals_imp['fail_ema']):.4f}")
     print(f"      norm: {ms(totals_imp['fail_norm']):.4f}")
     print(f"    probs total: {ms(totals_imp['probs_total']):.4f}")
