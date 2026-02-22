@@ -70,6 +70,10 @@ class MotionSamplerBench:
             device=device,
             dtype=torch.long,
         )
+        # env-level motion id cache (single source of truth)
+        self.env_motion_ids = torch.bucketize(
+            self.time_steps, self.motion_ends, right=True
+        )
 
         total_len = float(self.motion_lengths.sum().item())
         self.target_dist = (self.motion_lengths.float() / total_len).unsqueeze(0)
@@ -106,25 +110,33 @@ class MotionSamplerBench:
             torch.rand(self.num_envs, device=self.device) < terminated_prob
         )
 
-    def _get_env_ids_to_resample(self):
+    def _get_env_ids_to_resample(self, timer):
+        t0 = timer.stamp()
         overflow_mask = self.time_steps >= self.time_step_total
         valid_mask = ~overflow_mask
+        t1 = timer.stamp()
+
         cross_mask = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
         if valid_mask.any():
             valid_ids = torch.nonzero(valid_mask, as_tuple=False).squeeze(-1)
             cross_flags = self.new_data_flag[self.time_steps[valid_ids]]
             cross_mask[valid_ids] = cross_flags
+        t2 = timer.stamp()
+
         total_mask = overflow_mask | cross_mask | self.terminated
         env_ids = torch.nonzero(total_mask, as_tuple=False).squeeze(-1)
-        return env_ids
+        t3 = timer.stamp()
+
+        return env_ids, {
+            "get_overflow": t1 - t0,
+            "get_cross": t2 - t1,
+            "get_nonzero": t3 - t2,
+        }
 
     def _update_distribution(self):
-        # Vectorized: map time_steps to motion id, then bincount
-        ts = torch.clamp(self.time_steps, 0, self.time_step_total - 1)
-        # Intervals are [start, end); right=True ensures ts==end maps to next motion
-        self.motion_ids = torch.bucketize(ts, self.motion_ends, right=True)
+        # Vectorized: use cached env motion ids
         self.counts = torch.bincount(
-            self.motion_ids, minlength=self.num_motions
+            self.env_motion_ids, minlength=self.num_motions
         ).float()
         self.motion_distribution = (self.counts / self.num_envs).unsqueeze(0)
 
@@ -156,6 +168,7 @@ class MotionSamplerBench:
             torch.rand((len(env_ids),), device=self.device) * (selected_lengths - 1)
         ).long()
         self.time_steps[env_ids] = selected_starts + local_steps
+        self.env_motion_ids[env_ids] = motion_ids
         t3 = timer.stamp()
 
         return {
@@ -170,7 +183,7 @@ class MotionSamplerBench:
         t0 = timer.stamp()
         # record current step terminated + motion_ids
         self._fail_term_buf[self._fail_buf_ptr].copy_(self.terminated)
-        self._fail_motion_buf[self._fail_buf_ptr].copy_(self.motion_ids)
+        self._fail_motion_buf[self._fail_buf_ptr].copy_(self.env_motion_ids)
         self._fail_buf_ptr = (self._fail_buf_ptr + 1) % self._fail_buf_size
         self._fail_buf_count = min(self._fail_buf_count + 1, self._fail_buf_size)
         t1 = timer.stamp()
@@ -270,6 +283,7 @@ class MotionSamplerBench:
             torch.rand((len(env_ids),), device=self.device) * (selected_lengths - 1)
         ).long()
         self.time_steps[env_ids] = selected_starts + local_steps
+        self.env_motion_ids[env_ids] = motion_ids
         t6 = timer.stamp()
 
         return {
@@ -331,7 +345,7 @@ def main():
     for _ in range(args.warmup):
         bench.update_termination(args.terminated_prob)
         bench.time_steps += 1
-        env_ids = bench._get_env_ids_to_resample()
+        env_ids, _ = bench._get_env_ids_to_resample(timer)
         bench._update_distribution()
         bench.resample_baseline(env_ids, timer)
 
@@ -341,6 +355,9 @@ def main():
         "termination": 0.0,
         "step_inc": 0.0,
         "get_env_ids": 0.0,
+        "get_overflow": 0.0,
+        "get_cross": 0.0,
+        "get_nonzero": 0.0,
         "update_dist": 0.0,
         "resample": 0.0,
         "probs": 0.0,
@@ -353,7 +370,7 @@ def main():
         t1 = timer.stamp()
         bench.time_steps += 1
         t2 = timer.stamp()
-        env_ids = bench._get_env_ids_to_resample()
+        env_ids, t_get = bench._get_env_ids_to_resample(timer)
         t3 = timer.stamp()
         bench._update_distribution()
         t4 = timer.stamp()
@@ -364,6 +381,9 @@ def main():
         totals_base["termination"] += t1 - t0
         totals_base["step_inc"] += t2 - t1
         totals_base["get_env_ids"] += t3 - t2
+        totals_base["get_overflow"] += t_get["get_overflow"]
+        totals_base["get_cross"] += t_get["get_cross"]
+        totals_base["get_nonzero"] += t_get["get_nonzero"]
         totals_base["update_dist"] += t4 - t3
         totals_base["resample"] += sum(t.values())
         totals_base["probs"] += t["resample_probs"]
@@ -376,6 +396,9 @@ def main():
         "termination": 0.0,
         "step_inc": 0.0,
         "get_env_ids": 0.0,
+        "get_overflow": 0.0,
+        "get_cross": 0.0,
+        "get_nonzero": 0.0,
         "update_dist": 0.0,
         "resample_total": 0.0,
         "fail_update": 0.0,
@@ -397,7 +420,7 @@ def main():
         t1 = timer.stamp()
         bench.time_steps += 1
         t2 = timer.stamp()
-        env_ids = bench._get_env_ids_to_resample()
+        env_ids, t_get = bench._get_env_ids_to_resample(timer)
         t3 = timer.stamp()
         bench._update_distribution()
         t4 = timer.stamp()
@@ -408,6 +431,9 @@ def main():
         totals_imp["termination"] += t1 - t0
         totals_imp["step_inc"] += t2 - t1
         totals_imp["get_env_ids"] += t3 - t2
+        totals_imp["get_overflow"] += t_get["get_overflow"]
+        totals_imp["get_cross"] += t_get["get_cross"]
+        totals_imp["get_nonzero"] += t_get["get_nonzero"]
         totals_imp["update_dist"] += t4 - t3
         totals_imp["resample_total"] += t["resample_total"]
         totals_imp["fail_update"] += t["fail_update"]
@@ -442,6 +468,9 @@ def main():
     print(f"    termination: {ms(totals_base['termination']):.4f}")
     print(f"    step_inc: {ms(totals_base['step_inc']):.4f}")
     print(f"    get_env_ids: {ms(totals_base['get_env_ids']):.4f}")
+    print(f"      overflow+valid: {ms(totals_base['get_overflow']):.4f}")
+    print(f"      cross_mask: {ms(totals_base['get_cross']):.4f}")
+    print(f"      nonzero: {ms(totals_base['get_nonzero']):.4f}")
     print(f"    update_dist: {ms(totals_base['update_dist']):.4f}")
     print(f"    resample: {ms(totals_base['resample']):.4f}")
     print(f"        probs: {ms(totals_base['probs']):.4f}")
@@ -454,14 +483,17 @@ def main():
     print(f"    termination: {ms(totals_imp['termination']):.4f}")
     print(f"    step_inc: {ms(totals_imp['step_inc']):.4f}")
     print(f"    get_env_ids: {ms(totals_imp['get_env_ids']):.4f}")
+    print(f"      overflow+valid: {ms(totals_imp['get_overflow']):.4f}")
+    print(f"      cross_mask: {ms(totals_imp['get_cross']):.4f}")
+    print(f"      nonzero: {ms(totals_imp['get_nonzero']):.4f}")
     print(f"    update_dist: {ms(totals_imp['update_dist']):.4f}")
     print(f"    resample: {ms(totals_imp['resample_total']):.4f}")
     print(f"      fail_update: {ms(totals_imp['fail_update']):.4f}")
-    print(f"      record: {ms(totals_imp['fail_record']):.4f}")
-    print(f"      gate: {ms(totals_imp['fail_gate']):.4f}")
-    print(f"      compute: {ms(totals_imp['fail_compute']):.4f}")
-    print(f"      ema: {ms(totals_imp['fail_ema']):.4f}")
-    print(f"      norm: {ms(totals_imp['fail_norm']):.4f}")
+    print(f"        record: {ms(totals_imp['fail_record']):.4f}")
+    print(f"        gate: {ms(totals_imp['fail_gate']):.4f}")
+    print(f"        compute: {ms(totals_imp['fail_compute']):.4f}")
+    print(f"        ema: {ms(totals_imp['fail_ema']):.4f}")
+    print(f"        norm: {ms(totals_imp['fail_norm']):.4f}")
     print(f"      probs total: {ms(totals_imp['probs_total']):.4f}")
     print(f"        base_weights: {ms(totals_imp['probs_base']):.4f}")
     print(f"        fail_weights: {ms(totals_imp['probs_fail']):.4f}")
