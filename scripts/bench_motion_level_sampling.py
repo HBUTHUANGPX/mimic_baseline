@@ -311,9 +311,13 @@ def main():
         description="Motion-level sampling: baseline vs improved"
     )
     p.add_argument("--num_envs", type=int, default=4096 * 4 * 8)
-    p.add_argument("--num_motions", type=int, default=800)
-    p.add_argument("--frames_per_motion", type=int, default=3000)
-    p.add_argument("--length_jitter", type=float, default=0.05)
+    # p.add_argument("--num_envs", type=int, default=4096 * 4 * 1)
+    # p.add_argument("--num_envs", type=int, default=4096 * 1 * 1)
+    p.add_argument("--num_motions", type=int, default=80000)
+    # p.add_argument("--num_motions", type=int, default=80)
+    # p.add_argument("--num_motions", type=int, default=1)
+    p.add_argument("--frames_per_motion", type=int, default=50*60*2)
+    p.add_argument("--length_jitter", type=float, default=0.9)
     p.add_argument("--iters", type=int, default=200)
     p.add_argument("--warmup", type=int, default=20)
     p.add_argument(

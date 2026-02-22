@@ -464,11 +464,10 @@ class MotionCommand(CommandTerm):
         target_dist = self.motion.target_dist.squeeze(0)
         base_weights = target_dist / (current_dist + epsilon)
         weights = base_weights * self.motion_fail_weights
-        probs = weights / weights.sum()  # Normalized probabilities for dynamic balance
-
+        
         # 按动态平衡后的 probs 采样 motion id（每个 env 独立采样）
         motion_ids = torch.multinomial(
-            probs, len(env_ids), replacement=True
+            weights, len(env_ids), replacement=True
         )  # (len(env_ids),)
 
         # 对每个 env 在“选中的 motion 区间”内再采样局部相位（时间步）
