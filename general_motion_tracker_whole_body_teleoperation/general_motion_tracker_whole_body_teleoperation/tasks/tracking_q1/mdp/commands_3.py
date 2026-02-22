@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 import os
 import torch
+import time
 from collections.abc import Sequence
 from dataclasses import MISSING
 from typing import TYPE_CHECKING
@@ -287,6 +288,56 @@ class MotionCommand(CommandTerm):
         self.metrics["error_joint_vel"] = torch.zeros(self.num_envs, device=self.device)
         # for name in self.motion.extracted_list:
         #     self.metrics[name] = torch.zeros(self.num_envs, device=self.device)
+        # property timing metrics (ms)
+        self._prop_names = [
+            "motion_id",
+            "motion_group",
+            "command",
+            "joint_pos",
+            "joint_vel",
+            "body_pos_w",
+            "body_quat_w",
+            "body_lin_vel_w",
+            "body_ang_vel_w",
+            "ref_pos_w",
+            "ref_quat_w",
+            "ref_lin_vel_w",
+            "ref_ang_vel_w",
+            "robot_joint_pos",
+            "robot_joint_vel",
+            "robot_body_pos_w",
+            "robot_body_quat_w",
+            "robot_body_lin_vel_w",
+            "robot_body_ang_vel_w",
+            "robot_ref_pos_w",
+            "robot_ref_quat_w",
+            "robot_ref_lin_vel_w",
+            "robot_ref_ang_vel_w",
+        ]
+        for name in self._prop_names:
+            self.metrics[f"time_prop_{name}_pre_ms"] = torch.zeros(
+                self.num_envs, device=self.device
+            )
+            self.metrics[f"time_prop_{name}_post_ms"] = torch.zeros(
+                self.num_envs, device=self.device
+            )
+        # timing metrics (ms)
+        self.metrics["time_resample_adaptive_ms"] = torch.zeros(
+            self.num_envs, device=self.device
+        )
+        self.metrics["time_get_env_ids_ms"] = torch.zeros(
+            self.num_envs, device=self.device
+        )
+        self.metrics["time_update_dist_ms"] = torch.zeros(
+            self.num_envs, device=self.device
+        )
+        self.metrics["time_record_failures_ms"] = torch.zeros(
+            self.num_envs, device=self.device
+        )
+        self.metrics["time_update_fail_weights_ms"] = torch.zeros(
+            self.num_envs, device=self.device
+        )
+        self._timing_ms: Dict[str, float] = {}
 
         # Failure-weighted motion sampling (improved)
         self.motion_fail_counts = torch.zeros(
@@ -308,103 +359,151 @@ class MotionCommand(CommandTerm):
 
     @property
     def motion_id(self) -> torch.Tensor:
-        return self.motion._motion_id[self.time_steps]
+        return self._profile_property("motion_id", lambda: self.motion._motion_id[self.time_steps])
 
     @property
     def motion_group(self) -> torch.Tensor:
-        return self.motion._motion_group[self.time_steps]
+        return self._profile_property("motion_group", lambda: self.motion._motion_group[self.time_steps])
 
     @property
     def command(
         self,
     ) -> torch.Tensor:  # TODO Consider again if this is the best observation
-        return torch.cat([self.joint_pos, self.joint_vel], dim=1)
+        return self._profile_property(
+            "command", lambda: torch.cat([self.joint_pos, self.joint_vel], dim=1)
+        )
 
     @property
     def joint_pos(self) -> torch.Tensor:
-        return self.motion.joint_pos[self.time_steps]
+        return self._profile_property("joint_pos", lambda: self.motion.joint_pos[self.time_steps])
 
     @property
     def joint_vel(self) -> torch.Tensor:
-        return self.motion.joint_vel[self.time_steps]
+        return self._profile_property("joint_vel", lambda: self.motion.joint_vel[self.time_steps])
 
     @property
     def body_pos_w(self) -> torch.Tensor:
-        return (
-            self.motion.body_pos_w[self.time_steps]
-            + self._env.scene.env_origins[:, None, :]
+        return self._profile_property(
+            "body_pos_w",
+            lambda: self.motion.body_pos_w[self.time_steps]
+            + self._env.scene.env_origins[:, None, :],
         )
 
     @property
     def body_quat_w(self) -> torch.Tensor:
-        return self.motion.body_quat_w[self.time_steps]
+        return self._profile_property("body_quat_w", lambda: self.motion.body_quat_w[self.time_steps])
 
     @property
     def body_lin_vel_w(self) -> torch.Tensor:
-        return self.motion.body_lin_vel_w[self.time_steps]
+        return self._profile_property("body_lin_vel_w", lambda: self.motion.body_lin_vel_w[self.time_steps])
 
     @property
     def body_ang_vel_w(self) -> torch.Tensor:
-        return self.motion.body_ang_vel_w[self.time_steps]
+        return self._profile_property("body_ang_vel_w", lambda: self.motion.body_ang_vel_w[self.time_steps])
 
     @property
     def ref_pos_w(self) -> torch.Tensor:
-        return (
-            self.motion.body_pos_w[self.time_steps, self.motion_ref_body_index]
-            + self._env.scene.env_origins
+        return self._profile_property(
+            "ref_pos_w",
+            lambda: self.motion.body_pos_w[self.time_steps, self.motion_ref_body_index]
+            + self._env.scene.env_origins,
         )
 
     @property
     def ref_quat_w(self) -> torch.Tensor:
-        return self.motion.body_quat_w[self.time_steps, self.motion_ref_body_index]
+        return self._profile_property(
+            "ref_quat_w",
+            lambda: self.motion.body_quat_w[self.time_steps, self.motion_ref_body_index],
+        )
 
     @property
     def ref_lin_vel_w(self) -> torch.Tensor:
-        return self.motion.body_lin_vel_w[self.time_steps, self.motion_ref_body_index]
+        return self._profile_property(
+            "ref_lin_vel_w",
+            lambda: self.motion.body_lin_vel_w[self.time_steps, self.motion_ref_body_index],
+        )
 
     @property
     def ref_ang_vel_w(self) -> torch.Tensor:
-        return self.motion.body_ang_vel_w[self.time_steps, self.motion_ref_body_index]
+        return self._profile_property(
+            "ref_ang_vel_w",
+            lambda: self.motion.body_ang_vel_w[self.time_steps, self.motion_ref_body_index],
+        )
 
     @property
     def robot_joint_pos(self) -> torch.Tensor:
-        return self.robot.data.joint_pos
+        return self._profile_property("robot_joint_pos", lambda: self.robot.data.joint_pos)
 
     @property
     def robot_joint_vel(self) -> torch.Tensor:
-        return self.robot.data.joint_vel
+        return self._profile_property("robot_joint_vel", lambda: self.robot.data.joint_vel)
 
     @property
-    def robot_body_pos_w(self) -> torch.Tensor:
-        return self.robot.data.body_pos_w[:, self.body_indexes]
+    def robot_body_pos_w(self) -> torch.Tensor: # tag
+        return self._profile_property(
+            "robot_body_pos_w", lambda: self.robot.data.body_pos_w[:, self.body_indexes]
+        )
 
     @property
-    def robot_body_quat_w(self) -> torch.Tensor:
-        return self.robot.data.body_quat_w[:, self.body_indexes]
+    def robot_body_quat_w(self) -> torch.Tensor: # tag
+        return self._profile_property(
+            "robot_body_quat_w", lambda: self.robot.data.body_quat_w[:, self.body_indexes]
+        )
 
     @property
-    def robot_body_lin_vel_w(self) -> torch.Tensor:
-        return self.robot.data.body_lin_vel_w[:, self.body_indexes]
+    def robot_body_lin_vel_w(self) -> torch.Tensor: # tag
+        return self._profile_property(
+            "robot_body_lin_vel_w", lambda: self.robot.data.body_lin_vel_w[:, self.body_indexes]
+        )
 
     @property
-    def robot_body_ang_vel_w(self) -> torch.Tensor:
-        return self.robot.data.body_ang_vel_w[:, self.body_indexes]
+    def robot_body_ang_vel_w(self) -> torch.Tensor: # tag
+        return self._profile_property(
+            "robot_body_ang_vel_w", lambda: self.robot.data.body_ang_vel_w[:, self.body_indexes]
+        )
 
     @property
-    def robot_ref_pos_w(self) -> torch.Tensor:
-        return self.robot.data.body_pos_w[:, self.robot_ref_body_index]
+    def robot_ref_pos_w(self) -> torch.Tensor: # tag
+        return self._profile_property(
+            "robot_ref_pos_w", lambda: self.robot.data.body_pos_w[:, self.robot_ref_body_index]
+        )
 
     @property
-    def robot_ref_quat_w(self) -> torch.Tensor:
-        return self.robot.data.body_quat_w[:, self.robot_ref_body_index]
+    def robot_ref_quat_w(self) -> torch.Tensor: # tag
+        return self._profile_property(
+            "robot_ref_quat_w", lambda: self.robot.data.body_quat_w[:, self.robot_ref_body_index]
+        )
 
     @property
-    def robot_ref_lin_vel_w(self) -> torch.Tensor:
-        return self.robot.data.body_lin_vel_w[:, self.robot_ref_body_index]
+    def robot_ref_lin_vel_w(self) -> torch.Tensor: # tag
+        return self._profile_property(
+            "robot_ref_lin_vel_w", lambda: self.robot.data.body_lin_vel_w[:, self.robot_ref_body_index]
+        )
 
     @property
-    def robot_ref_ang_vel_w(self) -> torch.Tensor:
-        return self.robot.data.body_ang_vel_w[:, self.robot_ref_body_index]
+    def robot_ref_ang_vel_w(self) -> torch.Tensor: # tag
+        return self._profile_property(
+            "robot_ref_ang_vel_w", lambda: self.robot.data.body_ang_vel_w[:, self.robot_ref_body_index]
+        )
+
+    def _profile_property(self, name: str, fn):
+        if not self.cfg.profile_properties:
+            return fn()
+        t0 = time.perf_counter()
+        torch.cuda.synchronize()
+        t1 = time.perf_counter()
+        out = fn()
+        torch.cuda.synchronize()
+        t2 = time.perf_counter()
+        dt_pre = (t1 - t0) * 1000.0
+        dt_post = (t2 - t1) * 1000.0
+        key_pre = f"time_prop_{name}_pre_ms"
+        key_post = f"time_prop_{name}_post_ms"
+        if key_pre in self.metrics:
+            self.metrics[key_pre].fill_(dt_pre)
+        if key_post in self.metrics:
+            self.metrics[key_post].fill_(dt_post)
+        return out
 
     def _update_metrics(self):
         self.metrics["error_ref_pos"] = torch.norm(
@@ -442,6 +541,22 @@ class MotionCommand(CommandTerm):
         )
         # for i in range(self.motion.num_motions):
         #     self.metrics[self.motion.extracted_list[i]] = (self.motion_ids == i).float()
+        # timing metrics (ms)
+        self.metrics["time_resample_adaptive_ms"].fill_(
+            float(self._timing_ms.get("resample_adaptive", 0.0))
+        )
+        self.metrics["time_get_env_ids_ms"].fill_(
+            float(self._timing_ms.get("get_env_ids", 0.0))
+        )
+        self.metrics["time_update_dist_ms"].fill_(
+            float(self._timing_ms.get("update_dist", 0.0))
+        )
+        self.metrics["time_record_failures_ms"].fill_(
+            float(self._timing_ms.get("record_failures", 0.0))
+        )
+        self.metrics["time_update_fail_weights_ms"].fill_(
+            float(self._timing_ms.get("update_fail_weights", 0.0))
+        )
 
     def _resample_command(self, env_ids: Sequence[int]):
         # phase = sample_uniform(0.0, 1.0, (len(env_ids),), device=self.device)
@@ -453,6 +568,7 @@ class MotionCommand(CommandTerm):
         self._resample_reset_robot_state(env_ids)
 
     def _resample_adaptive_sampling(self, env_ids: Sequence[int]):
+        t0 = time.perf_counter()
         # 动态平衡采样核心:
         # 1) current_dist: 当前 time_steps 覆盖的 motion 分布（由 _update_command 统计）
         # 2) target_dist: 期望分布（按 motion 长度占比）
@@ -477,6 +593,8 @@ class MotionCommand(CommandTerm):
         local_steps = (local_phases * (selected_lengths - 1)).long()
         self.time_steps[env_ids] = selected_starts + local_steps
         self.env_motion_ids[env_ids] = motion_ids
+        torch.cuda.synchronize()
+        self._timing_ms["resample_adaptive"] = (time.perf_counter() - t0) * 1000.0
 
     def _resample_reset_robot_state(self, env_ids: Sequence[int]):
         root_pos = self.body_pos_w[:, 0].clone()
@@ -552,6 +670,7 @@ class MotionCommand(CommandTerm):
         self._update_state_data()
 
     def _get_env_ids_to_resample(self) -> torch.Tensor:
+        t0 = time.perf_counter()
         overflow_mask = self.time_steps >= self.motion.time_step_total  # 溢出掩码
         valid_mask = ~overflow_mask  # 有效索引掩码 (time_steps < time_step_total)
         cross_mask = torch.zeros(
@@ -570,6 +689,8 @@ class MotionCommand(CommandTerm):
         env_ids = torch.nonzero(total_mask, as_tuple=False).squeeze(
             -1
         )  # 获取需要重采样的 env_ids
+        torch.cuda.synchronize()
+        self._timing_ms["get_env_ids"] = (time.perf_counter() - t0) * 1000.0
         return env_ids
 
     def _update_state_data(self):
@@ -607,14 +728,18 @@ class MotionCommand(CommandTerm):
         pass
 
     def _update_distribution_vectorized(self):
+        t0 = time.perf_counter()
         # Vectorized: use cached env motion ids
         self.counts = torch.bincount(
             self.env_motion_ids, minlength=self.motion.num_motions
         ).float()
         self.motion.motion_distribution = (self.counts / self.num_envs).unsqueeze(0)
         self.motion_ids = self.env_motion_ids
+        torch.cuda.synchronize()
+        self._timing_ms["update_dist"] = (time.perf_counter() - t0) * 1000.0
 
     def _record_failures(self):
+        t0 = time.perf_counter()
         # record current step terminated + motion ids
         self._fail_term_buf[self._fail_buf_ptr].copy_(
             self._env.termination_manager.terminated
@@ -622,13 +747,20 @@ class MotionCommand(CommandTerm):
         self._fail_motion_buf[self._fail_buf_ptr].copy_(self.env_motion_ids)
         self._fail_buf_ptr = (self._fail_buf_ptr + 1) % self._fail_buf_size
         self._fail_buf_count = min(self._fail_buf_count + 1, self._fail_buf_size)
+        torch.cuda.synchronize()
+        self._timing_ms["record_failures"] = (time.perf_counter() - t0) * 1000.0
 
     def _update_failure_weights(self):
+        t0 = time.perf_counter()
         # low-frequency update of motion-level failure weights
         if self.cfg.fail_update_interval <= 0:
+            torch.cuda.synchronize()
+            self._timing_ms["update_fail_weights"] = (time.perf_counter() - t0) * 1000.0
             return
         if (self._fail_update_step % self.cfg.fail_update_interval) != 0:
             self._fail_update_step += 1
+            torch.cuda.synchronize()
+            self._timing_ms["update_fail_weights"] = (time.perf_counter() - t0) * 1000.0
             return
 
         if self._fail_buf_count > 0:
@@ -660,6 +792,8 @@ class MotionCommand(CommandTerm):
         # reset buffer window
         self._fail_buf_count = 0
         self._fail_update_step += 1
+        torch.cuda.synchronize()
+        self._timing_ms["update_fail_weights"] = (time.perf_counter() - t0) * 1000.0
 
     def _set_debug_vis_impl(self, debug_vis: bool):
         if debug_vis:
@@ -745,6 +879,8 @@ class MotionCommandCfg(CommandTermCfg):
     # failure-weighted motion sampling
     fail_update_interval: int = 48
     fail_weight_momentum: float = 0.1
+    # profile property access time
+    profile_properties: bool = True
 
     ref_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(
         prim_path="/Visuals/Command/pose"
