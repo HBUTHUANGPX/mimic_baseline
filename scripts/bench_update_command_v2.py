@@ -259,10 +259,28 @@ class Bench:
 
     # ===== commands_2 style =====
     def _cmd2_get_env_ids(self, timer):
+        # Match cmd1 behavior: overflow + cross + terminated
         t0 = timer.stamp()
-        env_ids = torch.nonzero(self.time_steps >= self.time_step_total | self.terminated,as_tuple=False).squeeze(-1)
+        overflow_mask = self.time_steps >= self.time_step_total
+        valid_mask = ~overflow_mask
         t1 = timer.stamp()
-        return env_ids, {"get_where": t1 - t0}
+
+        cross_mask = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
+        if valid_mask.any():
+            valid_ids = torch.nonzero(valid_mask, as_tuple=False).squeeze(-1)
+            cross_flags = self.new_data_flag[self.time_steps[valid_ids]]
+            cross_mask[valid_ids] = cross_flags
+        t2 = timer.stamp()
+
+        total_mask = overflow_mask | cross_mask | self.terminated
+        env_ids = torch.nonzero(total_mask, as_tuple=False).squeeze(-1)
+        t3 = timer.stamp()
+
+        return env_ids, {
+            "cmd2_overflow": t1 - t0,
+            "cmd2_cross": t2 - t1,
+            "cmd2_nonzero": t3 - t2,
+        }
 
     def _cmd2_adaptive_sampling(self, env_ids, timer, adaptive_uniform_ratio, adaptive_kernel_size):
         t0 = timer.stamp()
@@ -363,10 +381,11 @@ class Timer:
 def main():
     p = argparse.ArgumentParser(description="Benchmark cmd1 vs cmd2 vs cmd3 sampling paths")
     p.add_argument("--mode", type=str, default="cmd1", choices=["cmd1", "cmd2", "cmd3", "both"])
-    p.add_argument("--num_envs", type=int, default=4096 * 4 * 8)
+    # p.add_argument("--num_envs", type=int, default=4096 * 4 * 8)
     # p.add_argument("--num_envs", type=int, default=4096 * 4 * 1)
-    # p.add_argument("--num_envs", type=int, default=4096 * 1 * 1)
-    p.add_argument("--num_motions", type=int, default=800)
+    p.add_argument("--num_envs", type=int, default=4096 * 1 * 1)
+    p.add_argument("--num_motions", type=int, default=1)
+    # p.add_argument("--num_motions", type=int, default=800)
     p.add_argument("--frames_per_motion", type=int, default=3000)
     p.add_argument("--length_jitter", type=float, default=0.05)
     p.add_argument("--bin_size", type=int, default=50)
@@ -518,7 +537,9 @@ def main():
             "adaptive": 0.0,
             "post_update": 0.0,
             "total": 0.0,
-            "get_where": 0.0,
+            "cmd2_overflow": 0.0,
+            "cmd2_cross": 0.0,
+            "cmd2_nonzero": 0.0,
             "cmd2_mask": 0.0,
             "cmd2_fail_bins": 0.0,
             "cmd2_probs": 0.0,
@@ -573,7 +594,9 @@ def main():
         print()
         print("Average per-iter time (ms):")
         print(f"  _get_env_ids: {ms(totals['get_env_ids']):.4f}")
-        print(f"    where: {ms(totals['get_where']):.4f}")
+        print(f"    overflow+valid: {ms(totals['cmd2_overflow']):.4f}")
+        print(f"    cross_mask: {ms(totals['cmd2_cross']):.4f}")
+        print(f"    nonzero: {ms(totals['cmd2_nonzero']):.4f}")
         print(f"  _adaptive_sampling: {ms(totals['adaptive']):.4f}")
         print(f"    mask: {ms(totals['cmd2_mask']):.4f}")
         print(f"    fail_bins: {ms(totals['cmd2_fail_bins']):.4f}")
