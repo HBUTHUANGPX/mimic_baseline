@@ -156,10 +156,10 @@ class MotionSamplerBench:
         current_dist = self.motion_distribution.squeeze(0)
         target_dist = self.target_dist.squeeze(0)
         weights = target_dist / (current_dist + epsilon)
-        probs = weights / weights.sum()
+        # probs = weights / weights.sum()
         t1 = timer.stamp()
 
-        motion_ids = torch.multinomial(probs, len(env_ids), replacement=True)
+        motion_ids = torch.multinomial(weights, len(env_ids), replacement=True)
         t2 = timer.stamp()
 
         selected_starts = self.motion_indices[motion_ids, 0]
@@ -225,7 +225,8 @@ class MotionSamplerBench:
         # normalize to weights (avoid zero)
         eps = 1e-6
         w = self.motion_fail_counts + eps
-        self.motion_fail_weights = w / w.mean()
+        self.motion_fail_weights = w / (w.sum()/self.num_motions)
+        # self.motion_fail_weights = w / w.mean()
         t4 = timer.stamp()
 
         # reset buffer window
@@ -272,9 +273,10 @@ class MotionSamplerBench:
         t2 = timer.stamp()
         weights = base_weights * self.motion_fail_weights
         t3 = timer.stamp()
-        probs = weights / weights.sum()
+        # probs = weights / weights.sum()
         t4 = timer.stamp()
-        motion_ids = torch.multinomial(probs, len(env_ids), replacement=True)
+        
+        motion_ids = torch.multinomial(weights, len(env_ids), replacement=True)
         t5 = timer.stamp()
 
         selected_starts = self.motion_indices[motion_ids, 0]
@@ -318,7 +320,7 @@ def main():
         "--device", type=str, default="auto", choices=["auto", "cuda", "cpu"]
     )
     p.add_argument("--seed", type=int, default=123)
-    p.add_argument("--terminated_prob", type=float, default=0.9)
+    p.add_argument("--terminated_prob", type=float, default=0.01)
     p.add_argument(
         "--update_interval",
         type=int,

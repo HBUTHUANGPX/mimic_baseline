@@ -37,21 +37,18 @@ def extract_part(path):
     # 假设路径以 'artifacts/' 开头，提取其后的相对路径（包括子文件夹和文件名）
     if path.startswith("artifacts/"):
         # 去除 'artifacts/' 前缀，并返回剩余部分
-        relative_path = path[len("artifacts/") :]
+        relative_path = path[len("artifacts/"):]
         # 验证是否为有效的NPZ文件路径
-        if relative_path.endswith(".npz"):
+        if relative_path.endswith('.npz'):
             return relative_path
     return None
-
-
 def get_run_name(mf: str) -> str | None:
     if mf.startswith("artifacts/"):
-        path = mf[len("artifacts/") :]
+        path = mf[len("artifacts/"):]
     path = path.replace("/", "_")
     if path.endswith(".npz"):
         path = path[:-4]
     return path
-
 
 class MotionLoader:
     def __init__(
@@ -91,9 +88,9 @@ class MotionLoader:
                 extract_part(p) for p in paths if extract_part(p) is not None
             ]
             num_motions = len(extracted_list)
-
+            
             # for _file in self.motion_file:
-            for i, _file in enumerate(paths):
+            for i , _file in enumerate(paths):
                 data = np.load(_file)
                 if self.fps is None:
                     self.fps = data["fps"]
@@ -112,42 +109,16 @@ class MotionLoader:
                     torch.tensor(data["body_pos_w"], dtype=torch.float32, device=device)
                 )
                 body_quat_w_list.append(
-                    torch.tensor(
-                        data["body_quat_w"], dtype=torch.float32, device=device
-                    )
+                    torch.tensor(data["body_quat_w"], dtype=torch.float32, device=device)
                 )
                 body_lin_vel_w_list.append(
-                    torch.tensor(
-                        data["body_lin_vel_w"], dtype=torch.float32, device=device
-                    )
+                    torch.tensor(data["body_lin_vel_w"], dtype=torch.float32, device=device)
                 )
                 body_ang_vel_w_list.append(
-                    torch.tensor(
-                        data["body_ang_vel_w"], dtype=torch.float32, device=device
-                    )
+                    torch.tensor(data["body_ang_vel_w"], dtype=torch.float32, device=device)
                 )
-                motion_group_list.append(
-                    torch.tensor(
-                        motion_file_group_index, dtype=torch.float32, device=device
-                    )
-                    * torch.ones(
-                        data["joint_pos"].shape[0],
-                        1,
-                        dtype=torch.float32,
-                        device=device,
-                    )
-                )
-                motion_id_list.append(
-                    torch.tensor(
-                        self.num_motions + i, dtype=torch.float32, device=device
-                    )
-                    * torch.ones(
-                        data["joint_pos"].shape[0],
-                        1,
-                        dtype=torch.float32,
-                        device=device,
-                    )
-                )
+                motion_group_list.append(torch.tensor(motion_file_group_index, dtype=torch.float32, device=device) * torch.ones(data["joint_pos"].shape[0], 1, dtype=torch.float32, device=device))
+                motion_id_list.append(torch.tensor(self.num_motions + i, dtype=torch.float32, device=device) * torch.ones(data["joint_pos"].shape[0],1, dtype=torch.float32, device=device))
                 self.motion_lengths.append(data["joint_pos"].shape[0])
             motion_file_group_index += 1
             self.extracted_list.extend(extracted_list)
@@ -246,24 +217,16 @@ class MotionCommand(CommandTerm):
             device=self.device,
         )
         self.load_motion(self.cfg.motion_file)
-
+        
     def load_motion(self, motion_file: Dict[str, List[str]]):
-        self.motion = MotionLoader(motion_file, self.body_indexes, device=self.device)
-        self.time_steps = torch.zeros(
-            self.num_envs, dtype=torch.long, device=self.device
-        )
-        self._motion_ends = self.motion.motion_indices[:, 1].contiguous()
-        ts = torch.clamp(self.time_steps, 0, self.motion.time_step_total - 1)
-        self.motion_ids = torch.bucketize(
-            ts, self._motion_ends, right=True
-        )  # Intervals are [start, end); right=True ensures ts==end maps to next motion
-        # Cache env-level motion ids as the single source of truth
-        self.env_motion_ids = self.motion_ids.clone()
-        self._motion_lengths_tensor = torch.tensor(
-            self.motion.motion_lengths, dtype=torch.long, device=self.device
+        self.motion = MotionLoader(
+            motion_file, self.body_indexes, device=self.device
         )
         self.counts = torch.zeros(
             self.motion.num_motions, dtype=torch.float32, device=self.device
+        )
+        self.time_steps = torch.zeros(
+            self.num_envs, dtype=torch.long, device=self.device
         )
         self.body_pos_relative_w = torch.zeros(
             self.num_envs, len(self.cfg.body_names), 3, device=self.device
@@ -287,25 +250,7 @@ class MotionCommand(CommandTerm):
         self.metrics["error_joint_vel"] = torch.zeros(self.num_envs, device=self.device)
         for name in self.motion.extracted_list:
             self.metrics[name] = torch.zeros(self.num_envs, device=self.device)
-
-        # Failure-weighted motion sampling (improved)
-        self.motion_fail_counts = torch.zeros(
-            self.motion.num_motions, dtype=torch.float32, device=self.device
-        )
-        self.motion_fail_weights = torch.ones(
-            self.motion.num_motions, dtype=torch.float32, device=self.device
-        )
-        self._fail_update_step = 0
-        self._fail_buf_size = max(1, int(self.cfg.fail_update_interval))
-        self._fail_buf_ptr = 0
-        self._fail_buf_count = 0
-        self._fail_term_buf = torch.zeros(
-            self._fail_buf_size, self.num_envs, dtype=torch.bool, device=self.device
-        )
-        self._fail_motion_buf = torch.zeros(
-            self._fail_buf_size, self.num_envs, dtype=torch.long, device=self.device
-        )
-
+    
     @property
     def motion_id(self) -> torch.Tensor:
         return self.motion._motion_id[self.time_steps]
@@ -440,8 +385,6 @@ class MotionCommand(CommandTerm):
         self.metrics["error_joint_vel"] = torch.norm(
             self.joint_vel - self.robot_joint_vel, dim=-1
         )
-        for i in range(self.motion.num_motions):
-            self.metrics[self.motion.extracted_list[i]] = (self.motion_ids == i).float()
 
     def _resample_command(self, env_ids: Sequence[int]):
         # phase = sample_uniform(0.0, 1.0, (len(env_ids),), device=self.device)
@@ -449,10 +392,7 @@ class MotionCommand(CommandTerm):
 
         if len(env_ids) == 0:
             return
-        self._resample_adaptive_sampling(env_ids)
-        self._resample_reset_robot_state(env_ids)
 
-    def _resample_adaptive_sampling(self, env_ids: Sequence[int]):
         # 动态平衡采样核心:
         # 1) current_dist: 当前 time_steps 覆盖的 motion 分布（由 _update_command 统计）
         # 2) target_dist: 期望分布（按 motion 长度占比）
@@ -461,9 +401,8 @@ class MotionCommand(CommandTerm):
         epsilon = 1e-6
 
         current_dist = self.motion.motion_distribution.squeeze(0)
-        target_dist = self.motion.target_dist.squeeze(0)
-        base_weights = target_dist / (current_dist + epsilon)
-        weights = base_weights * self.motion_fail_weights
+        target_dist = self.motion.target_dist.squeeze(0) 
+        weights = target_dist / (current_dist + epsilon)
         probs = weights / weights.sum()  # Normalized probabilities for dynamic balance
 
         # 按动态平衡后的 probs 采样 motion id（每个 env 独立采样）
@@ -473,13 +412,14 @@ class MotionCommand(CommandTerm):
 
         # 对每个 env 在“选中的 motion 区间”内再采样局部相位（时间步）
         selected_starts = self.motion.motion_indices[motion_ids, 0]  # (len(env_ids),)
-        selected_lengths = self._motion_lengths_tensor[motion_ids]
+        selected_lengths = torch.tensor(
+            [self.motion.motion_lengths[mid.item()] for mid in motion_ids],
+            device=self.device,
+        )
         local_phases = torch.rand((len(env_ids),), device=self.device)  # Uniform [0,1)
         local_steps = (local_phases * (selected_lengths - 1)).long()
         self.time_steps[env_ids] = selected_starts + local_steps
-        self.env_motion_ids[env_ids] = motion_ids
 
-    def _resample_reset_robot_state(self, env_ids: Sequence[int]):
         root_pos = self.body_pos_w[:, 0].clone()
         root_ori = self.body_quat_w[:, 0].clone()
         root_lin_vel = self.body_lin_vel_w[:, 0].clone()
@@ -545,35 +485,31 @@ class MotionCommand(CommandTerm):
 
     def _update_command(self):
         self.time_steps += 1
+        
+        overflow_mask = self.time_steps >= self.motion.time_step_total # 溢出掩码
+        valid_mask = ~overflow_mask  # 有效索引掩码 (time_steps < time_step_total)
+        cross_mask = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)  # 跨越掩码初始化
+        if valid_mask.any():  # 仅对有效部分检查 new_data_flag
+            valid_ids = torch.nonzero(valid_mask, as_tuple=False).squeeze(-1)  # 获取有效 env_ids
+            cross_flags = self.motion.new_data_flag[self.time_steps[valid_ids]]  # 检查对应 time_steps 的 flag
+            cross_mask[valid_ids] = cross_flags  # 更新跨越掩码
+        
+        total_mask = overflow_mask | cross_mask  # 合并掩码：溢出或跨越
+        env_ids = torch.nonzero(total_mask, as_tuple=False).squeeze(-1)  # 获取需要重采样的 env_ids
 
-        env_ids = self._get_env_ids_to_resample()
-        self._post_update_command()
+        # 动态平衡采样统计:
+        # 遍历每个 motion 区间，统计当前 time_steps 落在该区间的 env 数
+        # counts / num_envs 即当前分布 motion_distribution
+        for i in range(self.motion.num_motions):
+            start, end = self.motion.motion_indices[i]
+            map = (self.time_steps >= start) & (self.time_steps < end)
+            self.metrics[self.motion.extracted_list[i]] = map.clone().float()
+            self.counts[i] = map.sum().float()
+        self.motion.motion_distribution = (self.counts / self.num_envs).unsqueeze(0)
+
         # 根据动态平衡策略为需要重采样的 env 重新分配 time_steps
         self._resample_command(env_ids)
-        self._update_state_data()
 
-    def _get_env_ids_to_resample(self) -> torch.Tensor:
-        overflow_mask = self.time_steps >= self.motion.time_step_total  # 溢出掩码
-        valid_mask = ~overflow_mask  # 有效索引掩码 (time_steps < time_step_total)
-        cross_mask = torch.zeros(
-            self.num_envs, dtype=torch.bool, device=self.device
-        )  # 跨越掩码初始化
-        if valid_mask.any():  # 仅对有效部分检查 new_data_flag
-            valid_ids = torch.nonzero(valid_mask, as_tuple=False).squeeze(
-                -1
-            )  # 获取有效 env_ids
-            cross_flags = self.motion.new_data_flag[
-                self.time_steps[valid_ids]
-            ]  # 检查对应 time_steps 的 flag
-            cross_mask[valid_ids] = cross_flags  # 更新跨越掩码
-
-        total_mask = overflow_mask | cross_mask  # 合并掩码：溢出或跨越
-        env_ids = torch.nonzero(total_mask, as_tuple=False).squeeze(
-            -1
-        )  # 获取需要重采样的 env_ids
-        return env_ids
-
-    def _update_state_data(self):
         ref_pos_w_repeat = self.ref_pos_w[:, None, :].repeat(
             1, len(self.cfg.body_names), 1
         )
@@ -599,68 +535,6 @@ class MotionCommand(CommandTerm):
             + delta_pos_w
             + quat_apply(delta_ori_w, self.body_pos_w - ref_pos_w_repeat)
         )
-
-    def _post_update_command(self):
-        # 预留接口，供子类在更新 time_steps 后、重采样前进行额外处理
-        self._update_distribution_vectorized()  # 使用向量化方法更新分布统计
-        self._record_failures()
-        self._update_failure_weights()
-        pass
-
-    def _update_distribution_vectorized(self):
-        # Vectorized: use cached env motion ids
-        self.counts = torch.bincount(
-            self.env_motion_ids, minlength=self.motion.num_motions
-        ).float()
-        self.motion.motion_distribution = (self.counts / self.num_envs).unsqueeze(0)
-        self.motion_ids = self.env_motion_ids
-
-    def _record_failures(self):
-        # record current step terminated + motion ids
-        self._fail_term_buf[self._fail_buf_ptr].copy_(
-            self._env.termination_manager.terminated
-        )
-        self._fail_motion_buf[self._fail_buf_ptr].copy_(self.env_motion_ids)
-        self._fail_buf_ptr = (self._fail_buf_ptr + 1) % self._fail_buf_size
-        self._fail_buf_count = min(self._fail_buf_count + 1, self._fail_buf_size)
-
-    def _update_failure_weights(self):
-        # low-frequency update of motion-level failure weights
-        if self.cfg.fail_update_interval <= 0:
-            return
-        if (self._fail_update_step % self.cfg.fail_update_interval) != 0:
-            self._fail_update_step += 1
-            return
-
-        if self._fail_buf_count > 0:
-            term = self._fail_term_buf[: self._fail_buf_count]
-            mids = self._fail_motion_buf[: self._fail_buf_count]
-            fail_motion_ids = mids[term]
-            if fail_motion_ids.numel() > 0:
-                counts = torch.bincount(
-                    fail_motion_ids, minlength=self.motion.num_motions
-                ).float()
-            else:
-                counts = torch.zeros(
-                    self.motion.num_motions, dtype=torch.float32, device=self.device
-                )
-        else:
-            counts = torch.zeros(
-                self.motion.num_motions, dtype=torch.float32, device=self.device
-            )
-
-        # EMA update of motion-level failure counts
-        alpha = float(self.cfg.fail_weight_momentum)
-        self.motion_fail_counts = alpha * self.motion_fail_counts + (1.0 - alpha) * counts
-
-        # normalize to weights (avoid zero)
-        eps = 1e-6
-        w = self.motion_fail_counts + eps
-        self.motion_fail_weights = w / (w.sum() / float(self.motion.num_motions))
-
-        # reset buffer window
-        self._fail_buf_count = 0
-        self._fail_update_step += 1
 
     def _set_debug_vis_impl(self, debug_vis: bool):
         if debug_vis:
@@ -743,9 +617,6 @@ class MotionCommandCfg(CommandTermCfg):
 
     joint_position_range: tuple[float, float] = (-0.52, 0.52)
     joint_velocity_range: tuple[float, float] = (-0.52, 0.52)
-    # failure-weighted motion sampling
-    fail_update_interval: int = 48
-    fail_weight_momentum: float = 0.1
 
     ref_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(
         prim_path="/Visuals/Command/pose"

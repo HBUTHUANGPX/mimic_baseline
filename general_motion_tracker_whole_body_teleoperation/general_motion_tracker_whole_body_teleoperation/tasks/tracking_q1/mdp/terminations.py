@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 from isaaclab.assets import Articulation, RigidObject
 from isaaclab.managers import SceneEntityCfg
 
-from general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp.commands import MotionCommand
+from general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp.commands_3 import MotionCommand
 from general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp.rewards import _get_body_indexes
 
 

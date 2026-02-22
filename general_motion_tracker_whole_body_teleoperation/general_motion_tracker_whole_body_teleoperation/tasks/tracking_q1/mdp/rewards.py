@@ -7,7 +7,7 @@ from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors import ContactSensor
 from isaaclab.utils.math import quat_error_magnitude
 
-from general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp.commands import MotionCommand
+from general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp.commands_3 import MotionCommand
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
