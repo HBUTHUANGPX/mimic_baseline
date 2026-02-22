@@ -119,11 +119,6 @@ class MotionSamplerBench:
         return env_ids
 
     def _update_distribution(self):
-        # for i in range(self.num_motions):
-        #     start, end = self.motion_indices[i]
-        #     mask = (self.time_steps >= start) & (self.time_steps < end)
-        #     self.motion_distribution[0, i] = mask.sum().float() / float(self.num_envs)
-
         # Vectorized: map time_steps to motion id, then bincount
         ts = torch.clamp(self.time_steps, 0, self.time_step_total - 1)
         # Intervals are [start, end); right=True ensures ts==end maps to next motion
@@ -341,13 +336,35 @@ def main():
         bench.resample_baseline(env_ids, timer)
 
     # Baseline timing
-    totals_base = {"resample": 0.0, "probs": 0.0, "sample": 0.0, "assign": 0.0}
+    totals_base = {
+        "total": 0.0,
+        "termination": 0.0,
+        "step_inc": 0.0,
+        "get_env_ids": 0.0,
+        "update_dist": 0.0,
+        "resample": 0.0,
+        "probs": 0.0,
+        "sample": 0.0,
+        "assign": 0.0,
+    }
     for _ in range(args.iters):
+        t0 = timer.stamp()
         bench.update_termination(args.terminated_prob)
+        t1 = timer.stamp()
         bench.time_steps += 1
+        t2 = timer.stamp()
         env_ids = bench._get_env_ids_to_resample()
+        t3 = timer.stamp()
         bench._update_distribution()
+        t4 = timer.stamp()
         t = bench.resample_baseline(env_ids, timer)
+        t5 = timer.stamp()
+
+        totals_base["total"] += t5 - t0
+        totals_base["termination"] += t1 - t0
+        totals_base["step_inc"] += t2 - t1
+        totals_base["get_env_ids"] += t3 - t2
+        totals_base["update_dist"] += t4 - t3
         totals_base["resample"] += sum(t.values())
         totals_base["probs"] += t["resample_probs"]
         totals_base["sample"] += t["resample_sample"]
@@ -355,6 +372,11 @@ def main():
 
     # Improved timing
     totals_imp = {
+        "total": 0.0,
+        "termination": 0.0,
+        "step_inc": 0.0,
+        "get_env_ids": 0.0,
+        "update_dist": 0.0,
         "resample_total": 0.0,
         "fail_update": 0.0,
         "fail_record": 0.0,
@@ -370,11 +392,23 @@ def main():
         "assign": 0.0,
     }
     for _ in range(args.iters):
+        t0 = timer.stamp()
         bench.update_termination(args.terminated_prob)
+        t1 = timer.stamp()
         bench.time_steps += 1
+        t2 = timer.stamp()
         env_ids = bench._get_env_ids_to_resample()
+        t3 = timer.stamp()
         bench._update_distribution()
+        t4 = timer.stamp()
         t = bench.resample_improved(env_ids, timer, args.update_interval)
+        t5 = timer.stamp()
+
+        totals_imp["total"] += t5 - t0
+        totals_imp["termination"] += t1 - t0
+        totals_imp["step_inc"] += t2 - t1
+        totals_imp["get_env_ids"] += t3 - t2
+        totals_imp["update_dist"] += t4 - t3
         totals_imp["resample_total"] += t["resample_total"]
         totals_imp["fail_update"] += t["fail_update"]
         totals_imp["fail_record"] += t["fail_record"]
@@ -404,26 +438,36 @@ def main():
     print()
 
     print("Baseline (length-balanced motion sampling):")
-    print(f"  resample total: {ms(totals_base['resample']):.4f}")
-    print(f"    probs: {ms(totals_base['probs']):.4f}")
-    print(f"    sample: {ms(totals_base['sample']):.4f}")
-    print(f"    assign: {ms(totals_base['assign']):.4f}")
+    print(f"  total: {ms(totals_base['total']):.4f}")
+    print(f"    termination: {ms(totals_base['termination']):.4f}")
+    print(f"    step_inc: {ms(totals_base['step_inc']):.4f}")
+    print(f"    get_env_ids: {ms(totals_base['get_env_ids']):.4f}")
+    print(f"    update_dist: {ms(totals_base['update_dist']):.4f}")
+    print(f"    resample: {ms(totals_base['resample']):.4f}")
+    print(f"        probs: {ms(totals_base['probs']):.4f}")
+    print(f"        sample: {ms(totals_base['sample']):.4f}")
+    print(f"        assign: {ms(totals_base['assign']):.4f}")
     print()
 
     print("Improved (motion-level + failure weights, low-freq update):")
-    print(f"  resample total: {ms(totals_imp['resample_total']):.4f}")
-    print(f"    fail_update: {ms(totals_imp['fail_update']):.4f}")
+    print(f"  total: {ms(totals_imp['total']):.4f}")
+    print(f"    termination: {ms(totals_imp['termination']):.4f}")
+    print(f"    step_inc: {ms(totals_imp['step_inc']):.4f}")
+    print(f"    get_env_ids: {ms(totals_imp['get_env_ids']):.4f}")
+    print(f"    update_dist: {ms(totals_imp['update_dist']):.4f}")
+    print(f"    resample: {ms(totals_imp['resample_total']):.4f}")
+    print(f"      fail_update: {ms(totals_imp['fail_update']):.4f}")
     print(f"      record: {ms(totals_imp['fail_record']):.4f}")
     print(f"      gate: {ms(totals_imp['fail_gate']):.4f}")
     print(f"      compute: {ms(totals_imp['fail_compute']):.4f}")
     print(f"      ema: {ms(totals_imp['fail_ema']):.4f}")
     print(f"      norm: {ms(totals_imp['fail_norm']):.4f}")
-    print(f"    probs total: {ms(totals_imp['probs_total']):.4f}")
-    print(f"      base_weights: {ms(totals_imp['probs_base']):.4f}")
-    print(f"      fail_weights: {ms(totals_imp['probs_fail']):.4f}")
-    print(f"      norm: {ms(totals_imp['probs_norm']):.4f}")
-    print(f"    sample: {ms(totals_imp['sample']):.4f}")
-    print(f"    assign: {ms(totals_imp['assign']):.4f}")
+    print(f"      probs total: {ms(totals_imp['probs_total']):.4f}")
+    print(f"        base_weights: {ms(totals_imp['probs_base']):.4f}")
+    print(f"        fail_weights: {ms(totals_imp['probs_fail']):.4f}")
+    print(f"        norm: {ms(totals_imp['probs_norm']):.4f}")
+    print(f"      sample: {ms(totals_imp['sample']):.4f}")
+    print(f"      assign: {ms(totals_imp['assign']):.4f}")
 
 
 if __name__ == "__main__":
