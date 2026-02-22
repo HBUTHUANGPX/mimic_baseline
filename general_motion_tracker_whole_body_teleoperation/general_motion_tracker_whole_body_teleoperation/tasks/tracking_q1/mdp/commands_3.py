@@ -285,8 +285,8 @@ class MotionCommand(CommandTerm):
         self.metrics["error_body_rot"] = torch.zeros(self.num_envs, device=self.device)
         self.metrics["error_joint_pos"] = torch.zeros(self.num_envs, device=self.device)
         self.metrics["error_joint_vel"] = torch.zeros(self.num_envs, device=self.device)
-        for name in self.motion.extracted_list:
-            self.metrics[name] = torch.zeros(self.num_envs, device=self.device)
+        # for name in self.motion.extracted_list:
+        #     self.metrics[name] = torch.zeros(self.num_envs, device=self.device)
 
         # Failure-weighted motion sampling (improved)
         self.motion_fail_counts = torch.zeros(
@@ -440,8 +440,8 @@ class MotionCommand(CommandTerm):
         self.metrics["error_joint_vel"] = torch.norm(
             self.joint_vel - self.robot_joint_vel, dim=-1
         )
-        for i in range(self.motion.num_motions):
-            self.metrics[self.motion.extracted_list[i]] = (self.motion_ids == i).float()
+        # for i in range(self.motion.num_motions):
+        #     self.metrics[self.motion.extracted_list[i]] = (self.motion_ids == i).float()
 
     def _resample_command(self, env_ids: Sequence[int]):
         # phase = sample_uniform(0.0, 1.0, (len(env_ids),), device=self.device)
