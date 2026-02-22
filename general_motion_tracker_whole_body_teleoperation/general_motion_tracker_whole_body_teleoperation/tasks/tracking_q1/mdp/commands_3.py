@@ -588,10 +588,9 @@ class MotionCommand(CommandTerm):
         ts = torch.clamp(self.time_steps, 0, self.motion.time_step_total - 1)
         # Intervals are [start, end); right=True ensures ts==end maps to next motion
         self.motion_ids = torch.bucketize(ts, self._motion_ends, right=True)
-        counts = torch.bincount(
+        self.counts = torch.bincount(
             self.motion_ids, minlength=self.motion.num_motions
         ).float()
-        self.counts.copy_(counts)
         self.motion.motion_distribution = (self.counts / self.num_envs).unsqueeze(0)
 
     def _set_debug_vis_impl(self, debug_vis: bool):
