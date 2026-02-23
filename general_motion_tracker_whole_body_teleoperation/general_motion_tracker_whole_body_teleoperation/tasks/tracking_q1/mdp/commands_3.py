@@ -696,7 +696,7 @@ class MotionCommand(CommandTerm):
         self._timing_ms["write_root_state"] = (t5 - t4) * 1000.0
         self._timing_ms["write_root_state_pre"] = (t4 - t3) * 1000.0
 
-    def _update_command(self):
+    def _update_command(self): # 入口
         self.time_steps += 1
 
         env_ids = self._get_env_ids_to_resample()
