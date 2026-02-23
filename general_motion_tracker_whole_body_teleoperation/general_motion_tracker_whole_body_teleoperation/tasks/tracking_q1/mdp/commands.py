@@ -14,12 +14,14 @@ from isaaclab.markers import VisualizationMarkers, VisualizationMarkersCfg
 from isaaclab.markers.config import FRAME_MARKER_CFG
 from isaaclab.utils import configclass
 from isaaclab.utils.math import (
+    matrix_from_quat,
     quat_apply,
     quat_error_magnitude,
     quat_from_euler_xyz,
     quat_inv,
     quat_mul,
     sample_uniform,
+    subtract_frame_transforms,
     yaw_quat,
 )
 
@@ -266,6 +268,18 @@ class MotionCommand(CommandTerm):
         self.counts = torch.zeros(
             self.motion.num_motions, dtype=torch.float32, device=self.device
         )
+        # per-step cached tensors (computed in _update_state_data)
+        self._ref_pos_w = None
+        self._ref_quat_w = None
+        self._robot_ref_pos_w = None
+        self._robot_ref_quat_w = None
+        self._robot_body_pos_w = None
+        self._robot_body_quat_w = None
+        self._robot_body_pos_b = None
+        self._robot_body_ori_b_mat = None
+        self._motion_ref_pos_b = None
+        self._motion_ref_ori_b_mat = None
+        self._robot_ref_ori_w_mat = None
         self.body_pos_relative_w = torch.zeros(
             self.num_envs, len(self.cfg.body_names), 3, device=self.device
         )
@@ -411,18 +425,15 @@ class MotionCommand(CommandTerm):
 
     @property
     def ref_pos_w(self) -> torch.Tensor:
-        return self._profile_property(
-            "ref_pos_w",
-            lambda: self.motion.body_pos_w[self.time_steps, self.motion_ref_body_index]
-            + self._env.scene.env_origins,
-        )
+        if self.cfg.profile_properties:
+            return self._profile_property("ref_pos_w", lambda: self._ref_pos_w)
+        return self._ref_pos_w
 
     @property
     def ref_quat_w(self) -> torch.Tensor:
-        return self._profile_property(
-            "ref_quat_w",
-            lambda: self.motion.body_quat_w[self.time_steps, self.motion_ref_body_index],
-        )
+        if self.cfg.profile_properties:
+            return self._profile_property("ref_quat_w", lambda: self._ref_quat_w)
+        return self._ref_quat_w
 
     @property
     def ref_lin_vel_w(self) -> torch.Tensor:
@@ -448,15 +459,15 @@ class MotionCommand(CommandTerm):
 
     @property
     def robot_body_pos_w(self) -> torch.Tensor: # tag 8.2ms
-        return self._profile_property(
-            "robot_body_pos_w", lambda: self.robot.data.body_pos_w[:, self.body_indexes]
-        )
+        if self.cfg.profile_properties:
+            return self._profile_property("robot_body_pos_w", lambda: self._robot_body_pos_w)
+        return self._robot_body_pos_w
 
     @property
     def robot_body_quat_w(self) -> torch.Tensor: # tag 10.66ms
-        return self._profile_property(
-            "robot_body_quat_w", lambda: self.robot.data.body_quat_w[:, self.body_indexes]
-        )
+        if self.cfg.profile_properties:
+            return self._profile_property("robot_body_quat_w", lambda: self._robot_body_quat_w)
+        return self._robot_body_quat_w
 
     @property
     def robot_body_lin_vel_w(self) -> torch.Tensor: # tag 10.2ms
@@ -472,15 +483,15 @@ class MotionCommand(CommandTerm):
 
     @property
     def robot_ref_pos_w(self) -> torch.Tensor: # tag 14.5ms
-        return self._profile_property(
-            "robot_ref_pos_w", lambda: self.robot.data.body_pos_w[:, self.robot_ref_body_index]
-        )
+        if self.cfg.profile_properties:
+            return self._profile_property("robot_ref_pos_w", lambda: self._robot_ref_pos_w)
+        return self._robot_ref_pos_w
 
     @property
     def robot_ref_quat_w(self) -> torch.Tensor: # tag 20ms
-        return self._profile_property(
-            "robot_ref_quat_w", lambda: self.robot.data.body_quat_w[:, self.robot_ref_body_index]
-        )
+        if self.cfg.profile_properties:
+            return self._profile_property("robot_ref_quat_w", lambda: self._robot_ref_quat_w)
+        return self._robot_ref_quat_w
 
     @property
     def robot_ref_lin_vel_w(self) -> torch.Tensor: # tag 2.05ms
@@ -730,18 +741,32 @@ class MotionCommand(CommandTerm):
         return env_ids
 
     def _update_state_data(self):
-        ref_pos_w_repeat = self.ref_pos_w[:, None, :].repeat(
-            1, len(self.cfg.body_names), 1
+        # Compute and cache frequently used tensors once per step.
+        ref_pos_w = (
+            self.motion.body_pos_w[self.time_steps, self.motion_ref_body_index]
+            + self._env.scene.env_origins
         )
-        ref_quat_w_repeat = self.ref_quat_w[:, None, :].repeat(
-            1, len(self.cfg.body_names), 1
-        )
-        robot_ref_pos_w_repeat = self.robot_ref_pos_w[:, None, :].repeat(
-            1, len(self.cfg.body_names), 1
-        )
-        robot_ref_quat_w_repeat = self.robot_ref_quat_w[:, None, :].repeat(
-            1, len(self.cfg.body_names), 1
-        )
+        ref_quat_w = self.motion.body_quat_w[
+            self.time_steps, self.motion_ref_body_index
+        ]
+        robot_ref_pos_w = self.robot.data.body_pos_w[:, self.robot_ref_body_index]
+        robot_ref_quat_w = self.robot.data.body_quat_w[:, self.robot_ref_body_index]
+        robot_body_pos_w = self.robot.data.body_pos_w[:, self.body_indexes]
+        robot_body_quat_w = self.robot.data.body_quat_w[:, self.body_indexes]
+
+        self._ref_pos_w = ref_pos_w
+        self._ref_quat_w = ref_quat_w
+        self._robot_ref_pos_w = robot_ref_pos_w
+        self._robot_ref_quat_w = robot_ref_quat_w
+        self._robot_body_pos_w = robot_body_pos_w
+        self._robot_body_quat_w = robot_body_quat_w
+        self._robot_ref_ori_w_mat = matrix_from_quat(robot_ref_quat_w)
+
+        num_bodies = len(self.cfg.body_names)
+        ref_pos_w_repeat = ref_pos_w[:, None, :].expand(-1, num_bodies, -1)
+        ref_quat_w_repeat = ref_quat_w[:, None, :].expand(-1, num_bodies, -1)
+        robot_ref_pos_w_repeat = robot_ref_pos_w[:, None, :].expand(-1, num_bodies, -1)
+        robot_ref_quat_w_repeat = robot_ref_quat_w[:, None, :].expand(-1, num_bodies, -1)
 
         delta_pos_w = ref_pos_w_repeat - robot_ref_pos_w_repeat
         delta_pos_w[..., :2] = 0.0
@@ -755,6 +780,25 @@ class MotionCommand(CommandTerm):
             + delta_pos_w
             + quat_apply(delta_ori_w, self.body_pos_w - ref_pos_w_repeat)
         )
+
+        # Cache commonly used frame transforms for observations
+        pos_b, ori_b = subtract_frame_transforms(
+            robot_ref_pos_w_repeat,
+            robot_ref_quat_w_repeat,
+            robot_body_pos_w,
+            robot_body_quat_w,
+        )
+        self._robot_body_pos_b = pos_b
+        self._robot_body_ori_b_mat = matrix_from_quat(ori_b)
+
+        pos_m, ori_m = subtract_frame_transforms(
+            robot_ref_pos_w,
+            robot_ref_quat_w,
+            ref_pos_w,
+            ref_quat_w,
+        )
+        self._motion_ref_pos_b = pos_m
+        self._motion_ref_ori_b_mat = matrix_from_quat(ori_m)
 
     def _post_update_command(self):
         # 预留接口，供子类在更新 time_steps 后、重采样前进行额外处理
