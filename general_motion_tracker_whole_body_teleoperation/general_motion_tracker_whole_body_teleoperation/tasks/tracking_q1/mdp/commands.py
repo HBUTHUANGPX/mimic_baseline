@@ -329,13 +329,13 @@ class MotionCommand(CommandTerm):
             "robot_ref_ang_vel_w",
         ]
         for name in self._prop_names:
-            self.metrics[f"time_prop_{name}_pre_ms"] = torch.zeros(
-                self.num_envs, device=self.device
-            )
+            # self.metrics[f"time_prop_{name}_pre_ms"] = torch.zeros(
+            #     self.num_envs, device=self.device
+            # )
             self.metrics[f"time_prop_{name}_post_ms"] = torch.zeros(
                 self.num_envs, device=self.device
             )
-        self._prop_time_pre_sum = {name: 0.0 for name in self._prop_names}
+        # self._prop_time_pre_sum = {name: 0.0 for name in self._prop_names}
         self._prop_time_post_sum = {name: 0.0 for name in self._prop_names}
         # timing metrics (ms)
         self.metrics["time_resample_adaptive_ms"] = torch.zeros(
@@ -437,7 +437,7 @@ class MotionCommand(CommandTerm):
         return self._ref_quat_w
 
     @property
-    def ref_lin_vel_w(self) -> torch.Tensor:
+    def ref_lin_vel_w(self) -> torch.Tensor: # tag 2.05ms
         return self._profile_property(
             "ref_lin_vel_w",
             lambda: self.motion.body_lin_vel_w[self.time_steps, self.motion_ref_body_index],
@@ -517,46 +517,46 @@ class MotionCommand(CommandTerm):
         t2 = time.perf_counter()
         dt_pre = (t1 - t0) * 1000.0
         dt_post = (t2 - t1) * 1000.0
-        if name in self._prop_time_pre_sum:
-            self._prop_time_pre_sum[name] += dt_pre
+        # if name in self._prop_time_pre_sum:
+        #     self._prop_time_pre_sum[name] += dt_pre
         if name in self._prop_time_post_sum:
             self._prop_time_post_sum[name] += dt_post
         return out
 
     def _update_metrics(self):
-        self.metrics["error_ref_pos"] = torch.norm(
-            self.ref_pos_w - self.robot_ref_pos_w, dim=-1
-        )
-        self.metrics["error_ref_rot"] = quat_error_magnitude(
-            self.ref_quat_w, self.robot_ref_quat_w
-        )
-        self.metrics["error_ref_lin_vel"] = torch.norm(
-            self.ref_lin_vel_w - self.robot_ref_lin_vel_w, dim=-1
-        )
-        self.metrics["error_ref_ang_vel"] = torch.norm(
-            self.ref_ang_vel_w - self.robot_ref_ang_vel_w, dim=-1
-        )
+        # self.metrics["error_ref_pos"] = torch.norm(
+        #     self.ref_pos_w - self.robot_ref_pos_w, dim=-1
+        # )
+        # self.metrics["error_ref_rot"] = quat_error_magnitude(
+        #     self.ref_quat_w, self.robot_ref_quat_w
+        # )
+        # self.metrics["error_ref_lin_vel"] = torch.norm(
+        #     self.ref_lin_vel_w - self.robot_ref_lin_vel_w, dim=-1
+        # )
+        # self.metrics["error_ref_ang_vel"] = torch.norm(
+        #     self.ref_ang_vel_w - self.robot_ref_ang_vel_w, dim=-1
+        # )
 
-        self.metrics["error_body_pos"] = torch.norm(
-            self.body_pos_relative_w - self.robot_body_pos_w, dim=-1
-        ).mean(dim=-1)
-        self.metrics["error_body_rot"] = quat_error_magnitude(
-            self.body_quat_relative_w, self.robot_body_quat_w
-        ).mean(dim=-1)
+        # self.metrics["error_body_pos"] = torch.norm(
+        #     self.body_pos_relative_w - self.robot_body_pos_w, dim=-1
+        # ).mean(dim=-1)
+        # self.metrics["error_body_rot"] = quat_error_magnitude(
+        #     self.body_quat_relative_w, self.robot_body_quat_w
+        # ).mean(dim=-1)
 
-        self.metrics["error_body_lin_vel"] = torch.norm(
-            self.body_lin_vel_w - self.robot_body_lin_vel_w, dim=-1
-        ).mean(dim=-1)
-        self.metrics["error_body_ang_vel"] = torch.norm(
-            self.body_ang_vel_w - self.robot_body_ang_vel_w, dim=-1
-        ).mean(dim=-1)
+        # self.metrics["error_body_lin_vel"] = torch.norm(
+        #     self.body_lin_vel_w - self.robot_body_lin_vel_w, dim=-1
+        # ).mean(dim=-1)
+        # self.metrics["error_body_ang_vel"] = torch.norm(
+        #     self.body_ang_vel_w - self.robot_body_ang_vel_w, dim=-1
+        # ).mean(dim=-1)
 
-        self.metrics["error_joint_pos"] = torch.norm(
-            self.joint_pos - self.robot_joint_pos, dim=-1
-        )
-        self.metrics["error_joint_vel"] = torch.norm(
-            self.joint_vel - self.robot_joint_vel, dim=-1
-        )
+        # self.metrics["error_joint_pos"] = torch.norm(
+        #     self.joint_pos - self.robot_joint_pos, dim=-1
+        # )
+        # self.metrics["error_joint_vel"] = torch.norm(
+        #     self.joint_vel - self.robot_joint_vel, dim=-1
+        # )
         # for i in range(self.motion.num_motions):
         #     self.metrics[self.motion.extracted_list[i]] = (self.motion_ids == i).float()
         # timing metrics (ms)
@@ -582,11 +582,11 @@ class MotionCommand(CommandTerm):
             float(self._timing_ms.get("write_root_state", 0.0))
         )
         for name in self._prop_names:
-            pre = self._prop_time_pre_sum.get(name, 0.0)
+            # pre = self._prop_time_pre_sum.get(name, 0.0)
             post = self._prop_time_post_sum.get(name, 0.0)
-            self.metrics[f"time_prop_{name}_pre_ms"].fill_(pre)
+            # self.metrics[f"time_prop_{name}_pre_ms"].fill_(pre)
             self.metrics[f"time_prop_{name}_post_ms"].fill_(post)
-            self._prop_time_pre_sum[name] = 0.0
+            # self._prop_time_pre_sum[name] = 0.0
             self._prop_time_post_sum[name] = 0.0
 
     def _resample_command(self, env_ids: Sequence[int]):
