@@ -217,22 +217,26 @@ class MotionLoader:
         )  # torch.Size([1, num_motions])
 
         a = 1
+        self.body_ang_vel_w = self._body_ang_vel_w[:, self._body_indexes]
+        self.body_pos_w = self._body_pos_w[:, self._body_indexes]
+        self.body_quat_w = self._body_quat_w[:, self._body_indexes]
+        self.body_lin_vel_w = self._body_lin_vel_w[:, self._body_indexes]
 
-    @property
-    def body_pos_w(self) -> torch.Tensor:
-        return self._body_pos_w[:, self._body_indexes]
+    # @property
+    # def body_pos_w(self) -> torch.Tensor:
+    #     return self._body_pos_w[:, self._body_indexes]
 
-    @property
-    def body_quat_w(self) -> torch.Tensor:
-        return self._body_quat_w[:, self._body_indexes]
+    # @property
+    # def body_quat_w(self) -> torch.Tensor:
+    #     return self._body_quat_w[:, self._body_indexes]
 
-    @property
-    def body_lin_vel_w(self) -> torch.Tensor:
-        return self._body_lin_vel_w[:, self._body_indexes]
+    # @property
+    # def body_lin_vel_w(self) -> torch.Tensor:
+    #     return self._body_lin_vel_w[:, self._body_indexes]
 
-    @property
-    def body_ang_vel_w(self) -> torch.Tensor:
-        return self._body_ang_vel_w[:, self._body_indexes]
+    # @property
+    # def body_ang_vel_w(self) -> torch.Tensor:
+    #     return self._body_ang_vel_w[:, self._body_indexes]
 
 
 class MotionCommand(CommandTerm):
@@ -286,6 +290,14 @@ class MotionCommand(CommandTerm):
         self._motion_ref_pos_b = None
         self._motion_ref_ori_b_mat = None
         self._robot_ref_ori_w_mat = None
+        self._body_pos_w = None
+        self._body_quat_w = None
+        self._body_lin_vel_w = None
+        self._body_ang_vel_w = None
+        self._motion_body_pos_w_timestep = None
+        self._motion_body_quat_w_timestep = None
+        self._motion_body_lin_vel_w_timestep = None
+        self._motion_body_ang_vel_w_timestep = None
         self.body_pos_relative_w = torch.zeros(
             self.num_envs, len(self.cfg.body_names), 3, device=self.device
         )
@@ -384,6 +396,7 @@ class MotionCommand(CommandTerm):
         self._fail_motion_buf = torch.zeros(
             self._fail_buf_size, self.num_envs, dtype=torch.long, device=self.device
         )
+        self._update_motion_data()
         self._update_state_data()
 
     @property
@@ -414,21 +427,24 @@ class MotionCommand(CommandTerm):
     def body_pos_w(self) -> torch.Tensor:
         return self._profile_property(
             "body_pos_w",
-            lambda: self.motion.body_pos_w[self.time_steps]
-            + self._env.scene.env_origins[:, None, :],
+            lambda: self._body_pos_w,
+            # lambda: self.motion.body_pos_w[self.time_steps] + self._env.scene.env_origins[:, None, :],
         )
 
     @property
     def body_quat_w(self) -> torch.Tensor:
-        return self._profile_property("body_quat_w", lambda: self.motion.body_quat_w[self.time_steps])
+        return self._profile_property("body_quat_w", lambda: self._body_quat_w)
+        # return self._profile_property("body_quat_w", lambda: self.motion.body_quat_w[self.time_steps])
 
     @property
     def body_lin_vel_w(self) -> torch.Tensor:
-        return self._profile_property("body_lin_vel_w", lambda: self.motion.body_lin_vel_w[self.time_steps])
+        return self._profile_property("body_lin_vel_w", lambda: self._body_lin_vel_w)
+        # return self._profile_property("body_lin_vel_w", lambda: self.motion.body_lin_vel_w[self.time_steps])
 
     @property
     def body_ang_vel_w(self) -> torch.Tensor:
-        return self._profile_property("body_ang_vel_w", lambda: self.motion.body_ang_vel_w[self.time_steps])
+        return self._profile_property("body_ang_vel_w", lambda: self._body_ang_vel_w)
+        # return self._profile_property("body_ang_vel_w", lambda: self.motion.body_ang_vel_w[self.time_steps])
 
     @property
     def ref_pos_w(self) -> torch.Tensor:
@@ -608,6 +624,7 @@ class MotionCommand(CommandTerm):
         if len(env_ids) == 0:
             return
         self._resample_adaptive_sampling(env_ids)
+        self._update_motion_data()
         self._resample_reset_robot_state(env_ids)
 
     def _resample_adaptive_sampling(self, env_ids: Sequence[int]):
@@ -722,12 +739,23 @@ class MotionCommand(CommandTerm):
 
     def _update_command(self): # 入口
         self.time_steps += 1
-
         env_ids = self._get_env_ids_to_resample()
         self._post_update_command()
         # 根据动态平衡策略为需要重采样的 env 重新分配 time_steps
         self._resample_command(env_ids)
         self._update_state_data()
+
+    def _update_motion_data(self):
+        ts = torch.clamp(self.time_steps, 0, self.motion.time_step_total - 1)
+        self._motion_body_pos_w_timestep = self.motion.body_pos_w[self.time_steps]
+        self._motion_body_quat_w_timestep = self.motion.body_quat_w[self.time_steps]
+        self._motion_body_lin_vel_w_timestep = self.motion.body_lin_vel_w[self.time_steps]
+        self._motion_body_ang_vel_w_timestep = self.motion.body_ang_vel_w[self.time_steps]
+
+        self._body_pos_w = self._motion_body_pos_w_timestep + self._env.scene.env_origins[:, None, :]
+        self._body_quat_w = self._motion_body_quat_w_timestep
+        self._body_lin_vel_w = self._motion_body_lin_vel_w_timestep
+        self._body_ang_vel_w = self._motion_body_ang_vel_w_timestep
 
     def _get_env_ids_to_resample(self) -> torch.Tensor:
         t0 = time.perf_counter()
@@ -756,12 +784,10 @@ class MotionCommand(CommandTerm):
     def _update_state_data(self):
         # Compute and cache frequently used tensors once per step.
         ref_pos_w = (
-            self.motion.body_pos_w[self.time_steps, self.motion_ref_body_index]
+            self._motion_body_pos_w_timestep[:, self.motion_ref_body_index]
             + self._env.scene.env_origins
         )
-        ref_quat_w = self.motion.body_quat_w[
-            self.time_steps, self.motion_ref_body_index
-        ]
+        ref_quat_w = self._motion_body_quat_w_timestep[:, self.motion_ref_body_index]
         robot_data_body_pos_w = self.robot.data.body_pos_w.clone()
         robot_data_body_quat_w = self.robot.data.body_quat_w.clone()
         robot_data_body_lin_vel_w = self.robot.data.body_lin_vel_w.clone()
