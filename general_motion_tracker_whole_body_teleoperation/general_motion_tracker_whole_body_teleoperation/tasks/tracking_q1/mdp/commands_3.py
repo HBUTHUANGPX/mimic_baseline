@@ -321,6 +321,8 @@ class MotionCommand(CommandTerm):
             self.metrics[f"time_prop_{name}_post_ms"] = torch.zeros(
                 self.num_envs, device=self.device
             )
+        self._prop_time_pre_sum = {name: 0.0 for name in self._prop_names}
+        self._prop_time_post_sum = {name: 0.0 for name in self._prop_names}
         # timing metrics (ms)
         self.metrics["time_resample_adaptive_ms"] = torch.zeros(
             self.num_envs, device=self.device
@@ -335,6 +337,12 @@ class MotionCommand(CommandTerm):
             self.num_envs, device=self.device
         )
         self.metrics["time_update_fail_weights_ms"] = torch.zeros(
+            self.num_envs, device=self.device
+        )
+        self.metrics["time_write_joint_state_ms"] = torch.zeros(
+            self.num_envs, device=self.device
+        )
+        self.metrics["time_write_root_state_ms"] = torch.zeros(
             self.num_envs, device=self.device
         )
         self._timing_ms: Dict[str, float] = {}
@@ -497,12 +505,10 @@ class MotionCommand(CommandTerm):
         t2 = time.perf_counter()
         dt_pre = (t1 - t0) * 1000.0
         dt_post = (t2 - t1) * 1000.0
-        key_pre = f"time_prop_{name}_pre_ms"
-        key_post = f"time_prop_{name}_post_ms"
-        if key_pre in self.metrics:
-            self.metrics[key_pre].fill_(dt_pre)
-        if key_post in self.metrics:
-            self.metrics[key_post].fill_(dt_post)
+        if name in self._prop_time_pre_sum:
+            self._prop_time_pre_sum[name] += dt_pre
+        if name in self._prop_time_post_sum:
+            self._prop_time_post_sum[name] += dt_post
         return out
 
     def _update_metrics(self):
@@ -557,6 +563,19 @@ class MotionCommand(CommandTerm):
         self.metrics["time_update_fail_weights_ms"].fill_(
             float(self._timing_ms.get("update_fail_weights", 0.0))
         )
+        self.metrics["time_write_joint_state_ms"].fill_(
+            float(self._timing_ms.get("write_joint_state", 0.0))
+        )
+        self.metrics["time_write_root_state_ms"].fill_(
+            float(self._timing_ms.get("write_root_state", 0.0))
+        )
+        for name in self._prop_names:
+            pre = self._prop_time_pre_sum.get(name, 0.0)
+            post = self._prop_time_post_sum.get(name, 0.0)
+            self.metrics[f"time_prop_{name}_pre_ms"].fill_(pre)
+            self.metrics[f"time_prop_{name}_post_ms"].fill_(post)
+            self._prop_time_pre_sum[name] = 0.0
+            self._prop_time_post_sum[name] = 0.0
 
     def _resample_command(self, env_ids: Sequence[int]):
         # phase = sample_uniform(0.0, 1.0, (len(env_ids),), device=self.device)
@@ -644,9 +663,22 @@ class MotionCommand(CommandTerm):
         # joint_vel[env_ids] = torch.clip(
         #     joint_vel[env_ids], soft_joint_vel_limits[:, :, 0], soft_joint_vel_limits[:, :, 1]
         # )
+        # timing: write_joint_state_to_sim
+        t0 = time.perf_counter()
+        torch.cuda.synchronize()
+        t1 = time.perf_counter()
         self.robot.write_joint_state_to_sim(
             joint_pos[env_ids], joint_vel[env_ids], env_ids=env_ids
         )
+        torch.cuda.synchronize()
+        t2 = time.perf_counter()
+        self._timing_ms["write_joint_state"] = (t2 - t1) * 1000.0
+        self._timing_ms["write_joint_state_pre"] = (t1 - t0) * 1000.0
+
+        # timing: write_root_state_to_sim
+        t3 = time.perf_counter()
+        torch.cuda.synchronize()
+        t4 = time.perf_counter()
         self.robot.write_root_state_to_sim(
             torch.cat(
                 [
@@ -659,6 +691,10 @@ class MotionCommand(CommandTerm):
             ),
             env_ids=env_ids,
         )
+        torch.cuda.synchronize()
+        t5 = time.perf_counter()
+        self._timing_ms["write_root_state"] = (t5 - t4) * 1000.0
+        self._timing_ms["write_root_state_pre"] = (t4 - t3) * 1000.0
 
     def _update_command(self):
         self.time_steps += 1
