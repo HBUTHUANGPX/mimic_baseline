@@ -378,6 +378,7 @@ class MotionCommand(CommandTerm):
         self._fail_motion_buf = torch.zeros(
             self._fail_buf_size, self.num_envs, dtype=torch.long, device=self.device
         )
+        self._update_state_data()
 
     @property
     def motion_id(self) -> torch.Tensor:
@@ -749,10 +750,13 @@ class MotionCommand(CommandTerm):
         ref_quat_w = self.motion.body_quat_w[
             self.time_steps, self.motion_ref_body_index
         ]
-        robot_ref_pos_w = self.robot.data.body_pos_w[:, self.robot_ref_body_index]
-        robot_ref_quat_w = self.robot.data.body_quat_w[:, self.robot_ref_body_index]
-        robot_body_pos_w = self.robot.data.body_pos_w[:, self.body_indexes]
-        robot_body_quat_w = self.robot.data.body_quat_w[:, self.body_indexes]
+        robot_data_body_pos_w = self.robot.data.body_pos_w.clone()
+        robot_data_body_quat_w = self.robot.data.body_quat_w.clone()
+
+        robot_ref_pos_w = robot_data_body_pos_w[:, self.robot_ref_body_index]
+        robot_ref_quat_w = robot_data_body_quat_w[:, self.robot_ref_body_index]
+        robot_body_pos_w = robot_data_body_pos_w[:, self.body_indexes]
+        robot_body_quat_w = robot_data_body_quat_w[:, self.body_indexes]
 
         self._ref_pos_w = ref_pos_w
         self._ref_quat_w = ref_quat_w
