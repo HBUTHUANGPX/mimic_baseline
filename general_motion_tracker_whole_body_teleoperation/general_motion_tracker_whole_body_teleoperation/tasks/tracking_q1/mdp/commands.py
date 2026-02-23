@@ -343,141 +343,97 @@ class MotionCommand(CommandTerm):
 
     @property
     def motion_id(self) -> torch.Tensor:
-        return self._profile_property("motion_id", lambda: self.motion._motion_id[self.time_steps])
+        return self.motion._motion_id[self.time_steps]
 
     @property
     def motion_group(self) -> torch.Tensor:
-        return self._profile_property("motion_group", lambda: self.motion._motion_group[self.time_steps])
+        return self.motion._motion_group[self.time_steps]
 
     @property
     def command(
         self,
     ) -> torch.Tensor:  # TODO Consider again if this is the best observation
-        return self._profile_property(
-            "command", lambda: torch.cat([self.joint_pos, self.joint_vel], dim=1)
-        )
+        return torch.cat([self.joint_pos, self.joint_vel], dim=1)
 
     @property
     def joint_pos(self) -> torch.Tensor:
-        return self._profile_property("joint_pos", lambda: self.motion.joint_pos[self.time_steps])
+        return self.motion.joint_pos[self.time_steps]
 
     @property
     def joint_vel(self) -> torch.Tensor:
-        return self._profile_property("joint_vel", lambda: self.motion.joint_vel[self.time_steps])
+        return self.motion.joint_vel[self.time_steps]
 
     @property
     def body_pos_w(self) -> torch.Tensor:
-        return self._profile_property(
-            "body_pos_w",
-            lambda: self._body_pos_w,
-            # lambda: self.motion.body_pos_w[self.time_steps] + self._env.scene.env_origins[:, None, :],
-        )
+        return self._body_pos_w
 
     @property
     def body_quat_w(self) -> torch.Tensor:
-        return self._profile_property("body_quat_w", lambda: self._body_quat_w)
-        # return self._profile_property("body_quat_w", lambda: self.motion.body_quat_w[self.time_steps])
+        return self._body_quat_w
 
     @property
     def body_lin_vel_w(self) -> torch.Tensor:
-        return self._profile_property("body_lin_vel_w", lambda: self._body_lin_vel_w)
-        # return self._profile_property("body_lin_vel_w", lambda: self.motion.body_lin_vel_w[self.time_steps])
+        return self._body_lin_vel_w
 
     @property
     def body_ang_vel_w(self) -> torch.Tensor:
-        return self._profile_property("body_ang_vel_w", lambda: self._body_ang_vel_w)
-        # return self._profile_property("body_ang_vel_w", lambda: self.motion.body_ang_vel_w[self.time_steps])
+        return self._body_ang_vel_w
 
     @property
     def ref_pos_w(self) -> torch.Tensor:
-        if self.cfg.profile_properties:
-            return self._profile_property("ref_pos_w", lambda: self._ref_pos_w)
         return self._ref_pos_w
 
     @property
     def ref_quat_w(self) -> torch.Tensor:
-        if self.cfg.profile_properties:
-            return self._profile_property("ref_quat_w", lambda: self._ref_quat_w)
         return self._ref_quat_w
 
     @property
     def ref_lin_vel_w(self) -> torch.Tensor: # tag 2.05ms
-        return self._profile_property(
-            "ref_lin_vel_w",
-            lambda: self.motion.body_lin_vel_w[self.time_steps, self.motion_ref_body_index],
-        )
+        return self.motion.body_lin_vel_w[self.time_steps, self.motion_ref_body_index]
 
     @property
     def ref_ang_vel_w(self) -> torch.Tensor:
-        return self._profile_property(
-            "ref_ang_vel_w",
-            lambda: self.motion.body_ang_vel_w[self.time_steps, self.motion_ref_body_index],
-        )
+        return self.motion.body_ang_vel_w[self.time_steps, self.motion_ref_body_index]
 
     @property
     def robot_joint_pos(self) -> torch.Tensor:
-        return self._profile_property("robot_joint_pos", lambda: self._robot_joint_pos)
-        # return self._profile_property("robot_joint_pos", lambda: self.robot.data.joint_pos)
+        return self._robot_joint_pos
 
     @property
     def robot_joint_vel(self) -> torch.Tensor:
-        return self._profile_property("robot_joint_vel", lambda: self._robot_joint_vel)
-        # return self._profile_property("robot_joint_vel", lambda: self.robot.data.joint_vel)
+        return self._robot_joint_vel
 
     @property
     def robot_body_pos_w(self) -> torch.Tensor: # tag 8.2ms
-        if self.cfg.profile_properties:
-            return self._profile_property("robot_body_pos_w", lambda: self._robot_body_pos_w)
         return self._robot_body_pos_w
 
     @property
     def robot_body_quat_w(self) -> torch.Tensor: # tag 10.66ms
-        if self.cfg.profile_properties:
-            return self._profile_property("robot_body_quat_w", lambda: self._robot_body_quat_w)
         return self._robot_body_quat_w
 
     @property
     def robot_body_lin_vel_w(self) -> torch.Tensor: # tag 10.2ms
-        return self._profile_property(
-            "robot_body_lin_vel_w", lambda: self._robot_body_lin_vel_w
-            # "robot_body_lin_vel_w", lambda: self.robot.data.body_lin_vel_w[:, self.body_indexes]
-        )
+        return self._robot_body_lin_vel_w
 
     @property
     def robot_body_ang_vel_w(self) -> torch.Tensor: # tag 10.5ms
-        return self._profile_property(
-            "robot_body_ang_vel_w", lambda: self._robot_body_ang_vel_w
-            # "robot_body_ang_vel_w", lambda: self.robot.data.body_ang_vel_w[:, self.body_indexes]
-        )
+        return self._robot_body_ang_vel_w
 
     @property
     def robot_ref_pos_w(self) -> torch.Tensor: # tag 14.5ms
-        if self.cfg.profile_properties:
-            return self._profile_property("robot_ref_pos_w", lambda: self._robot_ref_pos_w)
         return self._robot_ref_pos_w
 
     @property
     def robot_ref_quat_w(self) -> torch.Tensor: # tag 20ms
-        if self.cfg.profile_properties:
-            return self._profile_property("robot_ref_quat_w", lambda: self._robot_ref_quat_w)
         return self._robot_ref_quat_w
 
     @property
     def robot_ref_lin_vel_w(self) -> torch.Tensor: # tag 2.05ms
-        return self._profile_property(
-            "robot_ref_lin_vel_w", lambda: self._robot_ref_lin_vel_w
-            # "robot_ref_lin_vel_w", lambda: self.robot.data.body_lin_vel_w[:, self.robot_ref_body_index]
-        )
+        return self._robot_ref_lin_vel_w
 
     @property
     def robot_ref_ang_vel_w(self) -> torch.Tensor: # tag 2.05ms
-        return self._profile_property(
-            "robot_ref_ang_vel_w", lambda: self._robot_ref_ang_vel_w
-            # "robot_ref_ang_vel_w", lambda: self.robot.data.body_ang_vel_w[:, self.robot_ref_body_index]
-        )
-
-    def _profile_property(self, name: str, fn):
-        return fn()
+        return self._robot_ref_ang_vel_w
 
     def _update_metrics(self):
         # self.metrics["error_ref_pos"] = torch.norm(
