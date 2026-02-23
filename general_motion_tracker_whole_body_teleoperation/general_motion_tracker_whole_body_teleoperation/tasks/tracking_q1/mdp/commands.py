@@ -273,8 +273,14 @@ class MotionCommand(CommandTerm):
         self._ref_quat_w = None
         self._robot_ref_pos_w = None
         self._robot_ref_quat_w = None
+        self._robot_ref_lin_vel_w = None
+        self._robot_ref_ang_vel_w = None
+        self._robot_joint_pos = None
+        self._robot_joint_vel = None
         self._robot_body_pos_w = None
         self._robot_body_quat_w = None
+        self._robot_body_lin_vel_w = None
+        self._robot_body_ang_vel_w = None
         self._robot_body_pos_b = None
         self._robot_body_ori_b_mat = None
         self._motion_ref_pos_b = None
@@ -452,11 +458,13 @@ class MotionCommand(CommandTerm):
 
     @property
     def robot_joint_pos(self) -> torch.Tensor:
-        return self._profile_property("robot_joint_pos", lambda: self.robot.data.joint_pos)
+        return self._profile_property("robot_joint_pos", lambda: self._robot_joint_pos)
+        # return self._profile_property("robot_joint_pos", lambda: self.robot.data.joint_pos)
 
     @property
     def robot_joint_vel(self) -> torch.Tensor:
-        return self._profile_property("robot_joint_vel", lambda: self.robot.data.joint_vel)
+        return self._profile_property("robot_joint_vel", lambda: self._robot_joint_vel)
+        # return self._profile_property("robot_joint_vel", lambda: self.robot.data.joint_vel)
 
     @property
     def robot_body_pos_w(self) -> torch.Tensor: # tag 8.2ms
@@ -473,13 +481,15 @@ class MotionCommand(CommandTerm):
     @property
     def robot_body_lin_vel_w(self) -> torch.Tensor: # tag 10.2ms
         return self._profile_property(
-            "robot_body_lin_vel_w", lambda: self.robot.data.body_lin_vel_w[:, self.body_indexes]
+            "robot_body_lin_vel_w", lambda: self._robot_body_lin_vel_w
+            # "robot_body_lin_vel_w", lambda: self.robot.data.body_lin_vel_w[:, self.body_indexes]
         )
 
     @property
     def robot_body_ang_vel_w(self) -> torch.Tensor: # tag 10.5ms
         return self._profile_property(
-            "robot_body_ang_vel_w", lambda: self.robot.data.body_ang_vel_w[:, self.body_indexes]
+            "robot_body_ang_vel_w", lambda: self._robot_body_ang_vel_w
+            # "robot_body_ang_vel_w", lambda: self.robot.data.body_ang_vel_w[:, self.body_indexes]
         )
 
     @property
@@ -497,13 +507,15 @@ class MotionCommand(CommandTerm):
     @property
     def robot_ref_lin_vel_w(self) -> torch.Tensor: # tag 2.05ms
         return self._profile_property(
-            "robot_ref_lin_vel_w", lambda: self.robot.data.body_lin_vel_w[:, self.robot_ref_body_index]
+            "robot_ref_lin_vel_w", lambda: self._robot_ref_lin_vel_w
+            # "robot_ref_lin_vel_w", lambda: self.robot.data.body_lin_vel_w[:, self.robot_ref_body_index]
         )
 
     @property
     def robot_ref_ang_vel_w(self) -> torch.Tensor: # tag 2.05ms
         return self._profile_property(
-            "robot_ref_ang_vel_w", lambda: self.robot.data.body_ang_vel_w[:, self.robot_ref_body_index]
+            "robot_ref_ang_vel_w", lambda: self._robot_ref_ang_vel_w
+            # "robot_ref_ang_vel_w", lambda: self.robot.data.body_ang_vel_w[:, self.robot_ref_body_index]
         )
 
     def _profile_property(self, name: str, fn):
@@ -752,11 +764,19 @@ class MotionCommand(CommandTerm):
         ]
         robot_data_body_pos_w = self.robot.data.body_pos_w.clone()
         robot_data_body_quat_w = self.robot.data.body_quat_w.clone()
+        robot_data_body_lin_vel_w = self.robot.data.body_lin_vel_w.clone()
+        robot_data_body_ang_vel_w = self.robot.data.body_ang_vel_w.clone()
+        robot_joint_pos = self.robot.data.joint_pos.clone()
+        robot_joint_vel = self.robot.data.joint_vel.clone()
 
         robot_ref_pos_w = robot_data_body_pos_w[:, self.robot_ref_body_index]
         robot_ref_quat_w = robot_data_body_quat_w[:, self.robot_ref_body_index]
         robot_body_pos_w = robot_data_body_pos_w[:, self.body_indexes]
         robot_body_quat_w = robot_data_body_quat_w[:, self.body_indexes]
+        robot_body_lin_vel_w = robot_data_body_lin_vel_w[:, self.body_indexes]
+        robot_body_ang_vel_w = robot_data_body_ang_vel_w[:, self.body_indexes]
+        robot_ref_lin_vel_w = robot_data_body_lin_vel_w[:, self.robot_ref_body_index]
+        robot_ref_ang_vel_w = robot_data_body_ang_vel_w[:, self.robot_ref_body_index]
 
         self._ref_pos_w = ref_pos_w
         self._ref_quat_w = ref_quat_w
@@ -764,6 +784,12 @@ class MotionCommand(CommandTerm):
         self._robot_ref_quat_w = robot_ref_quat_w
         self._robot_body_pos_w = robot_body_pos_w
         self._robot_body_quat_w = robot_body_quat_w
+        self._robot_body_lin_vel_w = robot_body_lin_vel_w
+        self._robot_body_ang_vel_w = robot_body_ang_vel_w
+        self._robot_ref_lin_vel_w = robot_ref_lin_vel_w
+        self._robot_ref_ang_vel_w = robot_ref_ang_vel_w
+        self._robot_joint_pos = robot_joint_pos
+        self._robot_joint_vel = robot_joint_vel
         self._robot_ref_ori_w_mat = matrix_from_quat(robot_ref_quat_w)
 
         num_bodies = len(self.cfg.body_names)
