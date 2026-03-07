@@ -3,9 +3,9 @@ from __future__ import annotations
 import torch
 from typing import TYPE_CHECKING
 
-from isaaclab.utils.math import matrix_from_quat, subtract_frame_transforms
+from isaaclab.utils.math import matrix_from_quat
 
-from general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp.commands import MotionCommand
+from general_motion_tracker_whole_body_teleoperation.tasks.tracking_g1.mdp.commands import MotionCommand
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.assets import Articulation, RigidObject
 
@@ -30,7 +30,7 @@ def motion_group(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
 
 def robot_ref_ori_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-    mat = matrix_from_quat(command.robot_ref_quat_w) # tag
+    mat = command._robot_ref_ori_w_mat
     return mat[..., :2].reshape(mat.shape[0], -1)
 
 
@@ -57,58 +57,22 @@ def robot_ref_wz_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
 
 def robot_body_pos_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-
-    num_bodies = len(command.cfg.body_names)
-    pos_b, _ = subtract_frame_transforms(
-        command.robot_ref_pos_w[:, None, :].repeat(1, num_bodies, 1), # tag
-        command.robot_ref_quat_w[:, None, :].repeat(1, num_bodies, 1), # tag
-        command.robot_body_pos_w, # tag
-        command.robot_body_quat_w, # tag
-    )
-
-    return pos_b.view(env.num_envs, -1)
+    return command._robot_body_pos_b.view(env.num_envs, -1)
 
 
 def robot_body_ori_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-
-    num_bodies = len(command.cfg.body_names)
-    _, ori_b = subtract_frame_transforms(
-        command.robot_ref_pos_w[:, None, :].repeat(1, num_bodies, 1), # tag
-        command.robot_ref_quat_w[:, None, :].repeat(1, num_bodies, 1), # tag
-        command.robot_body_pos_w, # tag
-        command.robot_body_quat_w, # tag
-    )
-    mat = matrix_from_quat(ori_b)
-    return mat[..., :2].reshape(mat.shape[0], -1)
+    return command._robot_body_ori_b_mat[..., :2].reshape(env.num_envs, -1)
 
 
 def motion_ref_pos_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-
-    pos, ori  = subtract_frame_transforms(
-        command.robot_ref_pos_w, # tag
-        command.robot_ref_quat_w, # tag
-        command.ref_pos_w,
-        command.ref_quat_w,
-    )
-    r1 = pos.view(env.num_envs, -1)
-    mat = matrix_from_quat(ori)
-    r2 = mat[..., :2].reshape(mat.shape[0], -1)
-    return pos.view(env.num_envs, -1)
+    return command._motion_ref_pos_b.view(env.num_envs, -1)
 
 
 def motion_ref_ori_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-
-    _, ori = subtract_frame_transforms(
-        command.robot_ref_pos_w, # tag
-        command.robot_ref_quat_w, # tag
-        command.ref_pos_w,
-        command.ref_quat_w,
-    )
-    mat = matrix_from_quat(ori)
-    return mat[..., :2].reshape(mat.shape[0], -1)
+    return command._motion_ref_ori_b_mat[..., :2].reshape(env.num_envs, -1)
 
 def joint_pos_delta(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
 

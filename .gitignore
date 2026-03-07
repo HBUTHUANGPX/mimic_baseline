@@ -20,3 +20,4 @@ deploy_mujoco/artifacts/*
 deploy_mujoco/deploy_policy/*
 artifacts/*
 retargeting_data_csv/*
+MJDATA.TXT

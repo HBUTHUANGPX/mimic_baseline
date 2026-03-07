@@ -71,7 +71,11 @@ parser.add_argument(
     action="store_true",
     help="Preload all CSV files into memory before simulation.",
 )
-
+parser.add_argument(
+    "--robot",
+    choices=["Q1","g1"],
+    default="Q1"
+)
 # Append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 # Parse the arguments
@@ -99,7 +103,73 @@ from isaaclab.utils.math import (
 ##
 # Pre-defined configs
 ##
-from general_motion_tracker_whole_body_teleoperation.robots.q1 import Q1_CYLINDER_CFG
+if args_cli.robot == "Q1":
+    from general_motion_tracker_whole_body_teleoperation.robots.q1 import Q1_CYLINDER_CFG as ROBOT_CFG
+    _joint_names = [
+        "L_hip_roll_joint",
+        "L_hip_yaw_joint",
+        "L_hip_pitch_joint",
+        "L_knee_joint",
+        "L_ankle_pitch_joint",
+        "L_ankle_roll_joint",
+        "R_hip_roll_joint",
+        "R_hip_yaw_joint",
+        "R_hip_pitch_joint",
+        "R_knee_joint",
+        "R_ankle_pitch_joint",
+        "R_ankle_roll_joint",
+        "pelvis_joint",
+        "L_shoulder_pitch_joint",
+        "L_shoulder_roll_joint",
+        "L_shoulder_yaw_joint",
+        "L_elbow_joint",
+        "L_forearm_yaw_joint",
+        "L_wrist_roll_joint",
+        "L_wrist_pitch_joint",
+        "R_shoulder_pitch_joint",
+        "R_shoulder_roll_joint",
+        "R_shoulder_yaw_joint",
+        "R_elbow_joint",
+        "R_forearm_yaw_joint",
+        "R_wrist_roll_joint",
+        "R_wrist_pitch_joint",
+        "head_yaw_joint",
+        "head_pitch_joint",
+    ] # Q1
+
+elif args_cli.robot == "g1":
+    from general_motion_tracker_whole_body_teleoperation.robots.g1 import G1_CYLINDER_CFG as ROBOT_CFG
+    _joint_names=[
+        "left_hip_pitch_joint",
+        "left_hip_roll_joint",
+        "left_hip_yaw_joint",
+        "left_knee_joint",
+        "left_ankle_pitch_joint",
+        "left_ankle_roll_joint",
+        "right_hip_pitch_joint",
+        "right_hip_roll_joint",
+        "right_hip_yaw_joint",
+        "right_knee_joint",
+        "right_ankle_pitch_joint",
+        "right_ankle_roll_joint",
+        "waist_yaw_joint",
+        "waist_roll_joint",
+        "waist_pitch_joint",
+        "left_shoulder_pitch_joint",
+        "left_shoulder_roll_joint",
+        "left_shoulder_yaw_joint",
+        "left_elbow_joint",
+        "left_wrist_roll_joint",
+        "left_wrist_pitch_joint",
+        "left_wrist_yaw_joint",
+        "right_shoulder_pitch_joint",
+        "right_shoulder_roll_joint",
+        "right_shoulder_yaw_joint",
+        "right_elbow_joint",
+        "right_wrist_roll_joint",
+        "right_wrist_pitch_joint",
+        "right_wrist_yaw_joint",
+    ] # g1
 
 def build_traj_module(
     fps: int,
@@ -150,7 +220,7 @@ class ReplayMotionsSceneCfg(InteractiveSceneCfg):
     )
 
     # articulation
-    robot: ArticulationCfg = Q1_CYLINDER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+    robot: ArticulationCfg = ROBOT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
 
 class MotionLoader:
@@ -389,38 +459,8 @@ def main():
         print(f"[INFO]: Found {len(csv_files)} CSV files to process.")
 
     # Process each CSV file sequentially
-    joint_names = [
-        "L_hip_roll_joint",
-        "L_hip_yaw_joint",
-        "L_hip_pitch_joint",
-        "L_knee_joint",
-        "L_ankle_pitch_joint",
-        "L_ankle_roll_joint",
-        "R_hip_roll_joint",
-        "R_hip_yaw_joint",
-        "R_hip_pitch_joint",
-        "R_knee_joint",
-        "R_ankle_pitch_joint",
-        "R_ankle_roll_joint",
-        "pelvis_joint",
-        "L_shoulder_pitch_joint",
-        "L_shoulder_roll_joint",
-        "L_shoulder_yaw_joint",
-        "L_elbow_joint",
-        "L_forearm_yaw_joint",
-        "L_wrist_roll_joint",
-        "L_wrist_pitch_joint",
-        "R_shoulder_pitch_joint",
-        "R_shoulder_roll_joint",
-        "R_shoulder_yaw_joint",
-        "R_elbow_joint",
-        "R_forearm_yaw_joint",
-        "R_wrist_roll_joint",
-        "R_wrist_pitch_joint",
-        "head_yaw_joint",
-        "head_pitch_joint",
-    ]
-
+    
+    joint_names = _joint_names
     robot = scene["robot"]
     robot_joint_indexes = robot.find_joints(joint_names, preserve_order=True)[0]
 

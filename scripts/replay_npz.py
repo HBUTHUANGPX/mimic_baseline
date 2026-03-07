@@ -17,7 +17,16 @@ from isaaclab.app import AppLauncher
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Replay converted motions.")
 parser.add_argument("--registry_name", type=str, help="The name of the wand registry.")
-
+parser.add_argument(
+    "--robot",
+    choices=["Q1","g1"],
+    default="Q1"
+)
+parser.add_argument(
+    "--motion_file",
+    type=str,
+    required=True,
+)
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 # parse the arguments
@@ -39,8 +48,12 @@ from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 ##
 # Pre-defined configs
 ##
-from general_motion_tracker_whole_body_teleoperation.robots.q1 import Q1_CYLINDER_CFG
-from general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp import MotionLoader
+if args_cli.robot == "Q1":
+    from general_motion_tracker_whole_body_teleoperation.robots.q1 import Q1_CYLINDER_CFG as ROBOT_CFG
+    from general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp import MotionLoader
+elif args_cli.robot == "g1":
+    from general_motion_tracker_whole_body_teleoperation.robots.g1 import G1_CYLINDER_CFG as ROBOT_CFG
+    from general_motion_tracker_whole_body_teleoperation.tasks.tracking_g1.mdp import MotionLoader
 
 
 @configclass
@@ -58,7 +71,7 @@ class ReplayMotionsSceneCfg(InteractiveSceneCfg):
     )
 
     # articulation
-    robot: ArticulationCfg = Q1_CYLINDER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+    robot: ArticulationCfg = ROBOT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
 
 def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
@@ -67,7 +80,7 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     # Define simulation stepping
     sim_dt = sim.get_physics_dt()
 
-    motion_file = "artifacts/Q1/100STYLE/LeanLeft/LeanLeft_FW.npz"
+    motion_file = args_cli.motion_file# "artifacts/Q1/100STYLE/LeanLeft/LeanLeft_FW.npz"
     motion_file_group ={"replay_motion": motion_file}
     motion = MotionLoader(
         motion_file_group,
