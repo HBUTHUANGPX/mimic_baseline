@@ -10,7 +10,7 @@ from isaaclab.managers import SceneEntityCfg
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedEnv
-from tasks.tracking_g1.mdp.commands_2 import MotionCommand
+from general_motion_tracker_whole_body_teleoperation.tasks.tracking_g1.mdp.commands import MotionCommand
 
 def randomize_joint_default_pos(
     env: ManagerBasedEnv,

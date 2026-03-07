@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import numpy as np
 import os
 import torch
@@ -192,29 +193,6 @@ class MotionLoader:
             )
             start = end
 
-        # 动态平衡采样: 记录“当前被采样到的 motion 比例”
-        # - 形状: (1, num_motions)
-        # - 初始均匀分布，后续在 _update_command 中按当前 time_steps 统计更新
-        # - 用于 _resample_command 中与 target_dist 计算权重，避免某些 motion 被过度采样
-        self.motion_distribution = torch.full(
-            (1, self.num_motions),
-            1.0 / self.num_motions,
-            dtype=torch.float32,
-            device=device,
-        )  # torch.Size([1, num_motions])
-
-        # 动态平衡采样: 目标分布（按 motion 长度占比）
-        # - 长序列在时间维度上覆盖更多步数，因此目标分布按长度归一化
-        # - 采样时希望“当前分布”逼近该目标分布
-        total_length = sum(self.motion_lengths)
-        self.target_dist = torch.tensor(
-            [length / total_length for length in self.motion_lengths],
-            dtype=torch.float32,
-            device=device,
-        ).unsqueeze(
-            0
-        )  # torch.Size([1, num_motions])
-
         a = 1
         self.body_ang_vel_w = self._body_ang_vel_w[:, self._body_indexes]
         self.body_pos_w = self._body_pos_w[:, self._body_indexes]
@@ -249,12 +227,6 @@ class MotionCommand(CommandTerm):
         )  # Intervals are [start, end); right=True ensures ts==end maps to next motion
         # Cache env-level motion ids as the single source of truth
         self.env_motion_ids = self.motion_ids.clone()
-        self._motion_lengths_tensor = torch.tensor(
-            self.motion.motion_lengths, dtype=torch.long, device=self.device
-        )
-        self.counts = torch.zeros(
-            self.motion.num_motions, dtype=torch.float32, device=self.device
-        )
         # per-step cached tensors (computed in _update_state_data)
         self._ref_pos_w = None
         self._ref_quat_w = None
@@ -301,27 +273,29 @@ class MotionCommand(CommandTerm):
         self.metrics["error_body_rot"] = torch.zeros(self.num_envs, device=self.device)
         self.metrics["error_joint_pos"] = torch.zeros(self.num_envs, device=self.device)
         self.metrics["error_joint_vel"] = torch.zeros(self.num_envs, device=self.device)
+        self.metrics["sampling_entropy"] = torch.zeros(self.num_envs, device=self.device)
+        self.metrics["sampling_top1_prob"] = torch.zeros(self.num_envs, device=self.device)
+        self.metrics["sampling_top1_bin"] = torch.zeros(self.num_envs, device=self.device)
         # for name in self.motion.extracted_list:
         #     self.metrics[name] = torch.zeros(self.num_envs, device=self.device)
         # timing metrics removed
 
-        # Failure-weighted motion sampling (improved)
-        self.motion_fail_counts = torch.zeros(
-            self.motion.num_motions, dtype=torch.float32, device=self.device
+        # Global timeline adaptive sampling (bin-based), aligned with commands_3.
+        self.bin_count = int(
+            self.motion.time_step_total // (1 / (self._env.cfg.decimation * self._env.cfg.sim.dt))
+        ) + 1
+        self.bin_failed_count = torch.zeros(
+            self.bin_count, dtype=torch.float32, device=self.device
         )
-        self.motion_fail_weights = torch.ones(
-            self.motion.num_motions, dtype=torch.float32, device=self.device
+        self._current_bin_failed = torch.zeros(
+            self.bin_count, dtype=torch.float32, device=self.device
         )
-        self._fail_update_step = 0
-        self._fail_buf_size = max(1, int(self.cfg.fail_update_interval))
-        self._fail_buf_ptr = 0
-        self._fail_buf_count = 0
-        self._fail_term_buf = torch.zeros(
-            self._fail_buf_size, self.num_envs, dtype=torch.bool, device=self.device
+        self.kernel = torch.tensor(
+            [self.cfg.adaptive_lambda**i for i in range(self.cfg.adaptive_kernel_size)],
+            dtype=torch.float32,
+            device=self.device,
         )
-        self._fail_motion_buf = torch.zeros(
-            self._fail_buf_size, self.num_envs, dtype=torch.long, device=self.device
-        )
+        self.kernel = self.kernel / self.kernel.sum()
         self._update_motion_data()
         self._update_state_data()
 
@@ -468,30 +442,48 @@ class MotionCommand(CommandTerm):
         self._resample_reset_robot_state(env_ids)
 
     def _resample_adaptive_sampling(self, env_ids: Sequence[int]):
-        # 动态平衡采样核心:
-        # 1) current_dist: 当前 time_steps 覆盖的 motion 分布（由 _update_command 统计）
-        # 2) target_dist: 期望分布（按 motion 长度占比）
-        # 3) 权重 = target / current，当某个 motion 被“采少了”，权重会变大
-        # 4) 对权重再归一化，得到采样概率 probs
-        epsilon = 1e-6
+        episode_failed = self._env.termination_manager.terminated[env_ids]
+        if torch.any(episode_failed):
+            current_bin_index = torch.clamp(
+                (self.time_steps * self.bin_count) // max(self.motion.time_step_total, 1),
+                0,
+                self.bin_count - 1,
+            )
+            fail_bins = current_bin_index[env_ids][episode_failed]
+            self._current_bin_failed[:] = torch.bincount(fail_bins, minlength=self.bin_count)
 
-        current_dist = self.motion.motion_distribution.squeeze(0)
-        target_dist = self.motion.target_dist.squeeze(0)
-        base_weights = target_dist / (current_dist + epsilon)
-        weights = base_weights * self.motion_fail_weights
-        
-        # 按动态平衡后的 probs 采样 motion id（每个 env 独立采样）
-        motion_ids = torch.multinomial(
-            weights, len(env_ids), replacement=True
-        )  # (len(env_ids),)
+        sampling_probabilities = self.bin_failed_count + self.cfg.adaptive_uniform_ratio / float(self.bin_count)
+        sampling_probabilities = torch.nn.functional.pad(
+            sampling_probabilities.unsqueeze(0).unsqueeze(0),
+            (0, self.cfg.adaptive_kernel_size - 1),
+            mode="replicate",
+        )
+        sampling_probabilities = torch.nn.functional.conv1d(
+            sampling_probabilities, self.kernel.view(1, 1, -1)
+        ).view(-1)
+        sampling_probabilities = sampling_probabilities / sampling_probabilities.sum()
 
-        # 对每个 env 在“选中的 motion 区间”内再采样局部相位（时间步）
-        selected_starts = self.motion.motion_indices[motion_ids, 0]  # (len(env_ids),)
-        selected_lengths = self._motion_lengths_tensor[motion_ids]
-        local_phases = torch.rand((len(env_ids),), device=self.device)  # Uniform [0,1)
-        local_steps = (local_phases * (selected_lengths - 1)).long()
-        self.time_steps[env_ids] = selected_starts + local_steps
-        self.env_motion_ids[env_ids] = motion_ids
+        sampled_bins = torch.multinomial(sampling_probabilities, len(env_ids), replacement=True)
+        self.time_steps[env_ids] = (
+            (sampled_bins + sample_uniform(0.0, 1.0, (len(env_ids),), device=self.device))
+            / self.bin_count
+            * (self.motion.time_step_total - 1)
+        ).long()
+        ts = torch.clamp(self.time_steps[env_ids], 0, self.motion.time_step_total - 1)
+        self.env_motion_ids[env_ids] = torch.bucketize(ts, self._motion_ends, right=True)
+
+        H = -(sampling_probabilities * (sampling_probabilities + 1e-12).log()).sum()
+        H_norm = H / max(math.log(self.bin_count), 1e-12)
+        pmax, imax = sampling_probabilities.max(dim=0)
+        self.metrics["sampling_entropy"][:] = H_norm
+        self.metrics["sampling_top1_prob"][:] = pmax
+        self.metrics["sampling_top1_bin"][:] = imax.float() / self.bin_count
+
+        self.bin_failed_count = (
+            self.cfg.adaptive_alpha * self._current_bin_failed
+            + (1 - self.cfg.adaptive_alpha) * self.bin_failed_count
+        )
+        self._current_bin_failed.zero_()
 
     def _resample_reset_robot_state(self, env_ids: Sequence[int]):
         root_pos = self.body_pos_w[:, 0].clone()
@@ -675,65 +667,7 @@ class MotionCommand(CommandTerm):
 
     def _post_update_command(self):
         # 预留接口，供子类在更新 time_steps 后、重采样前进行额外处理
-        self._update_distribution_vectorized()  # 使用向量化方法更新分布统计
-        self._record_failures()
-        self._update_failure_weights()
         pass
-
-    def _update_distribution_vectorized(self):
-        # Vectorized: use cached env motion ids
-        self.counts = torch.bincount(
-            self.env_motion_ids, minlength=self.motion.num_motions
-        ).float()
-        self.motion.motion_distribution = (self.counts / self.num_envs).unsqueeze(0)
-        self.motion_ids = self.env_motion_ids
-
-    def _record_failures(self):
-        # record current step terminated + motion ids
-        self._fail_term_buf[self._fail_buf_ptr].copy_(
-            self._env.termination_manager.terminated
-        )
-        self._fail_motion_buf[self._fail_buf_ptr].copy_(self.env_motion_ids)
-        self._fail_buf_ptr = (self._fail_buf_ptr + 1) % self._fail_buf_size
-        self._fail_buf_count = min(self._fail_buf_count + 1, self._fail_buf_size)
-
-    def _update_failure_weights(self):
-        # low-frequency update of motion-level failure weights
-        if self.cfg.fail_update_interval <= 0:
-            return
-        if (self._fail_update_step % self.cfg.fail_update_interval) != 0:
-            self._fail_update_step += 1
-            return
-
-        if self._fail_buf_count > 0:
-            term = self._fail_term_buf[: self._fail_buf_count]
-            mids = self._fail_motion_buf[: self._fail_buf_count]
-            fail_motion_ids = mids[term]
-            if fail_motion_ids.numel() > 0:
-                counts = torch.bincount(
-                    fail_motion_ids, minlength=self.motion.num_motions
-                ).float()
-            else:
-                counts = torch.zeros(
-                    self.motion.num_motions, dtype=torch.float32, device=self.device
-                )
-        else:
-            counts = torch.zeros(
-                self.motion.num_motions, dtype=torch.float32, device=self.device
-            )
-
-        # EMA update of motion-level failure counts
-        alpha = float(self.cfg.fail_weight_momentum)
-        self.motion_fail_counts = alpha * self.motion_fail_counts + (1.0 - alpha) * counts
-
-        # normalize to weights (avoid zero)
-        eps = 1e-6
-        w = self.motion_fail_counts + eps
-        self.motion_fail_weights = w / (w.sum() / float(self.motion.num_motions))
-
-        # reset buffer window
-        self._fail_buf_count = 0
-        self._fail_update_step += 1
 
     def _set_debug_vis_impl(self, debug_vis: bool):
         if debug_vis:
@@ -816,9 +750,10 @@ class MotionCommandCfg(CommandTermCfg):
 
     joint_position_range: tuple[float, float] = (-0.52, 0.52)
     joint_velocity_range: tuple[float, float] = (-0.52, 0.52)
-    # failure-weighted motion sampling
-    fail_update_interval: int = 48
-    fail_weight_momentum: float = 0.1
+    adaptive_kernel_size: int = 1
+    adaptive_lambda: float = 0.8
+    adaptive_uniform_ratio: float = 0.1
+    adaptive_alpha: float = 0.001
     # profile property access time
     profile_properties: bool = True
 

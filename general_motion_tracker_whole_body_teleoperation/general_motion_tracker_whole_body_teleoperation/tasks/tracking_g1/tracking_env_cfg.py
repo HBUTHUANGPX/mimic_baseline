@@ -29,11 +29,11 @@ import general_motion_tracker_whole_body_teleoperation.tasks.tracking_g1.mdp as 
 
 VELOCITY_RANGE = {
     "x": (-1.2, 1.2),
-    "y": (-0.5, 0.5),
-    "z": (-0.2, 0.2),
-    "roll": (-0.52, 0.52),
-    "pitch": (-0.52, 0.52),
-    "yaw": (-0.78, 0.78),
+    "y": (-0.8, 0.8),
+    "z": (-0.3, 0.3),
+    "roll": (-0.8, 0.8),
+    "pitch": (-0.8, 0.8),
+    "yaw": (-1.2, 1.2),
 }
 
 
@@ -170,9 +170,190 @@ class ObservationsCfg:
         joint_vel = ObsTerm(func=mdp.joint_vel_rel)
         actions = ObsTerm(func=mdp.last_action)
 
+    @configclass
+    class ProprioceptionWithNoiseCfg(ObsGroup):  # 带噪声含特权信息的特权本体感知观测组
+        """Observations for proprioception group with noise."""
+
+        base_lin_vel = ObsTerm(
+            func=mdp.base_lin_vel, noise=Unoise(n_min=-0.25, n_max=0.25)
+        )
+        base_ang_vel = ObsTerm(
+            func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2)
+        )
+        joint_pos = ObsTerm(
+            func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.015, n_max=0.015)
+        )
+        joint_vel = ObsTerm(
+            func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.55, n_max=0.55)
+        )
+
+        def __post_init__(self):
+            self.enable_corruption = True
+
+    @configclass
+    class ProprioceptionWithNoiseWOPrivilegeCfg(ObsGroup):  # 带噪声不含特权信息的本体感知观测组
+        """Observations for proprioception group with noise."""
+
+        base_ang_vel = ObsTerm(
+            func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2)
+        )
+        joint_pos = ObsTerm(
+            func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01)
+        )
+        joint_vel = ObsTerm(
+            func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.5, n_max=0.5)
+        )
+
+        def __post_init__(self):
+            self.enable_corruption = True
+            self.history_length = 24
+
+    @configclass
+    class ProprioceptionCfg(ObsGroup):  # 不带噪声含特权信息的特权本体感知观测组
+        """Observations for proprioception group without noise."""
+
+        base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
+        base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
+
+        def __post_init__(self):
+            self.enable_corruption = True
+
+    @configclass
+    class ProprioceptionWOPrivilegeCfg(ObsGroup):  # 不带噪声不含特权信息本体感知观测组
+        """Observations for proprioception group without noise."""
+
+        base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
+
+        def __post_init__(self):
+            self.enable_corruption = True
+            self.history_length = 24
+
+    @configclass
+    class CommandWithNoiseCfg(ObsGroup):  # 带噪声含有特权信息的指令观测组
+        """Observations for command group with noise."""
+
+        joint_pos_delta = ObsTerm(
+            func=mdp.joint_pos_delta, 
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.02, n_max=0.02),
+        )
+        motion_ref_pos_b = ObsTerm(
+            func=mdp.motion_ref_pos_b,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.02, n_max=0.02),
+        )
+        motion_ref_ori_b = ObsTerm(
+            func=mdp.motion_ref_ori_b,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.05, n_max=0.05),
+        )
+        body_pos = ObsTerm(
+            func=mdp.robot_body_pos_b,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.005, n_max=0.005),
+        )
+        body_ori = ObsTerm(
+            func=mdp.robot_body_ori_b,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.01, n_max=0.01),
+        )
+
+        def __post_init__(self):
+            self.enable_corruption = True
+
+    @configclass
+    class CommandWithNoiseWOPrivilegeCfg(ObsGroup):  # 带噪声不含特权信息的指令观测组
+        """Observations for command group with noise."""
+
+        joint_pos_delta = ObsTerm(
+            func=mdp.joint_pos_delta, 
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.02, n_max=0.02),
+        )
+        motion_ref_ori_b = ObsTerm(
+            func=mdp.motion_ref_ori_b,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.05, n_max=0.05),
+        )
+
+        def __post_init__(self):
+            self.enable_corruption = True
+
+    @configclass
+    class CommandCfg(ObsGroup):  # 无噪声含有特权信息的指令观测组
+        """Observations for command group with noise."""
+        joint_pos_delta = ObsTerm(
+            func=mdp.joint_pos_delta, 
+            params={"command_name": "motion"}
+        )
+        motion_ref_pos_b = ObsTerm(
+            func=mdp.motion_ref_pos_b,
+            params={"command_name": "motion"},
+        )
+        motion_ref_ori_b = ObsTerm(
+            func=mdp.motion_ref_ori_b,
+            params={"command_name": "motion"},
+        )
+        body_pos = ObsTerm(
+            func=mdp.robot_body_pos_b,
+            params={"command_name": "motion"},
+        )
+        body_ori = ObsTerm(
+            func=mdp.robot_body_ori_b,
+            params={"command_name": "motion"},
+        )
+
+        def __post_init__(self):
+            self.enable_corruption = True
+
+    @configclass
+    class CommandWOPrivilegeCfg(ObsGroup):  # 无噪声不含特权信息的指令观测组
+        """Observations for command group with noise."""
+
+        joint_pos_delta = ObsTerm(
+            func=mdp.joint_pos_delta, 
+            params={"command_name": "motion"}
+        )
+        motion_ref_ori_b = ObsTerm(
+            func=mdp.motion_ref_ori_b,
+            params={"command_name": "motion"},
+        )
+        # robot_ref_vx_vy_w = ObsTerm(
+        #     func=mdp.robot_ref_vx_vy_w,
+        #     params={"command_name": "motion"},
+        # )
+
+        # robot_ref_wz_w = ObsTerm(
+        #     func=mdp.robot_ref_wz_w,
+        #     params={"command_name": "motion"},
+        # )
+
+        def __post_init__(self):
+            self.enable_corruption = True
+
+    @configclass
+    class LastActionCfg(ObsGroup):  # 不带噪声的上一个动作观测组
+        """Observations for last action group."""
+        actions = ObsTerm(func=mdp.last_action)
+
     # observation groups
     policy: PolicyCfg = PolicyCfg()
     critic: PrivilegedCfg = PrivilegedCfg()
+    proprioception_with_noise_wo_privilege: ProprioceptionWithNoiseWOPrivilegeCfg = (
+        ProprioceptionWithNoiseWOPrivilegeCfg()
+    )
+    command_with_noise_wo_privilege: CommandWithNoiseWOPrivilegeCfg = (
+        CommandWithNoiseWOPrivilegeCfg()
+    )
+    proprioception: ProprioceptionCfg = ProprioceptionCfg()
+    command: CommandCfg = CommandCfg()
+
+    last_action: LastActionCfg = LastActionCfg()
+
 
 
 @configclass
@@ -349,7 +530,7 @@ class TerminationsCfg:
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
     ref_pos = DoneTerm(
         func=mdp.bad_ref_pos_z_only,
-        params={"command_name": "motion", "threshold": 0.25},
+        params={"command_name": "motion", "threshold": 0.375},
     )
     ref_ori = DoneTerm(
         func=mdp.bad_ref_ori,
@@ -363,7 +544,7 @@ class TerminationsCfg:
         func=mdp.bad_motion_body_pos_z_only,
         params={
             "command_name": "motion",
-            "threshold": 0.25,
+            "threshold": 0.375,
             "body_names": [
                 "left_ankle_roll_link",
                 "right_ankle_roll_link",

@@ -17,8 +17,16 @@ class G1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     save_interval = 500
     obs_groups = (
         {
-            "policy": ["policy"],  # 映射到环境提供的 'policy' 观测组，用于演员网络
-            "critic": ["critic"],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
+            "policy": [
+                "command_with_noise_wo_privilege",
+                "proprioception_with_noise_wo_privilege",
+                "last_action",
+            ],  # 映射到环境提供的 'policy' 观测组，用于演员网络
+            "critic": [
+                "command",
+                "proprioception",
+                "last_action",
+            ],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
         },
     )
     experiment_name = "g1_flat"
