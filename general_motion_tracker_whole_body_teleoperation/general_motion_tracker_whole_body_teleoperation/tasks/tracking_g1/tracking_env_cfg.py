@@ -27,13 +27,22 @@ import general_motion_tracker_whole_body_teleoperation.tasks.tracking_g1.mdp as 
 # Scene definition
 ##
 
+# VELOCITY_RANGE = {
+#     "x": (-1.2, 1.2),
+#     "y": (-0.8, 0.8),
+#     "z": (-0.3, 0.3),
+#     "roll": (-0.8, 0.8),
+#     "pitch": (-0.8, 0.8),
+#     "yaw": (-1.2, 1.2),
+# }
+
 VELOCITY_RANGE = {
-    "x": (-1.2, 1.2),
-    "y": (-0.8, 0.8),
-    "z": (-0.3, 0.3),
-    "roll": (-0.8, 0.8),
-    "pitch": (-0.8, 0.8),
-    "yaw": (-1.2, 1.2),
+    "x": (-0.0, 0.0),
+    "y": (-0.0, 0.0),
+    "z": (-0.0, 0.0),
+    "roll": (-0.0, 0.0),
+    "pitch": (-0.0, 0.0),
+    "yaw": (-0.0, 0.0),
 }
 
 
@@ -98,7 +107,7 @@ class CommandsCfg:
             # "pitch": (-0., 0.),
             # "yaw": (-0., 0.),
             "x": (-0.1, 0.1),
-            "z": (-0.0, 0.2),
+            "z": (-0.1, 0.12),
             "y": (-0.1, 0.1),
             "roll": (-0.1, 0.1),
             "pitch": (-0.1, 0.1),
@@ -373,40 +382,40 @@ class EventCfg:
         },
     )
 
-    add_joint_default_pos = EventTerm(
-        func=mdp.randomize_joint_default_pos,
-        mode="startup",
-        params={
-            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*"]),
-            "pos_distribution_params": (-0.01, 0.01),
-            "operation": "add",
-        },
-    )
+    # add_joint_default_pos = EventTerm(
+    #     func=mdp.randomize_joint_default_pos,
+    #     mode="startup",
+    #     params={
+    #         "asset_cfg": SceneEntityCfg("robot", joint_names=[".*"]),
+    #         "pos_distribution_params": (-0.01, 0.01),
+    #         "operation": "add",
+    #     },
+    # )
     
-    base_com = EventTerm(
-        func=mdp.randomize_rigid_body_com,
-        mode="startup",
-        params={
-            "asset_cfg": SceneEntityCfg("robot", body_names="torso_link"),
-            "com_range": {"x": (-0.02, 0.02), "y": (-0.015, 0.015), "z": (-0.01, 0.025)},
-        },
-    )
-    pelvis_com = EventTerm(
-        func=mdp.randomize_rigid_body_com,
-        mode="startup",
-        params={
-            "asset_cfg": SceneEntityCfg("robot", body_names="pelvis"),
-            "com_range": {"x": (-0.01, 0.01), "y": (-0.02, 0.02), "z": (0.01, 0.01)},
-        },
-    )
-    knee_link_com = EventTerm(
-        func=mdp.randomize_rigid_body_com,
-        mode="startup",
-        params={
-            "asset_cfg": SceneEntityCfg("robot", body_names=["left_knee_link", "right_knee_link"]),
-            "com_range": {"x": (-0.01, 0.01), "y": (-0.01, 0.01), "z": (-0.03, 0.03)},
-        },
-    )
+    # base_com = EventTerm(
+    #     func=mdp.randomize_rigid_body_com,
+    #     mode="startup",
+    #     params={
+    #         "asset_cfg": SceneEntityCfg("robot", body_names="torso_link"),
+    #         "com_range": {"x": (-0.02, 0.02), "y": (-0.015, 0.015), "z": (-0.01, 0.025)},
+    #     },
+    # )
+    # pelvis_com = EventTerm(
+    #     func=mdp.randomize_rigid_body_com,
+    #     mode="startup",
+    #     params={
+    #         "asset_cfg": SceneEntityCfg("robot", body_names="pelvis"),
+    #         "com_range": {"x": (-0.01, 0.01), "y": (-0.02, 0.02), "z": (0.01, 0.01)},
+    #     },
+    # )
+    # knee_link_com = EventTerm(
+    #     func=mdp.randomize_rigid_body_com,
+    #     mode="startup",
+    #     params={
+    #         "asset_cfg": SceneEntityCfg("robot", body_names=["left_knee_link", "right_knee_link"]),
+    #         "com_range": {"x": (-0.01, 0.01), "y": (-0.01, 0.01), "z": (-0.03, 0.03)},
+    #     },
+    # )
     # robot_scale_mass = EventTerm(
     #     func=mdp.randomize_rigid_body_mass,
     #     mode="startup",
@@ -416,17 +425,17 @@ class EventCfg:
     #         "operation": "scale",
     #     },
     # )
-    robot_joint_stiffness_and_damping = EventTerm(
-        func=mdp.randomize_actuator_gains,
-        mode="startup", # startup 和 reset 的训练结构没什么区别，反而 reset 会增加训练时间
-        params={
-            "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
-            "stiffness_distribution_params": (1/2.0, 2.0),
-            "damping_distribution_params": (1/2.0, 2.0),
-            "operation": "scale",
-            "distribution": "uniform",
-        },
-    )
+    # robot_joint_stiffness_and_damping = EventTerm(
+    #     func=mdp.randomize_actuator_gains,
+    #     mode="startup", # startup 和 reset 的训练结构没什么区别，反而 reset 会增加训练时间
+    #     params={
+    #         "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
+    #         "stiffness_distribution_params": (1/2.0, 2.0),
+    #         "damping_distribution_params": (1/2.0, 2.0),
+    #         "operation": "scale",
+    #         "distribution": "uniform",
+    #     },
+    # )
     # interval
     push_robot = EventTerm(
         func=mdp.push_by_setting_velocity,
@@ -530,7 +539,7 @@ class TerminationsCfg:
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
     ref_pos = DoneTerm(
         func=mdp.bad_ref_pos_z_only,
-        params={"command_name": "motion", "threshold": 0.375},
+        params={"command_name": "motion", "threshold": 0.25},
     )
     ref_ori = DoneTerm(
         func=mdp.bad_ref_ori,
@@ -544,7 +553,7 @@ class TerminationsCfg:
         func=mdp.bad_motion_body_pos_z_only,
         params={
             "command_name": "motion",
-            "threshold": 0.375,
+            "threshold": 0.25,
             "body_names": [
                 "left_ankle_roll_link",
                 "right_ankle_roll_link",
