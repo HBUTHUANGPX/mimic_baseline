@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from isaaclab.utils.math import matrix_from_quat
 
-from general_motion_tracker_whole_body_teleoperation.tasks.tracking_g1.mdp.commands import MotionCommand
+from tasks.tracking_g1.mdp.commands_2 import MotionCommand
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.assets import Articulation, RigidObject
 

@@ -4,7 +4,7 @@ from isaaclab.envs.mdp import *  # noqa: F401, F403
 
 from general_motion_tracker_whole_body_teleoperation.tasks.tracking_g1.mdp import *  # noqa: F401, F403
 
-from .commands import *  # noqa: F401, F403
+from .commands_2 import *  # noqa: F401, F403
 from .events import *  # noqa: F401, F403
 from .observations import *  # noqa: F401, F403
 from .rewards import *  # noqa: F401, F403
