@@ -155,7 +155,7 @@ G1_CYLINDER_CFG = ArticulationCfg(
     spawn=sim_utils.UrdfFileCfg(
         fix_base=False,
         replace_cylinders_with_capsules=True,
-        asset_path=ASSET_DIR + "/unitree_g1/g1_29dof_mode_15.urdf",        
+        asset_path=ASSET_DIR + "/unitree_g1/g1_29dof_mode_15.urdf",
         activate_contact_sensors=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=False,
@@ -207,7 +207,7 @@ for a in G1_CYLINDER_CFG.actuators.values():
         e = {n: e for n in names}
     if not isinstance(s, dict):
         s = {n: s for n in names}
-    
+
     for n in names:
         if n in e and n in s and s[n]:
             print(f"{n}: \n    el: {e[n]}\n    sf: {s[n]}")

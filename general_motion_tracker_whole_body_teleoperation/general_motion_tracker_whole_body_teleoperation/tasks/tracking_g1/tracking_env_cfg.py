@@ -200,7 +200,9 @@ class ObservationsCfg:
             self.enable_corruption = True
 
     @configclass
-    class ProprioceptionWithNoiseWOPrivilegeCfg(ObsGroup):  # 带噪声不含特权信息的本体感知观测组
+    class ProprioceptionWithNoiseWOPrivilegeCfg(
+        ObsGroup
+    ):  # 带噪声不含特权信息的本体感知观测组
         """Observations for proprioception group with noise."""
 
         base_ang_vel = ObsTerm(
@@ -209,9 +211,7 @@ class ObservationsCfg:
         joint_pos = ObsTerm(
             func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01)
         )
-        joint_vel = ObsTerm(
-            func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.5, n_max=0.5)
-        )
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.5, n_max=0.5))
 
         def __post_init__(self):
             self.enable_corruption = True
@@ -246,7 +246,7 @@ class ObservationsCfg:
         """Observations for command group with noise."""
 
         joint_pos_delta = ObsTerm(
-            func=mdp.joint_pos_delta, 
+            func=mdp.joint_pos_delta,
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.02, n_max=0.02),
         )
@@ -279,7 +279,7 @@ class ObservationsCfg:
         """Observations for command group with noise."""
 
         joint_pos_delta = ObsTerm(
-            func=mdp.joint_pos_delta, 
+            func=mdp.joint_pos_delta,
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.02, n_max=0.02),
         )
@@ -295,9 +295,9 @@ class ObservationsCfg:
     @configclass
     class CommandCfg(ObsGroup):  # 无噪声含有特权信息的指令观测组
         """Observations for command group with noise."""
+
         joint_pos_delta = ObsTerm(
-            func=mdp.joint_pos_delta, 
-            params={"command_name": "motion"}
+            func=mdp.joint_pos_delta, params={"command_name": "motion"}
         )
         motion_ref_pos_b = ObsTerm(
             func=mdp.motion_ref_pos_b,
@@ -324,8 +324,7 @@ class ObservationsCfg:
         """Observations for command group with noise."""
 
         joint_pos_delta = ObsTerm(
-            func=mdp.joint_pos_delta, 
-            params={"command_name": "motion"}
+            func=mdp.joint_pos_delta, params={"command_name": "motion"}
         )
         motion_ref_ori_b = ObsTerm(
             func=mdp.motion_ref_ori_b,
@@ -347,6 +346,7 @@ class ObservationsCfg:
     @configclass
     class LastActionCfg(ObsGroup):  # 不带噪声的上一个动作观测组
         """Observations for last action group."""
+
         actions = ObsTerm(func=mdp.last_action)
 
     # observation groups
@@ -362,7 +362,6 @@ class ObservationsCfg:
     command: CommandCfg = CommandCfg()
 
     last_action: LastActionCfg = LastActionCfg()
-
 
 
 @configclass
@@ -391,7 +390,7 @@ class EventCfg:
     #         "operation": "add",
     #     },
     # )
-    
+
     # base_com = EventTerm(
     #     func=mdp.randomize_rigid_body_com,
     #     mode="startup",
@@ -447,11 +446,12 @@ class EventCfg:
     # reset robot
     reset_robot = EventTerm(
         func=mdp.reset_robot_state_by_motioncommand,
-        mode = "reset",
+        mode="reset",
         params={
-            "command_name":"motion",
-        }
+            "command_name": "motion",
+        },
     )
+
 
 @configclass
 class RewardsCfg:

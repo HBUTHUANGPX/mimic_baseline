@@ -10,7 +10,10 @@ from isaaclab.managers import SceneEntityCfg
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedEnv
-from general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp.commands import MotionCommand
+from general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp.commands import (
+    MotionCommand,
+)
+
 
 def randomize_joint_default_pos(
     env: ManagerBasedEnv,
@@ -37,12 +40,19 @@ def randomize_joint_default_pos(
     if asset_cfg.joint_ids == slice(None):
         joint_ids = slice(None)  # for optimization purposes
     else:
-        joint_ids = torch.tensor(asset_cfg.joint_ids, dtype=torch.int, device=asset.device)
+        joint_ids = torch.tensor(
+            asset_cfg.joint_ids, dtype=torch.int, device=asset.device
+        )
 
     if pos_distribution_params is not None:
         pos = asset.data.default_joint_pos.to(asset.device).clone()
         pos = _randomize_prop_by_op(
-            pos, pos_distribution_params, env_ids, joint_ids, operation=operation, distribution=distribution
+            pos,
+            pos_distribution_params,
+            env_ids,
+            joint_ids,
+            operation=operation,
+            distribution=distribution,
         )[env_ids][:, joint_ids]
 
         if env_ids != slice(None) and joint_ids != slice(None):
@@ -81,7 +91,9 @@ def randomize_rigid_body_com(
     # sample random CoM values
     range_list = [com_range.get(key, (0.0, 0.0)) for key in ["x", "y", "z"]]
     ranges = torch.tensor(range_list, device="cpu")
-    rand_samples = math_utils.sample_uniform(ranges[:, 0], ranges[:, 1], (len(env_ids), 3), device="cpu").unsqueeze(1)
+    rand_samples = math_utils.sample_uniform(
+        ranges[:, 0], ranges[:, 1], (len(env_ids), 3), device="cpu"
+    ).unsqueeze(1)
 
     # get the current com of the bodies (num_assets, num_bodies)
     coms = asset.root_physx_view.get_coms().clone()
@@ -96,7 +108,7 @@ def randomize_rigid_body_com(
 def reset_robot_state_by_motioncommand(
     env: ManagerBasedEnv,
     env_ids: torch.Tensor,
-    command_name:str,
+    command_name: str,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ):
     """Reset the robot joints with offsets around the default position and velocity by the given ranges.
@@ -107,6 +119,5 @@ def reset_robot_state_by_motioncommand(
     # extract the used quantities (to enable type-hinting)
     asset: Articulation = env.scene[asset_cfg.name]
     command: MotionCommand = env.command_manager.get_term(command_name)
-    
-    command._resample_command(env_ids)
 
+    command._resample_command(env_ids)

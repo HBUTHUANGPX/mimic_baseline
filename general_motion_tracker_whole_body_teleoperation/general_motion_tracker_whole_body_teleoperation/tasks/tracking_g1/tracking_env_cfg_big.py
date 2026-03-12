@@ -211,7 +211,11 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names="torso_link"),
-            "com_range": {"x": (-0.065, 0.065), "y": (-0.065, 0.065), "z": (0.01, 0.05)},
+            "com_range": {
+                "x": (-0.065, 0.065),
+                "y": (-0.065, 0.065),
+                "z": (0.01, 0.05),
+            },
         },
     )
 
@@ -226,11 +230,12 @@ class EventCfg:
     # reset robot
     reset_robot = EventTerm(
         func=mdp.reset_robot_state_by_motioncommand,
-        mode = "reset",
+        mode="reset",
         params={
-            "command_name":"motion",
-        }
+            "command_name": "motion",
+        },
     )
+
 
 @configclass
 class RewardsCfg:

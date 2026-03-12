@@ -36,6 +36,7 @@ VELOCITY_RANGE = {
     "yaw": (-0.78, 0.78),
 }
 
+
 @configclass
 class MySceneCfg(InteractiveSceneCfg):
     """Configuration for the terrain scene with a legged robot."""
@@ -223,9 +224,7 @@ class ObservationsCfg:
         joint_pos = ObsTerm(
             func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.015, n_max=0.015)
         )
-        joint_vel = ObsTerm(
-            func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.8, n_max=0.8)
-        )
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.8, n_max=0.8))
 
         def __post_init__(self):
             self.enable_corruption = True
@@ -260,7 +259,7 @@ class ObservationsCfg:
         """Observations for command group with noise."""
 
         joint_pos_delta = ObsTerm(
-            func=mdp.joint_pos_delta, 
+            func=mdp.joint_pos_delta,
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.02, n_max=0.02),
         )
@@ -293,7 +292,7 @@ class ObservationsCfg:
         """Observations for command group with noise."""
 
         joint_pos_delta = ObsTerm(
-            func=mdp.joint_pos_delta, 
+            func=mdp.joint_pos_delta,
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.02, n_max=0.02),
         )
@@ -309,9 +308,9 @@ class ObservationsCfg:
     @configclass
     class CommandCfg(ObsGroup):  # 无噪声含有特权信息的指令观测组
         """Observations for command group with noise."""
+
         joint_pos_delta = ObsTerm(
-            func=mdp.joint_pos_delta, 
-            params={"command_name": "motion"}
+            func=mdp.joint_pos_delta, params={"command_name": "motion"}
         )
         motion_ref_pos_b = ObsTerm(
             func=mdp.motion_ref_pos_b,
@@ -338,8 +337,7 @@ class ObservationsCfg:
         """Observations for command group with noise."""
 
         joint_pos_delta = ObsTerm(
-            func=mdp.joint_pos_delta, 
-            params={"command_name": "motion"}
+            func=mdp.joint_pos_delta, params={"command_name": "motion"}
         )
         motion_ref_ori_b = ObsTerm(
             func=mdp.motion_ref_ori_b,
@@ -369,7 +367,7 @@ class ObservationsCfg:
         """Observations for last action group."""
 
         motion_id = ObsTerm(func=mdp.motion_id, params={"command_name": "motion"})
-    
+
     @configclass
     class MotionGroupCfg(ObsGroup):  # 不带噪声的上一个动作观测组
         """Observations for last action group."""
@@ -451,7 +449,9 @@ class EventCfg:
         func=mdp.randomize_rigid_body_com,
         mode="startup",
         params={
-            "asset_cfg": SceneEntityCfg("robot", body_names=["L_knee_link", "R_knee_link"]),
+            "asset_cfg": SceneEntityCfg(
+                "robot", body_names=["L_knee_link", "R_knee_link"]
+            ),
             "com_range": {"x": (-0.01, 0.01), "y": (-0.01, 0.01), "z": (-0.03, 0.03)},
         },
     )
@@ -466,11 +466,11 @@ class EventCfg:
     )
     robot_joint_stiffness_and_damping = EventTerm(
         func=mdp.randomize_actuator_gains,
-        mode="startup", # startup 和 reset 的训练结构没什么区别，反而 reset 会增加训练时间
+        mode="startup",  # startup 和 reset 的训练结构没什么区别，反而 reset 会增加训练时间
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
-            "stiffness_distribution_params": (1/3.0, 3.0),
-            "damping_distribution_params": (1/3.0, 3.0),
+            "stiffness_distribution_params": (1 / 3.0, 3.0),
+            "damping_distribution_params": (1 / 3.0, 3.0),
             "operation": "scale",
             "distribution": "uniform",
         },
@@ -482,7 +482,6 @@ class EventCfg:
         interval_range_s=(1.0, 3.0),
         params={"velocity_range": VELOCITY_RANGE},
     )
-
 
     # reset robot
     reset_robot = EventTerm(

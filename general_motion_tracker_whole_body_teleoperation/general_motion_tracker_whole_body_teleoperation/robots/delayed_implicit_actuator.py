@@ -27,11 +27,19 @@ class DelayedImplicitActuator(ImplicitActuator):
     def __init__(self, cfg: DelayedImplicitActuatorCfg, *args, **kwargs):
         super().__init__(cfg, *args, **kwargs)
         # instantiate the delay buffers
-        self.positions_delay_buffer = DelayBuffer(cfg.max_delay, self._num_envs, device=self._device)
-        self.velocities_delay_buffer = DelayBuffer(cfg.max_delay, self._num_envs, device=self._device)
-        self.efforts_delay_buffer = DelayBuffer(cfg.max_delay, self._num_envs, device=self._device)
+        self.positions_delay_buffer = DelayBuffer(
+            cfg.max_delay, self._num_envs, device=self._device
+        )
+        self.velocities_delay_buffer = DelayBuffer(
+            cfg.max_delay, self._num_envs, device=self._device
+        )
+        self.efforts_delay_buffer = DelayBuffer(
+            cfg.max_delay, self._num_envs, device=self._device
+        )
         # all of the envs
-        self._ALL_INDICES = torch.arange(self._num_envs, dtype=torch.long, device=self._device)
+        self._ALL_INDICES = torch.arange(
+            self._num_envs, dtype=torch.long, device=self._device
+        )
 
     def reset(self, env_ids: Sequence[int]):
         super().reset(env_ids)
@@ -58,12 +66,21 @@ class DelayedImplicitActuator(ImplicitActuator):
         self.efforts_delay_buffer.reset(env_ids)
 
     def compute(
-        self, control_action: ArticulationActions, joint_pos: torch.Tensor, joint_vel: torch.Tensor
+        self,
+        control_action: ArticulationActions,
+        joint_pos: torch.Tensor,
+        joint_vel: torch.Tensor,
     ) -> ArticulationActions:
         # apply delay based on the delay the model for all the setpoints
-        control_action.joint_positions = self.positions_delay_buffer.compute(control_action.joint_positions)
-        control_action.joint_velocities = self.velocities_delay_buffer.compute(control_action.joint_velocities)
-        control_action.joint_efforts = self.efforts_delay_buffer.compute(control_action.joint_efforts)
+        control_action.joint_positions = self.positions_delay_buffer.compute(
+            control_action.joint_positions
+        )
+        control_action.joint_velocities = self.velocities_delay_buffer.compute(
+            control_action.joint_velocities
+        )
+        control_action.joint_efforts = self.efforts_delay_buffer.compute(
+            control_action.joint_efforts
+        )
         # compte actuator model
         return super().compute(control_action, joint_pos, joint_vel)
 

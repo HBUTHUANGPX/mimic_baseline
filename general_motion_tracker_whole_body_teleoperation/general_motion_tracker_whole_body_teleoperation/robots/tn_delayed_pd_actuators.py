@@ -9,6 +9,7 @@ from isaaclab.utils.types import ArticulationActions
 
 pi = 3.141592653589793
 
+
 class TNDelayedPDActuator(IdealPDActuator):
     """with TN limits Delayed actuator class that implements a torque-speed curve for the actuators.
 
@@ -151,7 +152,9 @@ Y2──────────|
 """
 
 scale = 1.15
-@configclass # 废弃
+
+
+@configclass  # 废弃
 class EncosActuatorCfg_EC_A8112(TNDelayedActuatorCfg):
     X1 = 16.231562044  # 额定转速
     X2 = 16.441001554  # 峰值转速
@@ -161,8 +164,9 @@ class EncosActuatorCfg_EC_A8112(TNDelayedActuatorCfg):
     armature = 51181 * 1e-6
 
     Fs = 1.0  # Static friction coefficient """
-    Fd = 1/16  # Dynamic friction coefficient """
+    Fd = 1 / 16  # Dynamic friction coefficient """
     Va = 0.001  # Velocity at which the friction is fully activated
+
 
 @configclass
 class EncosActuatorCfg_EC_A8116(TNDelayedActuatorCfg):
@@ -174,11 +178,11 @@ class EncosActuatorCfg_EC_A8116(TNDelayedActuatorCfg):
     armature = 61370 * 1e-6
 
     Fs = 1.0  # Static friction coefficient """
-    Fd = 1/16  # Dynamic friction coefficient """
+    Fd = 1 / 16  # Dynamic friction coefficient """
     Va = 0.001  # Velocity at which the friction is fully activated
 
 
-@configclass # 废弃
+@configclass  # 废弃
 class EncosActuatorCfg_EC_A6408(TNDelayedActuatorCfg):
     X1 = 13.927727431  # 额定转速
     X2 = 15.603243513  # 峰值转速
@@ -188,21 +192,23 @@ class EncosActuatorCfg_EC_A6408(TNDelayedActuatorCfg):
     armature = 58070 * 1e-6
 
     Fs = 1.1  # Static friction coefficient """
-    Fd = 2.5/15  # Dynamic friction coefficient """
+    Fd = 2.5 / 15  # Dynamic friction coefficient """
     Va = 0.001  # Velocity at which the friction is fully activated
+
 
 @configclass
 class EncosActuatorCfg_EC_A6416(TNDelayedActuatorCfg):
     X1 = 100 * 2 * pi / 60  # 额定转速
     X2 = 120 * 2 * pi / 60  # 峰值转速
     Y1 = 40.0  # 额定扭矩
-    Y2 = 56.0 * scale # 峰值扭矩
+    Y2 = 56.0 * scale  # 峰值扭矩
 
     armature = 65814 * 1e-6
 
     Fs = 1.1  # Static friction coefficient """
-    Fd = 2.5/15  # Dynamic friction coefficient """
+    Fd = 2.5 / 15  # Dynamic friction coefficient """
     Va = 0.001  # Velocity at which the friction is fully activated
+
 
 @configclass
 class EncosActuatorCfg_EC_A10020_24(TNDelayedActuatorCfg):
@@ -214,23 +220,25 @@ class EncosActuatorCfg_EC_A10020_24(TNDelayedActuatorCfg):
     armature = 277376 * 1e-6
 
     Fs = 1.0  # Static friction coefficient """
-    Fd = 2.3/12  # Dynamic friction coefficient """
+    Fd = 2.3 / 12  # Dynamic friction coefficient """
     Va = 0.001  # Velocity at which the friction is fully activated
+
 
 @configclass
 class EncosActuatorCfg_EC_A10020_12(TNDelayedActuatorCfg):
     X1 = 120 * 2 * pi / 60  # 额定转速
     X2 = 140 * 2 * pi / 60  # 峰值转速
     Y1 = 54.0  # 额定扭矩
-    Y2 = 74.0 * scale # 峰值扭矩
+    Y2 = 74.0 * scale  # 峰值扭矩
 
     armature = 70017 * 1e-6
 
     Fs = 1.0  # Static friction coefficient """
-    Fd = 2.3/12  # Dynamic friction coefficient """
+    Fd = 2.3 / 12  # Dynamic friction coefficient """
     Va = 0.001  # Velocity at which the friction is fully activated
 
-@configclass # 废弃
+
+@configclass  # 废弃
 class EncosActuatorCfg_EC_A4310(TNDelayedActuatorCfg):
     X1 = 7.853981634  # 额定转速
     X2 = 9.320058206  # 峰值转速
@@ -240,10 +248,11 @@ class EncosActuatorCfg_EC_A4310(TNDelayedActuatorCfg):
     armature = 24222 * 1e-6
 
     Fs = 0.8  # Static friction coefficient """
-    Fd = 1.6/9  # Dynamic friction coefficient """
+    Fd = 1.6 / 9  # Dynamic friction coefficient """
     Va = 0.001  # Velocity at which the friction is fully activated
 
-@configclass # 废弃
+
+@configclass  # 废弃
 class EncosActuatorCfg_EC_A4315(TNDelayedActuatorCfg):
     X1 = 7.853981634  # 额定转速
     X2 = 9.320058206  # 峰值转速
@@ -253,7 +262,7 @@ class EncosActuatorCfg_EC_A4315(TNDelayedActuatorCfg):
     armature = 24222 * 1e-6
 
     Fs = 0.8  # Static friction coefficient """
-    Fd = 1.6/9  # Dynamic friction coefficient """
+    Fd = 1.6 / 9  # Dynamic friction coefficient """
     Va = 0.001  # Velocity at which the friction is fully activated
 
 
@@ -267,8 +276,9 @@ class Ti5ActuatorCfg_CRA_RI60_80(TNDelayedActuatorCfg):
     armature = 213 * 1e-7 * (51 ^ 2)
 
     Fs = 3.5  # Static friction coefficient """
-    Fd = 2.5/8  # Dynamic friction coefficient """
+    Fd = 2.5 / 8  # Dynamic friction coefficient """
     Va = 0.001  # Velocity at which the friction is fully activated
+
 
 @configclass
 class Ti5ActuatorCfg_CRA_RI50_70(TNDelayedActuatorCfg):
@@ -280,8 +290,9 @@ class Ti5ActuatorCfg_CRA_RI50_70(TNDelayedActuatorCfg):
     armature = 124 * 1e-7 * (51 ^ 2)
 
     Fs = 2.5  # Static friction coefficient """
-    Fd = 2.5/8  # Dynamic friction coefficient """
+    Fd = 2.5 / 8  # Dynamic friction coefficient """
     Va = 0.001  # Velocity at which the friction is fully activated
+
 
 @configclass
 class Ti5ActuatorCfg_CRA_RI40_52(TNDelayedActuatorCfg):
@@ -293,8 +304,9 @@ class Ti5ActuatorCfg_CRA_RI40_52(TNDelayedActuatorCfg):
     armature = 80 * 1e-7 * (51 ^ 2)
 
     Fs = 1.5  # Static friction coefficient """
-    Fd = 2.5/8  # Dynamic friction coefficient """
+    Fd = 2.5 / 8  # Dynamic friction coefficient """
     Va = 0.001  # Velocity at which the friction is fully activated
+
 
 @configclass
 class Ti5ActuatorCfg_CRA_RI30_40(TNDelayedActuatorCfg):
@@ -306,8 +318,9 @@ class Ti5ActuatorCfg_CRA_RI30_40(TNDelayedActuatorCfg):
     armature = 16 * 1e-7 * (51 ^ 2)
 
     Fs = 0.5  # Static friction coefficient """
-    Fd = 2.5/8  # Dynamic friction coefficient """
+    Fd = 2.5 / 8  # Dynamic friction coefficient """
     Va = 0.001  # Velocity at which the friction is fully activated
+
 
 @configclass
 class HTActuatorCfg_DMS_6015(TNDelayedActuatorCfg):

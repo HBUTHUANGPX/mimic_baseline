@@ -5,7 +5,9 @@ from typing import TYPE_CHECKING
 
 from isaaclab.utils.math import matrix_from_quat
 
-from general_motion_tracker_whole_body_teleoperation.tasks.tracking_g1.mdp.commands import MotionCommand
+from general_motion_tracker_whole_body_teleoperation.tasks.tracking_g1.mdp.commands import (
+    MotionCommand,
+)
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.assets import Articulation, RigidObject
 
@@ -20,13 +22,17 @@ from isaaclab.envs.utils.io_descriptors import (
     record_joint_vel_offsets,
     record_shape,
 )
+
+
 def motion_id(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
     return command.motion_id
 
+
 def motion_group(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
     return command.motion_group
+
 
 def robot_ref_ori_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
@@ -45,15 +51,18 @@ def robot_ref_ang_vel_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor
 
     return command.robot_ref_ang_vel_w[:, :3].view(env.num_envs, -1)
 
+
 def robot_ref_vx_vy_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
 
-    return command.robot_ref_lin_vel_w[:, 0:2].view(env.num_envs, -1) # tag
+    return command.robot_ref_lin_vel_w[:, 0:2].view(env.num_envs, -1)  # tag
+
 
 def robot_ref_wz_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
 
-    return command.robot_ref_ang_vel_w.view(env.num_envs, -1) # tag
+    return command.robot_ref_ang_vel_w.view(env.num_envs, -1)  # tag
+
 
 def robot_body_pos_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
@@ -73,6 +82,7 @@ def motion_ref_pos_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
 def motion_ref_ori_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
     return command._motion_ref_ori_b_mat[..., :2].reshape(env.num_envs, -1)
+
 
 def joint_pos_delta(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
 

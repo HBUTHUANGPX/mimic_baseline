@@ -201,7 +201,7 @@ class EventCfg:
             "operation": "add",
         },
     )
-    
+
     base_com = EventTerm(
         func=mdp.randomize_rigid_body_com,
         mode="startup",
@@ -222,7 +222,9 @@ class EventCfg:
         func=mdp.randomize_rigid_body_com,
         mode="startup",
         params={
-            "asset_cfg": SceneEntityCfg("robot", body_names=["L_knee_link", "R_knee_link"]),
+            "asset_cfg": SceneEntityCfg(
+                "robot", body_names=["L_knee_link", "R_knee_link"]
+            ),
             "com_range": {"x": (-0.01, 0.01), "y": (-0.01, 0.01), "z": (-0.03, 0.03)},
         },
     )
@@ -237,11 +239,11 @@ class EventCfg:
     )
     robot_joint_stiffness_and_damping = EventTerm(
         func=mdp.randomize_actuator_gains,
-        mode="startup", # startup 和 reset 的训练结构没什么区别，反而 reset 会增加训练时间
+        mode="startup",  # startup 和 reset 的训练结构没什么区别，反而 reset 会增加训练时间
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
-            "stiffness_distribution_params": (1/2.0, 2.0),
-            "damping_distribution_params": (1/2.0, 2.0),
+            "stiffness_distribution_params": (1 / 2.0, 2.0),
+            "damping_distribution_params": (1 / 2.0, 2.0),
             "operation": "scale",
             "distribution": "uniform",
         },
@@ -257,11 +259,12 @@ class EventCfg:
     # reset robot
     reset_robot = EventTerm(
         func=mdp.reset_robot_state_by_motioncommand,
-        mode = "reset",
+        mode="reset",
         params={
-            "command_name":"motion",
-        }
+            "command_name": "motion",
+        },
     )
+
 
 @configclass
 class RewardsCfg:

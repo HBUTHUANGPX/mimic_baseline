@@ -13,7 +13,9 @@ from isaaclab.envs import ManagerBasedRLEnv
 from isaaclab_rl.rsl_rl.exporter import _OnnxPolicyExporter, _TorchPolicyExporter
 
 # from whole_body_tracking.tasks.tracking.mdp import MotionCommand
-from general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp import MotionCommand
+from general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp import (
+    MotionCommand,
+)
 
 
 def export_motion_policy_as_onnx(
@@ -28,9 +30,13 @@ def export_motion_policy_as_onnx(
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
     if cvae_multi_teacher:
-        policy_exporter = _OnnxCVAEMTMotionPolicyExporter(env, actor_critic, normalizer, verbose)
+        policy_exporter = _OnnxCVAEMTMotionPolicyExporter(
+            env, actor_critic, normalizer, verbose
+        )
     else:
-        policy_exporter = _OnnxMotionPolicyExporter(env, actor_critic, normalizer, verbose)
+        policy_exporter = _OnnxMotionPolicyExporter(
+            env, actor_critic, normalizer, verbose
+        )
     policy_exporter.export(path, filename)
 
 
@@ -39,6 +45,7 @@ def export_policy_as_jit(
 ):
     policy_exporter = _TorchPolicyExporter(policy, normalizer)
     policy_exporter.export(path, filename)
+
 
 class _OnnxCVAEMTMotionPolicyExporter(torch.nn.Module):
     def __init__(
@@ -73,10 +80,10 @@ class _OnnxCVAEMTMotionPolicyExporter(torch.nn.Module):
 
     def forward(self, x, time_step):
         """CVAE 前向传播（用于 ONNX 导出，仅使用先验分布）。
-        
+
         Args:
             x: 输入观测（部署观测）。
-        
+
         Returns:
             动作均值。
         """
@@ -100,10 +107,12 @@ class _OnnxCVAEMTMotionPolicyExporter(torch.nn.Module):
             self.body_lin_vel_w[time_step_clamped],
             self.body_ang_vel_w[time_step_clamped],
         )
-    
+
     def export(self, path, filename):
         self.to("cpu")
-        obs = torch.zeros(1, self.prior_network[0].in_features)  # dummy 输入（学生观测维度）
+        obs = torch.zeros(
+            1, self.prior_network[0].in_features
+        )  # dummy 输入（学生观测维度）
         time_step = torch.zeros(1, 1)
         torch.onnx.export(
             self,
@@ -124,6 +133,7 @@ class _OnnxCVAEMTMotionPolicyExporter(torch.nn.Module):
             ],
             dynamic_axes={},
         )
+
 
 class _OnnxMotionPolicyExporter(_OnnxPolicyExporter):
     def __init__(

@@ -138,9 +138,8 @@ class ObservationsCfg:
         joint_pos = ObsTerm(
             func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01)
         )
-        joint_vel = ObsTerm(
-            func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.5, n_max=0.5)
-        )
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.5, n_max=0.5))
+
         def __post_init__(self):
             self.enable_corruption = True
 
@@ -198,6 +197,7 @@ class ObservationsCfg:
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.01, n_max=0.01),
         )
+
         def __post_init__(self):
             self.enable_corruption = True
 
@@ -280,8 +280,8 @@ class EventCfg:
         mode="startup",  # startup 和 reset 的训练结构没什么区别，反而 reset 会增加训练时间
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
-            "stiffness_distribution_params": (1/1.3, 1.3),
-            "damping_distribution_params": (1/1.3, 1.3),
+            "stiffness_distribution_params": (1 / 1.3, 1.3),
+            "damping_distribution_params": (1 / 1.3, 1.3),
             "operation": "scale",
             "distribution": "uniform",
         },
@@ -432,7 +432,7 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
 
     # Scene settings
     # scene: MySceneCfg = MySceneCfg(num_envs=128, env_spacing=2.5)
-    scene: MySceneCfg = MySceneCfg(num_envs=4096 *4, env_spacing=2.5)
+    scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
     # scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()

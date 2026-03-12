@@ -388,7 +388,7 @@ class MotionCommand(CommandTerm):
         return self._ref_quat_w
 
     @property
-    def ref_lin_vel_w(self) -> torch.Tensor: # tag 2.05ms
+    def ref_lin_vel_w(self) -> torch.Tensor:  # tag 2.05ms
         return self.motion.body_lin_vel_w[self.time_steps, self.motion_ref_body_index]
 
     @property
@@ -404,35 +404,35 @@ class MotionCommand(CommandTerm):
         return self._robot_joint_vel
 
     @property
-    def robot_body_pos_w(self) -> torch.Tensor: # tag 8.2ms
+    def robot_body_pos_w(self) -> torch.Tensor:  # tag 8.2ms
         return self._robot_body_pos_w
 
     @property
-    def robot_body_quat_w(self) -> torch.Tensor: # tag 10.66ms
+    def robot_body_quat_w(self) -> torch.Tensor:  # tag 10.66ms
         return self._robot_body_quat_w
 
     @property
-    def robot_body_lin_vel_w(self) -> torch.Tensor: # tag 10.2ms
+    def robot_body_lin_vel_w(self) -> torch.Tensor:  # tag 10.2ms
         return self._robot_body_lin_vel_w
 
     @property
-    def robot_body_ang_vel_w(self) -> torch.Tensor: # tag 10.5ms
+    def robot_body_ang_vel_w(self) -> torch.Tensor:  # tag 10.5ms
         return self._robot_body_ang_vel_w
 
     @property
-    def robot_ref_pos_w(self) -> torch.Tensor: # tag 14.5ms
+    def robot_ref_pos_w(self) -> torch.Tensor:  # tag 14.5ms
         return self._robot_ref_pos_w
 
     @property
-    def robot_ref_quat_w(self) -> torch.Tensor: # tag 20ms
+    def robot_ref_quat_w(self) -> torch.Tensor:  # tag 20ms
         return self._robot_ref_quat_w
 
     @property
-    def robot_ref_lin_vel_w(self) -> torch.Tensor: # tag 2.05ms
+    def robot_ref_lin_vel_w(self) -> torch.Tensor:  # tag 2.05ms
         return self._robot_ref_lin_vel_w
 
     @property
-    def robot_ref_ang_vel_w(self) -> torch.Tensor: # tag 2.05ms
+    def robot_ref_ang_vel_w(self) -> torch.Tensor:  # tag 2.05ms
         return self._robot_ref_ang_vel_w
 
     def _update_metrics(self):
@@ -495,7 +495,7 @@ class MotionCommand(CommandTerm):
         target_dist = self.motion.target_dist.squeeze(0)
         base_weights = target_dist / (current_dist + epsilon)
         weights = base_weights * self.motion_fail_weights
-        
+
         # 按动态平衡后的 probs 采样 motion id（每个 env 独立采样）
         motion_ids = torch.multinomial(
             weights, len(env_ids), replacement=True
@@ -573,7 +573,7 @@ class MotionCommand(CommandTerm):
             env_ids=env_ids,
         )
 
-    def _update_command(self): # 入口
+    def _update_command(self):  # 入口
         self.time_steps += 1
         env_ids = self._get_env_ids_to_resample()
         self._post_update_command()
@@ -585,10 +585,16 @@ class MotionCommand(CommandTerm):
         ts = torch.clamp(self.time_steps, 0, self.motion.time_step_total - 1)
         self._motion_body_pos_w_timestep = self.motion.body_pos_w[self.time_steps]
         self._motion_body_quat_w_timestep = self.motion.body_quat_w[self.time_steps]
-        self._motion_body_lin_vel_w_timestep = self.motion.body_lin_vel_w[self.time_steps]
-        self._motion_body_ang_vel_w_timestep = self.motion.body_ang_vel_w[self.time_steps]
+        self._motion_body_lin_vel_w_timestep = self.motion.body_lin_vel_w[
+            self.time_steps
+        ]
+        self._motion_body_ang_vel_w_timestep = self.motion.body_ang_vel_w[
+            self.time_steps
+        ]
 
-        self._body_pos_w = self._motion_body_pos_w_timestep + self._env.scene.env_origins[:, None, :]
+        self._body_pos_w = (
+            self._motion_body_pos_w_timestep + self._env.scene.env_origins[:, None, :]
+        )
         self._body_quat_w = self._motion_body_quat_w_timestep
         self._body_lin_vel_w = self._motion_body_lin_vel_w_timestep
         self._body_ang_vel_w = self._motion_body_ang_vel_w_timestep
@@ -655,7 +661,9 @@ class MotionCommand(CommandTerm):
         ref_pos_w_repeat = ref_pos_w[:, None, :].expand(-1, num_bodies, -1)
         ref_quat_w_repeat = ref_quat_w[:, None, :].expand(-1, num_bodies, -1)
         robot_ref_pos_w_repeat = robot_ref_pos_w[:, None, :].expand(-1, num_bodies, -1)
-        robot_ref_quat_w_repeat = robot_ref_quat_w[:, None, :].expand(-1, num_bodies, -1)
+        robot_ref_quat_w_repeat = robot_ref_quat_w[:, None, :].expand(
+            -1, num_bodies, -1
+        )
 
         delta_pos_w = ref_pos_w_repeat - robot_ref_pos_w_repeat
         delta_pos_w[..., :2] = 0.0
@@ -740,7 +748,9 @@ class MotionCommand(CommandTerm):
 
         # EMA update of motion-level failure counts
         alpha = float(self.cfg.fail_weight_momentum)
-        self.motion_fail_counts = alpha * self.motion_fail_counts + (1.0 - alpha) * counts
+        self.motion_fail_counts = (
+            alpha * self.motion_fail_counts + (1.0 - alpha) * counts
+        )
 
         # normalize to weights (avoid zero)
         eps = 1e-6

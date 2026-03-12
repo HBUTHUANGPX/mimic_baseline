@@ -21,19 +21,19 @@ from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 
-import general_motion_tracker_whole_body_teleoperation.tasks.tracking_g1.mdp as mdp
+import general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp as mdp
 
 ##
 # Scene definition
 ##
 
 VELOCITY_RANGE = {
-    "x": (-0.8, 0.8),
-    "y": (-0.5, 0.5),
-    "z": (-0.2, 0.2),
-    "roll": (-0.52, 0.52),
-    "pitch": (-0.52, 0.52),
-    "yaw": (-0.78, 0.78),
+    "x": (0.0, 0.0),
+    "y": (0.0, 0.0),
+    "z": (0.0, 0.0),
+    "roll": (0.0, 0.0),
+    "pitch": (0.0, 0.0),
+    "yaw": (0.0, 0.0),
 }
 
 
@@ -126,11 +126,17 @@ class ObservationsCfg:
     """Observation specifications for the MDP."""
 
     @configclass
-    class ProprioceptionWithNoiseCfg(ObsGroup):  # 带噪声的本体感知观测组
-        """Observations for proprioception group with noise."""
+    class PolicyCfg(ObsGroup):
+        """Observations for policy group."""
 
-        base_lin_vel = ObsTerm(
-            func=mdp.base_lin_vel, noise=Unoise(n_min=-0.25, n_max=0.25)
+        # observation terms (order preserved)
+        command = ObsTerm(
+            func=mdp.generated_commands, params={"command_name": "motion"}
+        )
+        motion_ref_ori_b = ObsTerm(
+            func=mdp.motion_ref_ori_b,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.05, n_max=0.05),
         )
         base_ang_vel = ObsTerm(
             func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2)
@@ -139,25 +145,16 @@ class ObservationsCfg:
             func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01)
         )
         joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-0.5, n_max=0.5))
+        actions = ObsTerm(func=mdp.last_action)
 
         def __post_init__(self):
             self.enable_corruption = True
+            self.concatenate_terms = True
 
     @configclass
-    class ProprioceptionCfg(ObsGroup):  # 不带噪声的本体感知观测组
-        """Observations for proprioception group without noise."""
-
-        base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
-        base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
-        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
-        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
-
-    @configclass
-    class CommandCfg(ObsGroup):  # 不带噪声的指令观测组
-        """Observations for command group."""
-
-        joint_pos_delta = ObsTerm(
-            func=mdp.joint_pos_delta, params={"command_name": "motion"}
+    class PrivilegedCfg(ObsGroup):
+        command = ObsTerm(
+            func=mdp.generated_commands, params={"command_name": "motion"}
         )
         motion_ref_pos_b = ObsTerm(
             func=mdp.motion_ref_pos_b, params={"command_name": "motion"}
@@ -167,52 +164,15 @@ class ObservationsCfg:
         )
         body_pos = ObsTerm(func=mdp.robot_body_pos_b, params={"command_name": "motion"})
         body_ori = ObsTerm(func=mdp.robot_body_ori_b, params={"command_name": "motion"})
-
-    @configclass
-    class CommandWithNoiseCfg(ObsGroup):  # 带噪声的指令观测组
-        """Observations for command group with noise."""
-
-        joint_pos_delta = ObsTerm(
-            func=mdp.joint_pos_delta,
-            params={"command_name": "motion"},
-            noise=Unoise(n_min=-0.02, n_max=0.02),
-        )
-        motion_ref_pos_b = ObsTerm(
-            func=mdp.motion_ref_pos_b,
-            params={"command_name": "motion"},
-            noise=Unoise(n_min=-0.02, n_max=0.02),
-        )
-        motion_ref_ori_b = ObsTerm(
-            func=mdp.motion_ref_ori_b,
-            params={"command_name": "motion"},
-            noise=Unoise(n_min=-0.05, n_max=0.05),
-        )
-        body_pos = ObsTerm(
-            func=mdp.robot_body_pos_b,
-            params={"command_name": "motion"},
-            noise=Unoise(n_min=-0.005, n_max=0.005),
-        )
-        body_ori = ObsTerm(
-            func=mdp.robot_body_ori_b,
-            params={"command_name": "motion"},
-            noise=Unoise(n_min=-0.01, n_max=0.01),
-        )
-
-        def __post_init__(self):
-            self.enable_corruption = True
-
-    @configclass
-    class LastActionCfg(ObsGroup):  # 不带噪声的上一个动作观测组
-        """Observations for last action group."""
-
+        base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
+        base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
         actions = ObsTerm(func=mdp.last_action)
 
     # observation groups
-    last_action: LastActionCfg = LastActionCfg()
-    proprioception_with_noise: ProprioceptionWithNoiseCfg = ProprioceptionWithNoiseCfg()
-    proprioception: ProprioceptionCfg = ProprioceptionCfg()
-    command: CommandCfg = CommandCfg()
-    command_with_noise: CommandWithNoiseCfg = CommandWithNoiseCfg()
+    policy: PolicyCfg = PolicyCfg()
+    critic: PrivilegedCfg = PrivilegedCfg()
 
 
 @configclass
@@ -231,6 +191,7 @@ class EventCfg:
             "num_buckets": 64,
         },
     )
+
     add_joint_default_pos = EventTerm(
         func=mdp.randomize_joint_default_pos,
         mode="startup",
@@ -240,6 +201,7 @@ class EventCfg:
             "operation": "add",
         },
     )
+
     base_com = EventTerm(
         func=mdp.randomize_rigid_body_com,
         mode="startup",
@@ -253,7 +215,7 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names="pelvis_link"),
-            "com_range": {"x": (-0.01, 0.01), "y": (-0.02, 0.02), "z": (-0.01, 0.01)},
+            "com_range": {"x": (-0.01, 0.01), "y": (-0.02, 0.02), "z": (0.01, 0.01)},
         },
     )
     knee_link_com = EventTerm(
@@ -280,8 +242,8 @@ class EventCfg:
         mode="startup",  # startup 和 reset 的训练结构没什么区别，反而 reset 会增加训练时间
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
-            "stiffness_distribution_params": (1 / 1.3, 1.3),
-            "damping_distribution_params": (1 / 1.3, 1.3),
+            "stiffness_distribution_params": (1 / 2.0, 2.0),
+            "damping_distribution_params": (1 / 2.0, 2.0),
             "operation": "scale",
             "distribution": "uniform",
         },
@@ -293,6 +255,7 @@ class EventCfg:
         interval_range_s=(1.0, 3.0),
         params={"velocity_range": VELOCITY_RANGE},
     )
+
     # reset robot
     reset_robot = EventTerm(
         func=mdp.reset_robot_state_by_motioncommand,
@@ -342,7 +305,7 @@ class RewardsCfg:
         weight=1.0,
         params={"command_name": "motion", "std": 3.14},
     )
-    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-1e-1)
+    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.1)
     joint_limit = RewTerm(
         func=mdp.joint_pos_limits,
         weight=-10.0,
@@ -431,9 +394,8 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the locomotion velocity-tracking environment."""
 
     # Scene settings
-    # scene: MySceneCfg = MySceneCfg(num_envs=128, env_spacing=2.5)
-    scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
-    # scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
+    scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
+    # scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
@@ -450,11 +412,11 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
         # self.decimation = 4
         # self.sim.dt = 0.005
 
-        # self.decimation = 10
-        # self.sim.dt = 0.002
-
         self.decimation = 1
         self.sim.dt = 0.02
+
+        # self.decimation = 20
+        # self.sim.dt = 0.001
 
         self.episode_length_s = 10.0
         # simulation settings
