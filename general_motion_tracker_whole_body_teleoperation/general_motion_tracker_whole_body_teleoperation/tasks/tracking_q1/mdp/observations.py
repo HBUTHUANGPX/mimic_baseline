@@ -88,3 +88,8 @@ def joint_pos_delta(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
 
     command: MotionCommand = env.command_manager.get_term(command_name)
     return command.joint_pos - command.robot_joint_pos
+
+def robot_joint_pos(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    return command.joint_pos

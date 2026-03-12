@@ -46,6 +46,48 @@ class Q1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         clip_param=0.2,
     )
 
+@configclass  # 有特权信息WO DR 的训练
+class Q1FlatTeacherPPORunnerCfg(RslRlOnPolicyRunnerCfg):
+    num_steps_per_env = 24
+    max_iterations = 90001
+    save_interval = 500
+    obs_groups = (
+        {
+            "policy": [
+                "command",
+                "proprioception",
+                "last_action",
+                ],  
+            "critic": [
+                "command",
+                "proprioception",
+                "last_action",
+                ], 
+        },
+    )
+    experiment_name = "q1_flat_teacher"
+    policy = RslRlPpoActorCriticCfg(
+        init_noise_std=0.8,
+        actor_obs_normalization=True,
+        critic_obs_normalization=True,
+        actor_hidden_dims=[512, 256, 128],
+        critic_hidden_dims=[512, 256, 128],
+        activation="elu",
+    )
+    algorithm = RslRlPpoAlgorithmCfg(
+        num_learning_epochs=5,
+        num_mini_batches=4,
+        learning_rate=1.0e-3,
+        schedule="adaptive",
+        gamma=0.99,
+        lam=0.95,
+        entropy_coef=0.005,
+        desired_kl=0.01,
+        max_grad_norm=1.0,
+        value_loss_coef=1.0,
+        use_clipped_value_loss=True,
+        clip_param=0.2,
+    )
 
 @configclass  # 有特权信息的训练
 class PureQ1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
@@ -303,3 +345,5 @@ class Q1FlatFSQCVAEDistillationStudentMultiTeacherCfg(RslRlDistillationRunnerCfg
         use_clipped_value_loss=True,
         clip_param=0.2,
     )
+
+
