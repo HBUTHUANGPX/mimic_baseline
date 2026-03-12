@@ -30,13 +30,13 @@ ImplicitActuator_actuators = {
             ".*_knee_joint",
         ],
         effort_limit_sim={
-            ".*_hip_roll_joint": scale * 74.0, # 保守稳定运行 65.0，临界堵转 74.0 峰值 150.0
+            ".*_hip_roll_joint": scale *  138.0,# 保守稳定运行 130.0，临界堵转 138.0  峰值 330.0
             ".*_hip_yaw_joint": scale * 56.0,# 保守稳定运行 40.0，临界堵转 56.0  峰值 125.0
             ".*_hip_pitch_joint": scale *  138.0,# 保守稳定运行 130.0，临界堵转 138.0  峰值 330.0
             ".*_knee_joint": scale *  138.0,# 保守稳定运行 130.0，临界堵转 138.0  峰值 330.0
         },
         velocity_limit_sim={
-            ".*_hip_roll_joint": 140*2*torch.pi/60,
+            ".*_hip_roll_joint": 123*2*torch.pi/60,
             ".*_hip_yaw_joint": 120*2*torch.pi/60,
             ".*_hip_pitch_joint": 123*2*torch.pi/60,
             ".*_knee_joint": 123*2*torch.pi/60,
@@ -69,8 +69,8 @@ ImplicitActuator_actuators = {
         armature=61370 * 1e-6,
     ),
     "torso": ImplicitActuatorCfg(
-        effort_limit_sim=42,
-        velocity_limit_sim=8.58701992,
+        effort_limit_sim=scale *  138.0,# 保守稳定运行 130.0，临界堵转 138.0  峰值 330.0
+        velocity_limit_sim=123*2*torch.pi/60,
         joint_names_expr=["pelvis_joint"],
         stiffness=280,
         damping=4.5,
@@ -418,7 +418,7 @@ Q1_CYLINDER_CFG = ArticulationCfg(
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(0.0, 0.0, 0.995),
+        pos=(0.0, 0.0, 0.9968),
         joint_pos={
             ".*_hip_pitch_joint": 0,
             ".*_knee_joint": 0,

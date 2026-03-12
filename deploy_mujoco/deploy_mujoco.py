@@ -100,7 +100,7 @@ class cfg:
     policy_path = (
         current_path
         + "/"
-        + "deploy_mujoco/deploy_policy/Q1/2026-02-18_01-34-54_Q1_Diss_13500"
+        + "deploy_mujoco/deploy_policy/Q1/2026-03-12_14-51-15_Q1_slowly_walk"
         + "/policy.onnx"
     )
     asset_path = "/deploy_mujoco/assets/Q1"
@@ -111,7 +111,7 @@ class cfg:
         + "/deploy_mujoco/artifacts/Q1/"
         # + "xsens_bvh/251020_21/251021_05_xingyiquan_120Hz.npz"
         # + "xsens_bvh/251020_21/251021_04_boxing_120Hz.npz"
-        + "100STYLE/Aeroplane/Aeroplane_FR.npz"
+        + "xsens_bvh/251021/251021_01_slowly_walk_120Hz.npz"
     )
     only_leg_flag = False  # True, False
     with_wrist_flag = True  # True, False
@@ -120,11 +120,11 @@ class cfg:
     # stiffness damping and joint maximum torqueparam #
     ###################################################
     leg_P_gains = [350, 50, 450, 300, 70.0, 70.0] * 2
-    leg_tq_max = [85.1, 64.4, 158.7, 158.7, 75.9, 75.9] * (2)
+    leg_tq_max = [158.7, 64.4, 158.7, 158.7, 75.9, 75.9] * (2)
     leg_D_gains = [6.0, 2.5, 12.0, 6.0, 1.5, 1.5] * 2
 
     pelvis_P_gains = [280.0]
-    pelvis_tq_max = [42.0]
+    pelvis_tq_max = [158.7]
     pelvis_D_gains = [4.5]
 
     arm_P_gains = [70.0, 70.0, 70.0, 70.0, 20.0, 20.0, 20.0] * (2)
@@ -169,7 +169,7 @@ class cfg:
     # obs param #
     #############
     frame_stack = 1
-    num_single_obs = 1557 #1557 154
+    num_single_obs = 154 #1557 154
 
     ####################
     # motion play mode #
@@ -225,12 +225,12 @@ class ObsCfg:
         motion_joint_pos_command = TermCfg()
         motion_joint_vel_command = TermCfg()
         motion_ref_ori_b = TermCfg()
-        base_ang_vel = TermCfg(history_length=24)
-        joint_pos = TermCfg(history_length=24)
-        joint_vel = TermCfg(history_length=24)
-        # base_ang_vel = TermCfg()
-        # joint_pos = TermCfg()
-        # joint_vel = TermCfg()
+        # base_ang_vel = TermCfg(history_length=24)
+        # joint_pos = TermCfg(history_length=24)
+        # joint_vel = TermCfg(history_length=24)
+        base_ang_vel = TermCfg()
+        joint_pos = TermCfg()
+        joint_vel = TermCfg()
         actions = TermCfg()
 
     policy = PolicyCfg()
