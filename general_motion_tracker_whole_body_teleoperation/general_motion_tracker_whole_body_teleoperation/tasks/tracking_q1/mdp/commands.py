@@ -502,12 +502,6 @@ class MotionCommand(CommandTerm):
         self.metrics["sampling_top1_prob"][:] = pmax
         self.metrics["sampling_top1_bin"][:] = imax.float() / self.bin_count
 
-        self.bin_failed_count = (
-            self.cfg.adaptive_alpha * self._current_bin_failed
-            + (1 - self.cfg.adaptive_alpha) * self.bin_failed_count
-        )
-        self._current_bin_failed.zero_()
-
     def _resample_reset_robot_state(self, env_ids: Sequence[int]):
         root_pos = self.body_pos_w[:, 0].clone()
         root_ori = self.body_quat_w[:, 0].clone()
@@ -579,6 +573,11 @@ class MotionCommand(CommandTerm):
         # 根据动态平衡策略为需要重采样的 env 重新分配 time_steps
         self._resample_command(env_ids)
         self._update_state_data()
+        self.bin_failed_count = (
+            self.cfg.adaptive_alpha * self._current_bin_failed
+            + (1 - self.cfg.adaptive_alpha) * self.bin_failed_count
+        )
+        self._current_bin_failed.zero_()
 
     def _update_motion_data(self):
         ts = torch.clamp(self.time_steps, 0, self.motion.time_step_total - 1)
