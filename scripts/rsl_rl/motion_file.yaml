@@ -69,8 +69,13 @@ motion_group:
   #   folder_name: ["artifacts/Q1/xsens_bvh/251203"]
   #   wo_file_name: []
   #   wo_folder_name: []
-  xsens_bvh_251203:
-    file_name: ["artifacts/Q1/xsens_bvh/251021/251021_01_slowly_walk_120Hz.npz"]
-    folder_name: []
+  # xsens_bvh_251203:
+  #   file_name: ["artifacts/Q1/xsens_bvh/251021/251021_01_slowly_walk_120Hz.npz"]
+  #   folder_name: []
+  #   wo_file_name: []
+  #   wo_folder_name: []
+  Q1_all:
+    file_name: []
+    folder_name: ["artifacts/Q1"]
     wo_file_name: []
     wo_folder_name: []
