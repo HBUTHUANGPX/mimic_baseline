@@ -93,7 +93,7 @@ class CommandsCfg:
         pose_range={
             "x": (-0.0, 0.0),
             "y": (-0.0, 0.0),
-            "z": (0.2, 0.201),
+            "z": (0.1, 0.101),
             "roll": (-0., 0.),
             "pitch": (-0., 0.),
             "yaw": (-0., 0.),
@@ -461,7 +461,7 @@ class TerminationsCfg:
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
     ref_pos = DoneTerm(
         func=mdp.bad_ref_pos_z_only,
-        params={"command_name": "motion", "threshold": 0.25},
+        params={"command_name": "motion", "threshold": 0.35},
     )
     ref_ori = DoneTerm(
         func=mdp.bad_ref_ori,
@@ -475,7 +475,7 @@ class TerminationsCfg:
         func=mdp.bad_motion_body_pos_z_only,
         params={
             "command_name": "motion",
-            "threshold": 0.25,
+            "threshold": 0.35,
             "body_names": [
                 "L_ankle_roll_link",
                 "R_ankle_roll_link",
