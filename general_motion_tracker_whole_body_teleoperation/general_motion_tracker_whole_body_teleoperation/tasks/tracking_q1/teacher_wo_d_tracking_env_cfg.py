@@ -335,6 +335,37 @@ class ObservationsCfg:
         def __post_init__(self):
             self.enable_corruption = True
 
+
+    @configclass
+    class CommandWindowCfg(ObsGroup):  # 无噪 特权 cmd
+        """Observations for command group with noise."""
+
+        joint_pos_delta = ObsTerm(
+            func=mdp.joint_pos_delta_window, params={"command_name": "motion"}
+        )
+        target_joint_pos = ObsTerm(
+            func=mdp.motion_joint_pos_window, params={"command_name": "motion"},
+        )
+        motion_ref_pos_b = ObsTerm(
+            func=mdp.motion_ref_pos_b_window,
+            params={"command_name": "motion"},
+        )
+        motion_ref_ori_b = ObsTerm(
+            func=mdp.motion_ref_ori_b_window,
+            params={"command_name": "motion"},
+        )
+        body_pos = ObsTerm(
+            func=mdp.motion_body_pos_b_window,
+            params={"command_name": "motion"},
+        )
+        body_ori = ObsTerm(
+            func=mdp.motion_body_ori_b_window,
+            params={"command_name": "motion"},
+        )
+
+        def __post_init__(self):
+            self.enable_corruption = True
+
     @configclass
     class LastActionCfg(ObsGroup):  # 不带噪声的上一个动作观测组
         """Observations for last action group."""
@@ -356,7 +387,8 @@ class ObservationsCfg:
     # observation groups
 
     proprioception: ProprioceptionCfg = ProprioceptionCfg() # 无噪 特权 本体
-    command: CommandCfg = CommandCfg()  # 无噪 特权 cmd
+    # command: CommandCfg = CommandCfg()  # 无噪 特权 cmd
+    command: CommandWindowCfg = CommandWindowCfg()  # 无噪 特权 cmd
     last_action: LastActionCfg = LastActionCfg()
 
     motion_id: MotionIdCfg = MotionIdCfg()
@@ -504,8 +536,9 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the locomotion velocity-tracking environment."""
 
     # Scene settings
-    # scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
-    scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
+    # scene: MySceneCfg = MySceneCfg(num_envs=128, env_spacing=2.5)
+    scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
+    # scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
