@@ -211,7 +211,7 @@ class ObservationsCfg:
 
         def __post_init__(self):
             self.enable_corruption = True
-            self.history_length = 24
+            # self.history_length = 24
 
     @configclass
     class ProprioceptionWOPrivilegeCfg(ObsGroup):  # 无噪 无特权 本体
@@ -387,8 +387,8 @@ class ObservationsCfg:
     # observation groups
 
     proprioception: ProprioceptionCfg = ProprioceptionCfg() # 无噪 特权 本体
-    # command: CommandCfg = CommandCfg()  # 无噪 特权 cmd
-    command: CommandWindowCfg = CommandWindowCfg()  # 无噪 特权 cmd
+    command: CommandCfg = CommandCfg()  # 无噪 特权 cmd
+    # command: CommandWindowCfg = CommandWindowCfg()  # 无噪 特权 cmd
     last_action: LastActionCfg = LastActionCfg()
 
     motion_id: MotionIdCfg = MotionIdCfg()

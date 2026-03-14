@@ -628,7 +628,7 @@ class MotionCommand(CommandTerm):
         if len(env_ids) == 0:
             return
         self._resample_adaptive_sampling(env_ids)
-        self._update_motion_data()
+        
         self._resample_reset_robot_state(env_ids)
 
     def _resample_adaptive_sampling(self, env_ids: Sequence[int]):
@@ -748,6 +748,7 @@ class MotionCommand(CommandTerm):
         env_ids = self._get_env_ids_to_resample()
         self._post_update_command()
         self._resample_command(env_ids)
+        self._update_motion_data()
         self._update_state_data()
         self.center_failed_count = (
             self.cfg.adaptive_alpha * self._current_center_failed
@@ -1077,8 +1078,8 @@ class MotionCommandCfg(CommandTermCfg):
     adaptive_lambda: float = 0.8
     adaptive_uniform_ratio: float = 0.1
     adaptive_alpha: float = 0.001
-    history_frames: int = 2
-    future_frames: int = 8
+    history_frames: int = 0
+    future_frames: int = 0
     profile_properties: bool = True
 
     ref_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(
