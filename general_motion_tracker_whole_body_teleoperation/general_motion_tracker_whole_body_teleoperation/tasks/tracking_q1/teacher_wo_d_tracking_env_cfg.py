@@ -211,6 +211,7 @@ class ObservationsCfg:
 
         def __post_init__(self):
             self.enable_corruption = True
+            self.history_length = 24
 
     @configclass
     class ProprioceptionWOPrivilegeCfg(ObsGroup):  # 无噪 无特权 本体
