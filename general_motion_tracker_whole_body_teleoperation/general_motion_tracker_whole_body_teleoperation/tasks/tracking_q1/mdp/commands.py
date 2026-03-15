@@ -5,11 +5,12 @@ from __future__ import annotations
 This version supports the following staged features:
 
 1. Multiple trajectories are concatenated into one global timeline.
-2. Each environment tracks a single target frame, not a temporal window.
+2. Each environment tracks a center frame together with a temporal window
+   `[t - n, ..., t, ..., t + m]`.
 3. Resampling is guided by a failure-aware adaptive distribution over global
-   time bins.
-4. When stepping would cross into the next trajectory or exceed the dataset
-   boundary, the environment is resampled from that adaptive distribution.
+   time bins, but only valid center frames can be sampled.
+4. Single-frame outputs are derived directly from the center of the temporal
+   window instead of being computed independently.
 
 The goal of this rewrite is to recover a small, reliable baseline before adding
 temporal buffers in later iterations.
@@ -106,6 +107,8 @@ class MotionLoader:
         self,
         motion_file_group: dict[str, list[str] | str],
         body_indexes: Sequence[int],
+        history_frames: int,
+        future_frames: int,
         device: str = "cpu",
     ) -> None:
         """Initialize the motion loader.
@@ -114,6 +117,8 @@ class MotionLoader:
             motion_file_group: Mapping from semantic group name to motion files.
             body_indexes: Body indices that should be retained from the raw
                 motion files.
+            history_frames: Number of historical frames in the temporal window.
+            future_frames: Number of future frames in the temporal window.
             device: Torch device on which tensors will be stored.
         """
         self.group_names: list[str] = []
@@ -122,6 +127,9 @@ class MotionLoader:
         self.num_motions = 0
         self.fps = None
         self._body_indexes = body_indexes
+        self.history_frames = history_frames
+        self.future_frames = future_frames
+        self.window_size = history_frames + future_frames + 1
 
         joint_pos_list: list[torch.Tensor] = []
         joint_vel_list: list[torch.Tensor] = []
@@ -219,6 +227,19 @@ class MotionLoader:
         self.time_step_total = self.joint_pos.shape[0]
         self.motion_indices = self._build_motion_indices(device)
         self.new_data_flag = self._build_new_data_flag(device)
+        self.window_offsets = torch.arange(
+            -self.history_frames,
+            self.future_frames + 1,
+            dtype=torch.long,
+            device=device,
+        )
+        self.valid_center_mask = self._build_valid_center_mask(device)
+        self.valid_center_indices = torch.nonzero(
+            self.valid_center_mask, as_tuple=False
+        ).squeeze(-1)
+        assert (
+            self.valid_center_indices.numel() > 0
+        ), "No valid center frames found for the configured window size."
 
     def _normalize_paths(self, paths: list[str] | str) -> list[str]:
         """Convert a path input to a normalized list."""
@@ -263,16 +284,42 @@ class MotionLoader:
             cumulative_length += length
         return new_data_flag
 
+    def _build_valid_center_mask(self, device: str) -> torch.Tensor:
+        """Mark frame indices that can serve as valid window centers.
+
+        A frame is valid when the full temporal window `[t - n, ..., t + m]`
+        stays inside the same trajectory.
+
+        Args:
+            device: Device used for the output tensor.
+
+        Returns:
+            Boolean tensor over the concatenated global timeline.
+        """
+        valid_center_mask = torch.zeros(
+            self.time_step_total, dtype=torch.bool, device=device
+        )
+        for motion_id in range(self.num_motions):
+            start, end = self.motion_indices[motion_id]
+            valid_start = start + self.history_frames
+            valid_end = end - self.future_frames
+            if valid_start < valid_end:
+                valid_center_mask[valid_start:valid_end] = True
+        return valid_center_mask
+
 
 class MotionCommand(CommandTerm):
-    """Reference motion command for multi-trajectory single-frame tracking.
+    """Reference motion command for multi-trajectory temporal-window tracking.
 
-    The current implementation keeps the command in a deliberately simple form:
+    The current implementation keeps the command centered around a single
+    center-frame index per environment:
 
-    - one environment corresponds to one active target frame;
+    - one environment corresponds to one active center frame;
     - all trajectories are sampled from a shared global timeline;
-    - resampling uses an adaptive distribution that increases probability mass
-      around frames associated with failed episodes.
+    - resampling uses an adaptive bin distribution but only valid center frames
+      can be chosen;
+    - the temporal buffer `[t - n, ..., t, ..., t + m]` is the primary cached
+      representation, and single-frame outputs are derived from its center.
 
     The class still exposes the single-frame properties that existing
     observations, rewards, terminations, and events depend on.
@@ -301,6 +348,7 @@ class MotionCommand(CommandTerm):
         self._initialize_debug_caches()
         self._initialize_observation_caches()
         self._initialize_metrics()
+        self._initialize_sampling_metadata()
 
         # Sample an initial frame for every environment before the first step.
         # This path must not touch runtime managers such as the termination
@@ -318,7 +366,13 @@ class MotionCommand(CommandTerm):
         Args:
             motion_file: Motion file mapping grouped by semantic source.
         """
-        self.motion = MotionLoader(motion_file, self.body_indexes, device=self.device)
+        self.motion = MotionLoader(
+            motion_file,
+            self.body_indexes,
+            history_frames=self.cfg.history_frames,
+            future_frames=self.cfg.future_frames,
+            device=self.device,
+        )
         self._motion_ends = self.motion.motion_indices[:, 1].contiguous()
         self.time_steps = torch.zeros(
             self.num_envs, dtype=torch.long, device=self.device
@@ -329,7 +383,16 @@ class MotionCommand(CommandTerm):
 
     def _initialize_debug_caches(self) -> None:
         """Initialize caches related to visualization and optional extensions."""
-        # Window-based observations are intentionally unsupported in stage one.
+        self.center_frame_index = self.cfg.history_frames
+        self.window_size = self.motion.window_size
+        self._window_time_steps = None
+        self._motion_joint_pos_window = None
+        self._motion_joint_vel_window = None
+        self._motion_body_pos_w_window = None
+        self._motion_body_quat_w_window = None
+        self._motion_body_lin_vel_w_window = None
+        self._motion_body_ang_vel_w_window = None
+        self._body_pos_w_window = None
         self._motion_ref_pos_b_window = None
         self._motion_ref_ori_b_mat_window = None
         self._motion_body_pos_b_window = None
@@ -360,6 +423,10 @@ class MotionCommand(CommandTerm):
         self._body_quat_w = None
         self._body_lin_vel_w = None
         self._body_ang_vel_w = None
+        self._body_pos_w_center = None
+        self._body_quat_w_center = None
+        self._body_lin_vel_w_center = None
+        self._body_ang_vel_w_center = None
         self._motion_body_pos_w_timestep = None
         self._motion_body_quat_w_timestep = None
         self._motion_body_lin_vel_w_timestep = None
@@ -423,19 +490,61 @@ class MotionCommand(CommandTerm):
         )
         self.kernel = self.kernel / self.kernel.sum()
 
+    def _initialize_sampling_metadata(self) -> None:
+        """Build sampling metadata for valid center-frame bin sampling."""
+        valid_center_indices = self.motion.valid_center_indices
+        self.valid_center_bin_ids = torch.clamp(
+            (valid_center_indices * self.bin_count)
+            // max(self.motion.time_step_total, 1),
+            0,
+            self.bin_count - 1,
+        )
+        self.valid_center_count_per_bin = torch.bincount(
+            self.valid_center_bin_ids, minlength=self.bin_count
+        )
+        self.valid_sampling_bin_mask = self.valid_center_count_per_bin > 0
+
+        max_valid_centers_per_bin = max(
+            int(self.valid_center_count_per_bin.max().item()), 1
+        )
+        self.bin_valid_center_indices = torch.full(
+            (self.bin_count, max_valid_centers_per_bin),
+            -1,
+            dtype=torch.long,
+            device=self.device,
+        )
+        for bin_id in range(self.bin_count):
+            count = int(self.valid_center_count_per_bin[bin_id].item())
+            if count == 0:
+                continue
+            bin_valid_centers = valid_center_indices[self.valid_center_bin_ids == bin_id]
+            self.bin_valid_center_indices[bin_id, :count] = bin_valid_centers
+
+        self.valid_center_lookup = torch.full(
+            (self.motion.time_step_total,),
+            -1,
+            dtype=torch.long,
+            device=self.device,
+        )
+        self.valid_center_lookup[self.motion.valid_center_indices] = torch.arange(
+            self.motion.valid_center_indices.shape[0],
+            dtype=torch.long,
+            device=self.device,
+        )
+
     def _flatten_window(self, tensor: torch.Tensor | None) -> torch.Tensor:
-        """Raise an explicit error for unsupported window observations.
+        """Flatten a temporal-window tensor into `[num_envs, -1]`.
 
         Args:
-            tensor: Placeholder tensor from an unsupported window path.
+            tensor: Window tensor whose leading dimension is `num_envs`.
 
-        Raises:
-            RuntimeError: Always, because stage one only supports single frames.
+        Returns:
+            Flattened tensor preserving the fixed time order
+            `[t - n, ..., t, ..., t + m]`.
         """
-        raise RuntimeError(
-            "Temporal window observations are not enabled in the stage-one "
-            "MotionCommand refactor."
-        )
+        if tensor is None:
+            raise RuntimeError("Requested window cache has not been initialized.")
+        return tensor.reshape(self.num_envs, -1)
 
     @property
     def motion_id(self) -> torch.Tensor:
@@ -454,13 +563,13 @@ class MotionCommand(CommandTerm):
 
     @property
     def joint_pos(self) -> torch.Tensor:
-        """Return motion joint positions at the current frame."""
-        return self.motion.joint_pos[self.time_steps]
+        """Return motion joint positions at the current center frame."""
+        return self._motion_joint_pos_window[:, self.center_frame_index]
 
     @property
     def joint_vel(self) -> torch.Tensor:
-        """Return motion joint velocities at the current frame."""
-        return self.motion.joint_vel[self.time_steps]
+        """Return motion joint velocities at the current center frame."""
+        return self._motion_joint_vel_window[:, self.center_frame_index]
 
     @property
     def body_pos_w(self) -> torch.Tensor:
@@ -495,12 +604,26 @@ class MotionCommand(CommandTerm):
     @property
     def ref_lin_vel_w(self) -> torch.Tensor:
         """Return the target reference-body linear velocity."""
-        return self.motion.body_lin_vel_w[self.time_steps, self.motion_ref_body_index]
+        return self._motion_body_lin_vel_w_window[
+            :, self.center_frame_index, self.motion_ref_body_index
+        ]
 
     @property
     def ref_ang_vel_w(self) -> torch.Tensor:
         """Return the target reference-body angular velocity."""
-        return self.motion.body_ang_vel_w[self.time_steps, self.motion_ref_body_index]
+        return self._motion_body_ang_vel_w_window[
+            :, self.center_frame_index, self.motion_ref_body_index
+        ]
+
+    @property
+    def joint_pos_window(self) -> torch.Tensor:
+        """Return motion joint positions for the full temporal window."""
+        return self._motion_joint_pos_window
+
+    @property
+    def joint_vel_window(self) -> torch.Tensor:
+        """Return motion joint velocities for the full temporal window."""
+        return self._motion_joint_vel_window
 
     @property
     def robot_joint_pos(self) -> torch.Tensor:
@@ -571,6 +694,10 @@ class MotionCommand(CommandTerm):
         sampling_probabilities = torch.nn.functional.conv1d(
             sampling_probabilities, self.kernel.view(1, 1, -1)
         ).view(-1)
+        # Bins that do not contain any valid center frame must never be sampled.
+        sampling_probabilities = sampling_probabilities * self.valid_sampling_bin_mask.float()
+        if sampling_probabilities.sum() <= 0:
+            sampling_probabilities = self.valid_sampling_bin_mask.float()
         sampling_probabilities = sampling_probabilities / sampling_probabilities.sum()
         return sampling_probabilities
 
@@ -604,15 +731,17 @@ class MotionCommand(CommandTerm):
         )
 
     def _sample_time_steps_from_bins(self, sampled_bins: torch.Tensor) -> torch.Tensor:
-        """Map sampled bins to concrete global frame indices.
+        """Map sampled bins to valid center frames inside those bins.
 
         Args:
             sampled_bins: Bin indices sampled from the adaptive distribution.
 
         Returns:
-            Global frame indices sampled continuously inside each bin.
+            Valid center-frame indices sampled from the chosen bins.
         """
-        return (
+        # First sample a continuous position inside each bin, then snap it to
+        # the nearest valid center frame that belongs to the same bin.
+        candidate_time_steps = (
             (
                 sampled_bins
                 + sample_uniform(0.0, 1.0, sampled_bins.shape, device=self.device)
@@ -620,6 +749,31 @@ class MotionCommand(CommandTerm):
             / self.bin_count
             * (self.motion.time_step_total - 1)
         ).long()
+        sampled_time_steps = torch.empty_like(candidate_time_steps)
+
+        for bin_id in torch.unique(sampled_bins).tolist():
+            env_mask = sampled_bins == bin_id
+            valid_count = int(self.valid_center_count_per_bin[bin_id].item())
+            valid_centers = self.bin_valid_center_indices[bin_id, :valid_count]
+            if valid_count == 1:
+                sampled_time_steps[env_mask] = valid_centers[0]
+                continue
+
+            bin_candidates = candidate_time_steps[env_mask]
+            right_indices = torch.bucketize(bin_candidates, valid_centers)
+            right_indices = torch.clamp(right_indices, max=valid_count - 1)
+            left_indices = torch.clamp(right_indices - 1, min=0)
+            left_centers = valid_centers[left_indices]
+            right_centers = valid_centers[right_indices]
+
+            choose_right = torch.abs(right_centers - bin_candidates) < torch.abs(
+                bin_candidates - left_centers
+            )
+            sampled_time_steps[env_mask] = torch.where(
+                choose_right, right_centers, left_centers
+            )
+
+        return sampled_time_steps
 
     def _accumulate_failed_bins(self, env_ids: Sequence[int]) -> None:
         """Accumulate failure statistics in bin space.
@@ -785,43 +939,75 @@ class MotionCommand(CommandTerm):
         self._current_bin_failed.zero_()
 
     def _update_motion_data(self) -> None:
-        """Update motion tensors for the currently active single frame."""
-        self._motion_body_pos_w_timestep = self.motion.body_pos_w[self.time_steps]
-        self._motion_body_quat_w_timestep = self.motion.body_quat_w[self.time_steps]
-        self._motion_body_lin_vel_w_timestep = self.motion.body_lin_vel_w[
-            self.time_steps
+        """Update motion tensors for the active temporal window.
+
+        The temporal window is the primary cache. The legacy single-frame
+        caches are sliced from the center frame of this window.
+        """
+        self._window_time_steps = (
+            self.time_steps[:, None] + self.motion.window_offsets[None, :]
+        )
+        self._motion_joint_pos_window = self.motion.joint_pos[self._window_time_steps]
+        self._motion_joint_vel_window = self.motion.joint_vel[self._window_time_steps]
+        self._motion_body_pos_w_window = self.motion.body_pos_w[self._window_time_steps]
+        self._motion_body_quat_w_window = self.motion.body_quat_w[
+            self._window_time_steps
         ]
-        self._motion_body_ang_vel_w_timestep = self.motion.body_ang_vel_w[
-            self.time_steps
+        self._motion_body_lin_vel_w_window = self.motion.body_lin_vel_w[
+            self._window_time_steps
+        ]
+        self._motion_body_ang_vel_w_window = self.motion.body_ang_vel_w[
+            self._window_time_steps
         ]
 
-        # Shift motion-space body positions into each environment's world origin.
-        self._body_pos_w = (
-            self._motion_body_pos_w_timestep + self._env.scene.env_origins[:, None, :]
+        self._motion_body_pos_w_timestep = self._motion_body_pos_w_window[
+            :, self.center_frame_index
+        ]
+        self._motion_body_quat_w_timestep = self._motion_body_quat_w_window[
+            :, self.center_frame_index
+        ]
+        self._motion_body_lin_vel_w_timestep = self._motion_body_lin_vel_w_window[
+            :, self.center_frame_index
+        ]
+        self._motion_body_ang_vel_w_timestep = self._motion_body_ang_vel_w_window[
+            :, self.center_frame_index
+        ]
+
+        env_origins = self._env.scene.env_origins
+        self._body_pos_w_window = (
+            self._motion_body_pos_w_window + env_origins[:, None, None, :]
         )
+        self._body_pos_w = self._body_pos_w_window[:, self.center_frame_index]
         self._body_quat_w = self._motion_body_quat_w_timestep
         self._body_lin_vel_w = self._motion_body_lin_vel_w_timestep
         self._body_ang_vel_w = self._motion_body_ang_vel_w_timestep
 
     def _get_env_ids_to_resample(self) -> torch.Tensor:
-        """Find environments that have reached a trajectory boundary.
+        """Find environments whose center frame is no longer window-valid.
 
         Returns:
             Environment ids that should be resampled.
         """
-        overflow_mask = self.time_steps >= self.motion.time_step_total
-        valid_mask = ~overflow_mask
-        cross_mask = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
-        if valid_mask.any():
-            valid_env_ids = torch.nonzero(valid_mask, as_tuple=False).squeeze(-1)
-            cross_mask[valid_env_ids] = self.motion.new_data_flag[
-                self.time_steps[valid_env_ids]
+        overflow_mask = (self.time_steps < 0) | (
+            self.time_steps >= self.motion.time_step_total
+        )
+        valid_center_mask = torch.zeros(
+            self.num_envs, dtype=torch.bool, device=self.device
+        )
+        non_overflow_ids = torch.nonzero(~overflow_mask, as_tuple=False).squeeze(-1)
+        if non_overflow_ids.numel() > 0:
+            valid_center_mask[non_overflow_ids] = self.motion.valid_center_mask[
+                self.time_steps[non_overflow_ids]
             ]
-        total_mask = overflow_mask | cross_mask
-        return torch.nonzero(total_mask, as_tuple=False).squeeze(-1)
+        resample_mask = overflow_mask | (~valid_center_mask)
+        return torch.nonzero(resample_mask, as_tuple=False).squeeze(-1)
 
     def _update_state_data(self) -> None:
-        """Update observation caches derived from the simulator state."""
+        """Update observation caches derived from the simulator state.
+
+        All window-relative targets are expressed relative to the current robot
+        reference-body pose at the center frame.
+        """
         ref_pos_w = (
             self._motion_body_pos_w_timestep[:, self.motion_ref_body_index]
             + self._env.scene.env_origins
@@ -898,6 +1084,67 @@ class MotionCommand(CommandTerm):
         )
         self._motion_ref_pos_b = motion_ref_pos_b
         self._motion_ref_ori_b_mat = matrix_from_quat(motion_ref_ori_b)
+        self._update_window_state_data(
+            robot_ref_pos_w,
+            robot_ref_quat_w,
+            robot_joint_pos,
+        )
+
+    def _update_window_state_data(
+        self,
+        robot_ref_pos_w: torch.Tensor,
+        robot_ref_quat_w: torch.Tensor,
+        robot_joint_pos: torch.Tensor,
+    ) -> None:
+        """Update caches for temporal-window observations.
+
+        Args:
+            robot_ref_pos_w: Current robot reference-body positions.
+            robot_ref_quat_w: Current robot reference-body orientations.
+            robot_joint_pos: Current robot joint positions.
+        """
+        num_bodies = len(self.cfg.body_names)
+        window_size = self.window_size
+
+        motion_ref_pos_w_window = self._body_pos_w_window[
+            :, :, self.motion_ref_body_index
+        ]
+        motion_ref_quat_w_window = self._motion_body_quat_w_window[
+            :, :, self.motion_ref_body_index
+        ]
+
+        robot_ref_pos_w_window = robot_ref_pos_w[:, None, :].expand(-1, window_size, -1)
+        robot_ref_quat_w_window = robot_ref_quat_w[:, None, :].expand(
+            -1, window_size, -1
+        )
+        motion_ref_pos_b_window, motion_ref_ori_b_window = subtract_frame_transforms(
+            robot_ref_pos_w_window,
+            robot_ref_quat_w_window,
+            motion_ref_pos_w_window,
+            motion_ref_quat_w_window,
+        )
+        self._motion_ref_pos_b_window = motion_ref_pos_b_window
+        self._motion_ref_ori_b_mat_window = matrix_from_quat(motion_ref_ori_b_window)
+
+        robot_ref_pos_w_body = robot_ref_pos_w[:, None, None, :].expand(
+            -1, window_size, num_bodies, -1
+        )
+        robot_ref_quat_w_body = robot_ref_quat_w[:, None, None, :].expand(
+            -1, window_size, num_bodies, -1
+        )
+        motion_body_pos_b_window, motion_body_ori_b_window = subtract_frame_transforms(
+            robot_ref_pos_w_body,
+            robot_ref_quat_w_body,
+            self._body_pos_w_window,
+            self._motion_body_quat_w_window,
+        )
+        self._motion_body_pos_b_window = motion_body_pos_b_window
+        self._motion_body_ori_b_mat_window = matrix_from_quat(motion_body_ori_b_window)
+
+        robot_joint_pos_window = robot_joint_pos[:, None, :].expand(-1, window_size, -1)
+        self._joint_pos_delta_window = (
+            self._motion_joint_pos_window - robot_joint_pos_window
+        )
 
     def _post_update_command(self) -> None:
         """Hook for subclasses.
@@ -984,9 +1231,9 @@ class MotionCommand(CommandTerm):
 class MotionCommandCfg(CommandTermCfg):
     """Configuration for :class:`MotionCommand`.
 
-    Only the single-frame pathway is active in the current stage. Temporal
-    buffer configuration fields are kept for forward compatibility and
-    documented as reserved.
+    The current stage supports both single-frame outputs and temporal-window
+    caches. Single-frame outputs are always derived from the center of the
+    configured temporal window.
 
     Attributes:
         asset_name: Name of the robot articulation in the scene.
@@ -1002,8 +1249,8 @@ class MotionCommandCfg(CommandTermCfg):
         adaptive_uniform_ratio: Uniform prior mixed into the adaptive bin
             distribution.
         adaptive_alpha: Exponential moving average factor for bin failure counts.
-        history_frames: Reserved for future temporal-buffer support.
-        future_frames: Reserved for future temporal-buffer support.
+        history_frames: Number of frames before the center frame in the window.
+        future_frames: Number of frames after the center frame in the window.
         profile_properties: Upstream profiling switch retained for compatibility.
         ref_visualizer_cfg: Visualization configuration for the reference body.
         body_visualizer_cfg: Visualization configuration for tracked bodies.
@@ -1012,7 +1259,7 @@ class MotionCommandCfg(CommandTermCfg):
     class_type: type = MotionCommand
 
     asset_name: str = MISSING
-    motion_file: str = MISSING
+    motion_file: dict[str, list[str] | str] = MISSING
     reference_body: str = MISSING
     body_names: list[str] = MISSING
 
@@ -1021,7 +1268,6 @@ class MotionCommandCfg(CommandTermCfg):
     joint_position_range: tuple[float, float] = (-0.52, 0.52)
     joint_velocity_range: tuple[float, float] = (-0.52, 0.52)
 
-    # Reserved configuration fields for later refactor stages.
     adaptive_kernel_size: int = 1
     adaptive_lambda: float = 0.8
     adaptive_uniform_ratio: float = 0.1
