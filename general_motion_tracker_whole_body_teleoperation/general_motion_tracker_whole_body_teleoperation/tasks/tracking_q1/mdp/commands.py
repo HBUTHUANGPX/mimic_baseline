@@ -6,8 +6,8 @@ This version supports the following staged features:
 
 1. Multiple trajectories are concatenated into one global timeline.
 2. Each environment tracks a single target frame, not a temporal window.
-3. Resampling is guided by a failure-aware adaptive distribution over all valid
-   global frames.
+3. Resampling is guided by a failure-aware adaptive distribution over global
+   time bins.
 4. When stepping would cross into the next trajectory or exceed the dataset
    boundary, the environment is resampled from that adaptive distribution.
 
@@ -303,7 +303,12 @@ class MotionCommand(CommandTerm):
         self._initialize_metrics()
 
         # Sample an initial frame for every environment before the first step.
-        # self._resample_time_steps(torch.arange(self.num_envs, device=self.device))
+        # This path must not touch runtime managers such as the termination
+        # manager because manager construction is still in progress.
+        self._resample_time_steps(
+            torch.arange(self.num_envs, device=self.device),
+            update_failure_statistics=False,
+        )
         self._update_motion_data()
         self._update_state_data()
 
@@ -398,12 +403,25 @@ class MotionCommand(CommandTerm):
         self.metrics["sampling_top1_bin"] = torch.zeros(
             self.num_envs, device=self.device
         )
-        self.failed_frame_count = torch.zeros(
-            self.motion.time_step_total, dtype=torch.float32, device=self.device
+        self.bin_count = (
+            int(
+                self.motion.time_step_total
+                // (1 / (self._env.cfg.decimation * self._env.cfg.sim.dt))
+            )
+            + 1
         )
-        self._current_failed_frame_count = torch.zeros(
-            self.motion.time_step_total, dtype=torch.float32, device=self.device
+        self.bin_failed_count = torch.zeros(
+            self.bin_count, dtype=torch.float32, device=self.device
         )
+        self._current_bin_failed = torch.zeros(
+            self.bin_count, dtype=torch.float32, device=self.device
+        )
+        self.kernel = torch.tensor(
+            [self.cfg.adaptive_lambda**i for i in range(self.cfg.adaptive_kernel_size)],
+            dtype=torch.float32,
+            device=self.device,
+        )
+        self.kernel = self.kernel / self.kernel.sum()
 
     def _flatten_window(self, tensor: torch.Tensor | None) -> torch.Tensor:
         """Raise an explicit error for unsupported window observations.
@@ -534,33 +552,25 @@ class MotionCommand(CommandTerm):
         """Return robot reference-body angular velocity."""
         return self._robot_ref_ang_vel_w
 
-    def _sample_random_time_steps(self, count: int) -> torch.Tensor:
-        """Sample global frame indices uniformly from the dataset.
-
-        Args:
-            count: Number of samples to draw.
-
-        Returns:
-            Tensor of shape `[count]` containing random global frame indices.
-        """
-        return torch.randint(
-            low=0,
-            high=self.motion.time_step_total,
-            size=(count,),
-            device=self.device,
-            dtype=torch.long,
-        )
-
     def _build_sampling_probabilities(self) -> torch.Tensor:
-        """Construct the adaptive discrete resampling distribution.
+        """Construct the adaptive resampling distribution over time bins.
 
         Returns:
-            A probability vector over the concatenated global frame timeline.
+            A probability vector over global time bins.
         """
         sampling_probabilities = (
-            self.failed_frame_count
-            + self.cfg.adaptive_uniform_ratio / float(self.motion.time_step_total)
+            self.bin_failed_count
+            + self.cfg.adaptive_uniform_ratio / float(self.bin_count)
         )
+        # Smooth neighboring bins so nearby failure regions share sampling mass.
+        sampling_probabilities = torch.nn.functional.pad(
+            sampling_probabilities.unsqueeze(0).unsqueeze(0),
+            (0, self.cfg.adaptive_kernel_size - 1),
+            mode="replicate",
+        )
+        sampling_probabilities = torch.nn.functional.conv1d(
+            sampling_probabilities, self.kernel.view(1, 1, -1)
+        ).view(-1)
         sampling_probabilities = sampling_probabilities / sampling_probabilities.sum()
         return sampling_probabilities
 
@@ -571,16 +581,14 @@ class MotionCommand(CommandTerm):
 
         Args:
             sampling_probabilities: Adaptive sampling probabilities over global
-                frame indices.
+                time bins.
         """
         entropy = -(sampling_probabilities * (sampling_probabilities + 1e-12).log()).sum()
-        normalized_entropy = entropy / max(math.log(self.motion.time_step_total), 1e-12)
+        normalized_entropy = entropy / max(math.log(self.bin_count), 1e-12)
         top1_prob, top1_index = sampling_probabilities.max(dim=0)
         self.metrics["sampling_entropy"][:] = normalized_entropy
         self.metrics["sampling_top1_prob"][:] = top1_prob
-        self.metrics["sampling_top1_bin"][:] = top1_index.float() / max(
-            self.motion.time_step_total, 1
-        )
+        self.metrics["sampling_top1_bin"][:] = top1_index.float() / max(self.bin_count, 1)
 
     def _update_env_motion_ids(self, env_ids: Sequence[int]) -> None:
         """Refresh cached motion ids for the specified environments.
@@ -595,19 +603,26 @@ class MotionCommand(CommandTerm):
             sampled_time_steps, self._motion_ends, right=True
         )
 
-    def _resample_uniform_time_steps(self, env_ids: Sequence[int]) -> None:
-        """Resample single frames uniformly for the specified environments.
+    def _sample_time_steps_from_bins(self, sampled_bins: torch.Tensor) -> torch.Tensor:
+        """Map sampled bins to concrete global frame indices.
 
         Args:
-            env_ids: Environment ids that should receive a new frame.
-        """
-        if len(env_ids) == 0:
-            return
-        self.time_steps[env_ids] = self._sample_random_time_steps(len(env_ids))
-        self._update_env_motion_ids(env_ids)
+            sampled_bins: Bin indices sampled from the adaptive distribution.
 
-    def _accumulate_failed_frames(self, env_ids: Sequence[int]) -> None:
-        """Accumulate failure statistics for the specified environments.
+        Returns:
+            Global frame indices sampled continuously inside each bin.
+        """
+        return (
+            (
+                sampled_bins
+                + sample_uniform(0.0, 1.0, sampled_bins.shape, device=self.device)
+            )
+            / self.bin_count
+            * (self.motion.time_step_total - 1)
+        ).long()
+
+    def _accumulate_failed_bins(self, env_ids: Sequence[int]) -> None:
+        """Accumulate failure statistics in bin space.
 
         Args:
             env_ids: Environment ids that are being resampled.
@@ -625,26 +640,39 @@ class MotionCommand(CommandTerm):
             failed_time_steps = self.time_steps[env_ids][episode_failed]
         else:
             failed_time_steps = self._previous_time_steps[env_ids][episode_failed]
-        self._current_failed_frame_count.index_add_(
+        failed_bin_ids = torch.clamp(
+            (failed_time_steps * self.bin_count) // max(self.motion.time_step_total, 1),
             0,
-            failed_time_steps,
-            torch.ones_like(failed_time_steps, dtype=torch.float32),
+            self.bin_count - 1,
+        )
+        self._current_bin_failed.index_add_(
+            0,
+            failed_bin_ids,
+            torch.ones_like(failed_bin_ids, dtype=torch.float32),
         )
 
-    def _resample_time_steps(self, env_ids: Sequence[int]) -> None:
-        """Resample single frames using the adaptive failure-guided distribution.
+    def _resample_time_steps(
+        self,
+        env_ids: Sequence[int],
+        update_failure_statistics: bool = True,
+    ) -> None:
+        """Resample single frames using the adaptive bin-based distribution.
 
         Args:
             env_ids: Environment ids that should receive a new frame.
+            update_failure_statistics: Whether failure counts should be updated
+                before sampling. This must be disabled during cold start because
+                the termination manager is not available yet.
         """
         if len(env_ids) == 0:
             return
-        self._accumulate_failed_frames(env_ids)
+        if update_failure_statistics:
+            self._accumulate_failed_bins(env_ids)
         sampling_probabilities = self._build_sampling_probabilities()
-        sampled_time_steps = torch.multinomial(
+        sampled_bins = torch.multinomial(
             sampling_probabilities, len(env_ids), replacement=True
         )
-        self.time_steps[env_ids] = sampled_time_steps
+        self.time_steps[env_ids] = self._sample_time_steps_from_bins(sampled_bins)
         self._update_env_motion_ids(env_ids)
         self._update_sampling_metrics(sampling_probabilities)
 
@@ -750,11 +778,11 @@ class MotionCommand(CommandTerm):
         # Always refresh the caches so the frame actually advances every step.
         self._update_motion_data()
         self._update_state_data()
-        self.failed_frame_count = (
-            self.cfg.adaptive_alpha * self._current_failed_frame_count
-            + (1 - self.cfg.adaptive_alpha) * self.failed_frame_count
+        self.bin_failed_count = (
+            self.cfg.adaptive_alpha * self._current_bin_failed
+            + (1 - self.cfg.adaptive_alpha) * self.bin_failed_count
         )
-        self._current_failed_frame_count.zero_()
+        self._current_bin_failed.zero_()
 
     def _update_motion_data(self) -> None:
         """Update motion tensors for the currently active single frame."""
@@ -969,11 +997,11 @@ class MotionCommandCfg(CommandTermCfg):
         velocity_range: Root velocity perturbation applied during reset.
         joint_position_range: Joint position perturbation applied during reset.
         joint_velocity_range: Reserved for future use.
-        adaptive_kernel_size: Reserved for future adaptive smoothing support.
-        adaptive_lambda: Reserved for future adaptive smoothing support.
-        adaptive_uniform_ratio: Uniform prior mixed into the adaptive frame
+        adaptive_kernel_size: Size of the smoothing kernel used in bin space.
+        adaptive_lambda: Exponential decay factor for the bin-smoothing kernel.
+        adaptive_uniform_ratio: Uniform prior mixed into the adaptive bin
             distribution.
-        adaptive_alpha: Exponential moving average factor for failure counts.
+        adaptive_alpha: Exponential moving average factor for bin failure counts.
         history_frames: Reserved for future temporal-buffer support.
         future_frames: Reserved for future temporal-buffer support.
         profile_properties: Upstream profiling switch retained for compatibility.
