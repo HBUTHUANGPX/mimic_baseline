@@ -21,6 +21,7 @@ from collections.abc import Sequence
 from dataclasses import MISSING
 from typing import TYPE_CHECKING
 import math
+from abc import ABC, abstractmethod
 
 import numpy as np
 import torch
@@ -308,6 +309,288 @@ class MotionLoader:
         return valid_center_mask
 
 
+class AdaptiveSamplingModule(ABC):
+    """Abstract interface for pluggable adaptive sampling strategies.
+
+    Concrete implementations are responsible for tracking sampling statistics,
+    building a probability distribution over bins, and updating any internal
+    state after each environment step.
+    """
+
+    def __init__(self, command: MotionCommand) -> None:
+        """Initialize the sampling module.
+
+        Args:
+            command: Owning motion command.
+        """
+        self.command = command
+
+    @abstractmethod
+    def on_resample_start(
+        self, env_ids: Sequence[int], update_failure_statistics: bool
+    ) -> None:
+        """Update sampling statistics before a new batch of bins is sampled."""
+
+    @abstractmethod
+    def build_sampling_probabilities(self) -> torch.Tensor:
+        """Return the current bin sampling probabilities."""
+
+    @abstractmethod
+    def on_resample_complete(
+        self,
+        env_ids: Sequence[int],
+        sampled_bins: torch.Tensor,
+        update_failure_statistics: bool,
+    ) -> None:
+        """Record any state that should persist after resampling."""
+
+    @abstractmethod
+    def on_step_end(self) -> None:
+        """Finalize per-step temporary statistics."""
+
+
+class LegacyBinAdaptiveSampling(AdaptiveSamplingModule):
+    """Bin-based adaptive sampler that preserves the pre-SONIC behavior.
+
+    This implementation:
+    - accumulates failure counts in bin space;
+    - smooths bin scores with an exponential convolution kernel;
+    - mixes the smoothed scores with a uniform prior through additive blending;
+    - updates the persistent bin statistics via EMA.
+    """
+
+    def __init__(self, command: MotionCommand) -> None:
+        """Initialize the legacy sampler state.
+
+        Args:
+            command: Owning motion command.
+        """
+        super().__init__(command)
+        self.bin_failed_count = torch.zeros(
+            command.bin_count, dtype=torch.float32, device=command.device
+        )
+        self.current_bin_failed = torch.zeros(
+            command.bin_count, dtype=torch.float32, device=command.device
+        )
+        self.kernel = torch.tensor(
+            [command.cfg.adaptive_lambda**i for i in range(command.cfg.adaptive_kernel_size)],
+            dtype=torch.float32,
+            device=command.device,
+        )
+        self.kernel = self.kernel / self.kernel.sum()
+
+    def on_resample_start(
+        self, env_ids: Sequence[int], update_failure_statistics: bool
+    ) -> None:
+        """Accumulate failure counts for the bins that caused failed rollouts.
+
+        Args:
+            env_ids: Environment ids being resampled.
+            update_failure_statistics: Whether runtime failure statistics should
+                be updated for this resampling event.
+        """
+        if not update_failure_statistics or len(env_ids) == 0:
+            return
+        episode_failed = self.command._env.termination_manager.terminated[env_ids]
+        if not torch.any(episode_failed):
+            return
+
+        previous_time_steps = (
+            self.command.time_steps
+            if self.command._previous_time_steps is None
+            else self.command._previous_time_steps
+        )
+        failed_time_steps = previous_time_steps[env_ids][episode_failed]
+        failed_bin_ids = torch.clamp(
+            (failed_time_steps * self.command.bin_count)
+            // max(self.command.motion.time_step_total, 1),
+            0,
+            self.command.bin_count - 1,
+        )
+        self.current_bin_failed.index_add_(
+            0,
+            failed_bin_ids,
+            torch.ones_like(failed_bin_ids, dtype=torch.float32),
+        )
+
+    def build_sampling_probabilities(self) -> torch.Tensor:
+        """Construct the legacy adaptive probability distribution over bins.
+
+        Returns:
+            Probability vector over valid bins.
+        """
+        command = self.command
+        sampling_probabilities = (
+            self.bin_failed_count
+            + command.cfg.adaptive_uniform_ratio / float(command.bin_count)
+        )
+        sampling_probabilities = torch.nn.functional.pad(
+            sampling_probabilities.unsqueeze(0).unsqueeze(0),
+            (0, command.cfg.adaptive_kernel_size - 1),
+            mode="replicate",
+        )
+        sampling_probabilities = torch.nn.functional.conv1d(
+            sampling_probabilities, self.kernel.view(1, 1, -1)
+        ).view(-1)
+        sampling_probabilities = (
+            sampling_probabilities * command.valid_sampling_bin_mask.float()
+        )
+        if sampling_probabilities.sum() <= 0:
+            sampling_probabilities = command.valid_sampling_bin_mask.float()
+        return sampling_probabilities / sampling_probabilities.sum()
+
+    def on_resample_complete(
+        self,
+        env_ids: Sequence[int],
+        sampled_bins: torch.Tensor,
+        update_failure_statistics: bool,
+    ) -> None:
+        """No-op hook kept for interface compatibility.
+
+        Args:
+            env_ids: Environment ids that were resampled.
+            sampled_bins: Sampled bin ids.
+            update_failure_statistics: Whether failure statistics were enabled.
+        """
+        del env_ids, sampled_bins, update_failure_statistics
+
+    def on_step_end(self) -> None:
+        """Apply EMA to the legacy failure counts and clear the step buffer."""
+        self.bin_failed_count = (
+            self.command.cfg.adaptive_alpha * self.current_bin_failed
+            + (1 - self.command.cfg.adaptive_alpha) * self.bin_failed_count
+        )
+        self.current_bin_failed.zero_()
+
+
+class SonicBinAdaptiveSampling(AdaptiveSamplingModule):
+    """Strict SONIC-style adaptive sampler.
+
+    The sampler follows the paper logic:
+    - bin the motion dataset uniformly in time;
+    - record visit and failure counts for the starting bin of each sampled clip;
+    - compute per-bin failure rates;
+    - cap each failure rate by `beta * mean_failure_rate`;
+    - normalize capped failure rates to obtain `p_hat`;
+    - mix `p_hat` with a uniform distribution using `alpha`;
+    - uniformly sample an initial valid center frame from the selected bin.
+    """
+
+    def __init__(self, command: MotionCommand) -> None:
+        """Initialize SONIC statistics.
+
+        Args:
+            command: Owning motion command.
+        """
+        super().__init__(command)
+        self.bin_visit_count = torch.zeros(
+            command.bin_count, dtype=torch.float32, device=command.device
+        )
+        self.bin_fail_count = torch.zeros(
+            command.bin_count, dtype=torch.float32, device=command.device
+        )
+        self.env_start_bin_ids = torch.zeros(
+            command.num_envs, dtype=torch.long, device=command.device
+        )
+
+    def on_resample_start(
+        self, env_ids: Sequence[int], update_failure_statistics: bool
+    ) -> None:
+        """Update visit/failure counts for the completed sampled segments.
+
+        Args:
+            env_ids: Environment ids being resampled.
+            update_failure_statistics: Whether runtime failure statistics should
+                be updated for this resampling event.
+        """
+        if not update_failure_statistics or len(env_ids) == 0:
+            return
+        start_bin_ids = self.env_start_bin_ids[env_ids]
+        self.bin_visit_count.index_add_(
+            0,
+            start_bin_ids,
+            torch.ones_like(start_bin_ids, dtype=torch.float32),
+        )
+
+        episode_failed = self.command._env.termination_manager.terminated[env_ids]
+        if torch.any(episode_failed):
+            failed_start_bins = start_bin_ids[episode_failed]
+            self.bin_fail_count.index_add_(
+                0,
+                failed_start_bins,
+                torch.ones_like(failed_start_bins, dtype=torch.float32),
+            )
+
+    def build_sampling_probabilities(self) -> torch.Tensor:
+        """Construct the SONIC sampling distribution over bins.
+
+        Returns:
+            Probability vector over valid bins.
+        """
+        command = self.command
+        valid_mask = command.valid_sampling_bin_mask
+        valid_bin_count = max(int(valid_mask.sum().item()), 1)
+
+        failure_rate = torch.zeros(
+            command.bin_count, dtype=torch.float32, device=command.device
+        )
+        visited_mask = self.bin_visit_count > 0
+        failure_rate[visited_mask] = (
+            self.bin_fail_count[visited_mask] / self.bin_visit_count[visited_mask]
+        )
+        failure_rate = failure_rate * valid_mask.float()
+
+        valid_failure_rates = failure_rate[valid_mask]
+        mean_failure_rate = (
+            valid_failure_rates.mean()
+            if valid_failure_rates.numel() > 0
+            else torch.tensor(0.0, device=command.device)
+        )
+        capped_failure_rate = torch.minimum(
+            failure_rate,
+            command.cfg.sonic_failure_cap_beta * mean_failure_rate,
+        )
+
+        capped_sum = capped_failure_rate.sum()
+        if capped_sum > 0:
+            p_hat = capped_failure_rate / capped_sum
+        else:
+            p_hat = valid_mask.float() / float(valid_bin_count)
+
+        uniform_distribution = valid_mask.float() / float(valid_bin_count)
+        sampling_probabilities = (
+            command.cfg.sonic_mix_alpha * p_hat
+            + (1.0 - command.cfg.sonic_mix_alpha) * uniform_distribution
+        )
+        sampling_probabilities = sampling_probabilities * valid_mask.float()
+        return sampling_probabilities / sampling_probabilities.sum()
+
+    def on_resample_complete(
+        self,
+        env_ids: Sequence[int],
+        sampled_bins: torch.Tensor,
+        update_failure_statistics: bool,
+    ) -> None:
+        """Record the starting bins of the newly sampled clips.
+
+        Args:
+            env_ids: Environment ids that were resampled.
+            sampled_bins: Sampled bin ids.
+            update_failure_statistics: Whether failure statistics were enabled.
+        """
+        del update_failure_statistics
+        if len(env_ids) == 0:
+            return
+        self.env_start_bin_ids[env_ids] = sampled_bins
+
+    def on_step_end(self) -> None:
+        """Finalize per-step SONIC sampling state.
+
+        SONIC uses cumulative visit/failure counts, so no EMA update is needed.
+        """
+        return
+
+
 class MotionCommand(CommandTerm):
     """Reference motion command for multi-trajectory temporal-window tracking.
 
@@ -477,19 +760,6 @@ class MotionCommand(CommandTerm):
             )
             + 1
         )
-        self.bin_failed_count = torch.zeros(
-            self.bin_count, dtype=torch.float32, device=self.device
-        )
-        self._current_bin_failed = torch.zeros(
-            self.bin_count, dtype=torch.float32, device=self.device
-        )
-        self.kernel = torch.tensor(
-            [self.cfg.adaptive_lambda**i for i in range(self.cfg.adaptive_kernel_size)],
-            dtype=torch.float32,
-            device=self.device,
-        )
-        self.kernel = self.kernel / self.kernel.sum()
-
     def _initialize_sampling_metadata(self) -> None:
         """Build sampling metadata for valid center-frame bin sampling."""
         valid_center_indices = self.motion.valid_center_indices
@@ -530,6 +800,24 @@ class MotionCommand(CommandTerm):
             self.motion.valid_center_indices.shape[0],
             dtype=torch.long,
             device=self.device,
+        )
+        self.adaptive_sampler = self._build_adaptive_sampler()
+
+    def _build_adaptive_sampler(self) -> AdaptiveSamplingModule:
+        """Instantiate the configured adaptive sampling module.
+
+        Returns:
+            Adaptive sampling module selected by configuration.
+
+        Raises:
+            ValueError: If the configured sampler type is unknown.
+        """
+        if self.cfg.adaptive_sampler_type == "legacy_bin":
+            return LegacyBinAdaptiveSampling(self)
+        if self.cfg.adaptive_sampler_type == "sonic":
+            return SonicBinAdaptiveSampling(self)
+        raise ValueError(
+            f"Unsupported adaptive sampler type: {self.cfg.adaptive_sampler_type}"
         )
 
     def _flatten_window(self, tensor: torch.Tensor | None) -> torch.Tensor:
@@ -652,7 +940,7 @@ class MotionCommand(CommandTerm):
 
     @property
     def robot_body_ang_vel_w(self) -> torch.Tensor:
-        """Return robot body angular velocities in world coordinates."""
+        """Return robot body angular velocities in world coordinates.""" 
         return self._robot_body_ang_vel_w
 
     @property
@@ -674,32 +962,6 @@ class MotionCommand(CommandTerm):
     def robot_ref_ang_vel_w(self) -> torch.Tensor:
         """Return robot reference-body angular velocity."""
         return self._robot_ref_ang_vel_w
-
-    def _build_sampling_probabilities(self) -> torch.Tensor:
-        """Construct the adaptive resampling distribution over time bins.
-
-        Returns:
-            A probability vector over global time bins.
-        """
-        sampling_probabilities = (
-            self.bin_failed_count
-            + self.cfg.adaptive_uniform_ratio / float(self.bin_count)
-        )
-        # Smooth neighboring bins so nearby failure regions share sampling mass.
-        sampling_probabilities = torch.nn.functional.pad(
-            sampling_probabilities.unsqueeze(0).unsqueeze(0),
-            (0, self.cfg.adaptive_kernel_size - 1),
-            mode="replicate",
-        )
-        sampling_probabilities = torch.nn.functional.conv1d(
-            sampling_probabilities, self.kernel.view(1, 1, -1)
-        ).view(-1)
-        # Bins that do not contain any valid center frame must never be sampled.
-        sampling_probabilities = sampling_probabilities * self.valid_sampling_bin_mask.float()
-        if sampling_probabilities.sum() <= 0:
-            sampling_probabilities = self.valid_sampling_bin_mask.float()
-        sampling_probabilities = sampling_probabilities / sampling_probabilities.sum()
-        return sampling_probabilities
 
     def _update_sampling_metrics(
         self, sampling_probabilities: torch.Tensor
@@ -775,36 +1037,6 @@ class MotionCommand(CommandTerm):
 
         return sampled_time_steps
 
-    def _accumulate_failed_bins(self, env_ids: Sequence[int]) -> None:
-        """Accumulate failure statistics in bin space.
-
-        Args:
-            env_ids: Environment ids that are being resampled.
-        """
-        if len(env_ids) == 0:
-            return
-        episode_failed = self._env.termination_manager.terminated[env_ids]
-        if not torch.any(episode_failed):
-            return
-
-        # Use the frame that actually produced the failed transition when
-        # available. During reset-driven resampling there may be no previous
-        # step snapshot yet, so the current frame is the correct fallback.
-        if self._previous_time_steps is None:
-            failed_time_steps = self.time_steps[env_ids][episode_failed]
-        else:
-            failed_time_steps = self._previous_time_steps[env_ids][episode_failed]
-        failed_bin_ids = torch.clamp(
-            (failed_time_steps * self.bin_count) // max(self.motion.time_step_total, 1),
-            0,
-            self.bin_count - 1,
-        )
-        self._current_bin_failed.index_add_(
-            0,
-            failed_bin_ids,
-            torch.ones_like(failed_bin_ids, dtype=torch.float32),
-        )
-
     def _resample_time_steps(
         self,
         env_ids: Sequence[int],
@@ -820,14 +1052,16 @@ class MotionCommand(CommandTerm):
         """
         if len(env_ids) == 0:
             return
-        if update_failure_statistics:
-            self._accumulate_failed_bins(env_ids)
-        sampling_probabilities = self._build_sampling_probabilities()
+        self.adaptive_sampler.on_resample_start(env_ids, update_failure_statistics)
+        sampling_probabilities = self.adaptive_sampler.build_sampling_probabilities()
         sampled_bins = torch.multinomial(
             sampling_probabilities, len(env_ids), replacement=True
         )
         self.time_steps[env_ids] = self._sample_time_steps_from_bins(sampled_bins)
         self._update_env_motion_ids(env_ids)
+        self.adaptive_sampler.on_resample_complete(
+            env_ids, sampled_bins, update_failure_statistics
+        )
         self._update_sampling_metrics(sampling_probabilities)
 
     def _update_metrics(self) -> None:
@@ -932,11 +1166,7 @@ class MotionCommand(CommandTerm):
         # Always refresh the caches so the frame actually advances every step.
         self._update_motion_data()
         self._update_state_data()
-        self.bin_failed_count = (
-            self.cfg.adaptive_alpha * self._current_bin_failed
-            + (1 - self.cfg.adaptive_alpha) * self.bin_failed_count
-        )
-        self._current_bin_failed.zero_()
+        self.adaptive_sampler.on_step_end()
 
     def _update_motion_data(self) -> None:
         """Update motion tensors for the active temporal window.
@@ -1244,11 +1474,15 @@ class MotionCommandCfg(CommandTermCfg):
         velocity_range: Root velocity perturbation applied during reset.
         joint_position_range: Joint position perturbation applied during reset.
         joint_velocity_range: Reserved for future use.
+        adaptive_sampler_type: Name of the adaptive sampling module to use.
         adaptive_kernel_size: Size of the smoothing kernel used in bin space.
         adaptive_lambda: Exponential decay factor for the bin-smoothing kernel.
         adaptive_uniform_ratio: Uniform prior mixed into the adaptive bin
-            distribution.
+            distribution in the legacy sampler.
         adaptive_alpha: Exponential moving average factor for bin failure counts.
+        sonic_mix_alpha: SONIC mixture factor for combining hard-bin sampling
+            and uniform coverage.
+        sonic_failure_cap_beta: SONIC cap coefficient for failure-rate clipping.
         history_frames: Number of frames before the center frame in the window.
         future_frames: Number of frames after the center frame in the window.
         profile_properties: Upstream profiling switch retained for compatibility.
@@ -1268,10 +1502,13 @@ class MotionCommandCfg(CommandTermCfg):
     joint_position_range: tuple[float, float] = (-0.52, 0.52)
     joint_velocity_range: tuple[float, float] = (-0.52, 0.52)
 
+    adaptive_sampler_type: str = "sonic" # "sonic" | "legacy_bin"
     adaptive_kernel_size: int = 1
     adaptive_lambda: float = 0.8
     adaptive_uniform_ratio: float = 0.1
     adaptive_alpha: float = 0.001
+    sonic_mix_alpha: float = 0.1
+    sonic_failure_cap_beta: float = 200.0
     history_frames: int = 0
     future_frames: int = 0
     profile_properties: bool = True

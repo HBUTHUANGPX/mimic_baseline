@@ -67,7 +67,7 @@ class Q1FlatTeacherPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     )
     experiment_name = "q1_flat_teacher"
     policy = RslRlPpoActorCriticCfg(
-        init_noise_std=0.05,
+        init_noise_std=0.6,
         actor_obs_normalization=True,
         critic_obs_normalization=True,
         actor_hidden_dims=[512, 256, 128],
