@@ -402,8 +402,7 @@ class LegacyBinAdaptiveSampling(AdaptiveSamplingModule):
         )
         failed_time_steps = previous_time_steps[env_ids][episode_failed]
         failed_bin_ids = torch.clamp(
-            (failed_time_steps * self.command.bin_count)
-            // max(self.command.motion.time_step_total, 1),
+            failed_time_steps // self.command.bin_frame_count,
             0,
             self.command.bin_count - 1,
         )
@@ -753,19 +752,42 @@ class MotionCommand(CommandTerm):
         self.metrics["sampling_top1_bin"] = torch.zeros(
             self.num_envs, device=self.device
         )
-        self.bin_count = (
-            int(
-                self.motion.time_step_total
-                // (1 / (self._env.cfg.decimation * self._env.cfg.sim.dt))
+        self.bin_frame_count = self._compute_bin_frame_count()
+        self.bin_count = max(
+            int(math.ceil(self.motion.time_step_total / float(self.bin_frame_count))), 1
+        )
+
+    def _compute_bin_frame_count(self) -> int:
+        """Compute the number of motion frames contained in each sampling bin.
+
+        The preferred path uses a bin duration expressed in seconds from the
+        command configuration, which decouples the adaptive sampling bins from
+        the simulation rate. A fallback to the legacy sim-rate-based behavior is
+        kept for backward compatibility with older configs.
+
+        Returns:
+            Number of motion frames that belong to one adaptive-sampling bin.
+        """
+        if self.cfg.adaptive_bin_duration_s is not None:
+            assert (
+                self.cfg.adaptive_bin_duration_s > 0.0
+            ), "adaptive_bin_duration_s must be positive."
+            return max(
+                int(round(float(self.motion.fps) * self.cfg.adaptive_bin_duration_s)),
+                1,
             )
-            + 1
+
+        # Legacy fallback: keep historical behavior when old configs do not set
+        # an explicit bin duration yet.
+        return max(
+            int(1.0 / (self._env.cfg.decimation * self._env.cfg.sim.dt)),
+            1,
         )
     def _initialize_sampling_metadata(self) -> None:
         """Build sampling metadata for valid center-frame bin sampling."""
         valid_center_indices = self.motion.valid_center_indices
         self.valid_center_bin_ids = torch.clamp(
-            (valid_center_indices * self.bin_count)
-            // max(self.motion.time_step_total, 1),
+            valid_center_indices // self.bin_frame_count,
             0,
             self.bin_count - 1,
         )
@@ -1004,13 +1026,17 @@ class MotionCommand(CommandTerm):
         # First sample a continuous position inside each bin, then snap it to
         # the nearest valid center frame that belongs to the same bin.
         candidate_time_steps = (
-            (
-                sampled_bins
-                + sample_uniform(0.0, 1.0, sampled_bins.shape, device=self.device)
-            )
-            / self.bin_count
-            * (self.motion.time_step_total - 1)
-        ).long()
+            sampled_bins * self.bin_frame_count
+            + sample_uniform(
+                0.0,
+                float(self.bin_frame_count),
+                sampled_bins.shape,
+                device=self.device,
+            ).long()
+        )
+        candidate_time_steps = torch.clamp(
+            candidate_time_steps, 0, self.motion.time_step_total - 1
+        )
         sampled_time_steps = torch.empty_like(candidate_time_steps)
 
         for bin_id in torch.unique(sampled_bins).tolist():
@@ -1475,6 +1501,9 @@ class MotionCommandCfg(CommandTermCfg):
         joint_position_range: Joint position perturbation applied during reset.
         joint_velocity_range: Reserved for future use.
         adaptive_sampler_type: Name of the adaptive sampling module to use.
+        adaptive_bin_duration_s: Duration of each adaptive-sampling bin in
+            seconds. When left unset, the implementation falls back to the
+            legacy sim-rate-based bin size for backward compatibility.
         adaptive_kernel_size: Size of the smoothing kernel used in bin space.
         adaptive_lambda: Exponential decay factor for the bin-smoothing kernel.
         adaptive_uniform_ratio: Uniform prior mixed into the adaptive bin
@@ -1503,6 +1532,7 @@ class MotionCommandCfg(CommandTermCfg):
     joint_velocity_range: tuple[float, float] = (-0.52, 0.52)
 
     adaptive_sampler_type: str = "sonic" # "sonic" | "legacy_bin"
+    adaptive_bin_duration_s: float | None = None
     adaptive_kernel_size: int = 1
     adaptive_lambda: float = 0.8
     adaptive_uniform_ratio: float = 0.1
