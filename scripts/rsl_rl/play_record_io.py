@@ -289,8 +289,8 @@ def main(
 
         # time delay for real-time evaluation
         sleep_time = dt - (time.time() - start_time)
-        if args_cli.real_time and sleep_time > 0:
-            time.sleep(sleep_time)
+        # if args_cli.real_time and sleep_time > 0:
+        #     time.sleep(sleep_time)
 
     # close the simulator
     env.close()

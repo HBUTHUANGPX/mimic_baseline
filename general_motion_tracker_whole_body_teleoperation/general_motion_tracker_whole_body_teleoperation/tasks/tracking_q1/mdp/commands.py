@@ -11,6 +11,8 @@ This version supports the following staged features:
    time bins, but only valid center frames can be sampled.
 4. Single-frame outputs are derived directly from the center of the temporal
    window instead of being computed independently.
+5. Optionally, each environment can be deterministically assigned to one motion
+   and execute it sequentially from start to finish without resampling.
 
 The goal of this rewrite is to recover a small, reliable baseline before adding
 temporal buffers in later iterations.
@@ -146,7 +148,7 @@ class MotionLoader:
             normalized_paths = self._normalize_paths(paths)
             print(f"\nGroup: {group_name}")
             print(f"[INFO] Loading {len(normalized_paths)} motion files for training.")
-            print(f"[INFO] load motion file: {normalized_paths}")
+            # print(f"[INFO] load motion file: {normalized_paths}")
 
             extracted_list = [
                 extract_part(path)
@@ -602,6 +604,8 @@ class MotionCommand(CommandTerm):
       can be chosen;
     - the temporal buffer `[t - n, ..., t, ..., t + m]` is the primary cached
       representation, and single-frame outputs are derived from its center.
+    - an optional sequential-assignment mode binds each environment to a fixed
+      motion and advances it monotonically without any resampling.
 
     The class still exposes the single-frame properties that existing
     observations, rewards, terminations, and events depend on.
@@ -631,14 +635,18 @@ class MotionCommand(CommandTerm):
         self._initialize_observation_caches()
         self._initialize_metrics()
         self._initialize_sampling_metadata()
+        self._initialize_assignment_metadata()
 
-        # Sample an initial frame for every environment before the first step.
-        # This path must not touch runtime managers such as the termination
-        # manager because manager construction is still in progress.
-        self._resample_time_steps(
-            torch.arange(self.num_envs, device=self.device),
-            update_failure_statistics=False,
-        )
+        # Sample or assign initial frames before the first step. This path must
+        # not touch runtime managers such as the termination manager because
+        # manager construction is still in progress.
+        if self.cfg.sampling_mode == "assigned_sequential":
+            self._initialize_assigned_motion_tracks()
+        else:
+            self._resample_time_steps(
+                torch.arange(self.num_envs, device=self.device),
+                update_failure_statistics=False,
+            )
         self._update_motion_data()
         self._update_state_data()
 
@@ -681,6 +689,10 @@ class MotionCommand(CommandTerm):
         self._motion_body_ori_b_mat_window = None
         self._joint_pos_delta_window = None
         self._previous_time_steps = None
+        self.assigned_motion_ids = None
+        self.assigned_motion_starts = None
+        self.assigned_motion_ends = None
+        self.assigned_last_center_steps = None
 
     def _initialize_observation_caches(self) -> None:
         """Allocate all per-step caches used by observations and rewards."""
@@ -825,6 +837,13 @@ class MotionCommand(CommandTerm):
         )
         self.adaptive_sampler = self._build_adaptive_sampler()
 
+    def _initialize_assignment_metadata(self) -> None:
+        """Initialize metadata for deterministic motion assignment mode."""
+        self.assigned_motion_ids = None
+        self.assigned_motion_starts = None
+        self.assigned_motion_ends = None
+        self.assigned_last_center_steps = None
+
     def _build_adaptive_sampler(self) -> AdaptiveSamplingModule:
         """Instantiate the configured adaptive sampling module.
 
@@ -841,6 +860,55 @@ class MotionCommand(CommandTerm):
         raise ValueError(
             f"Unsupported adaptive sampler type: {self.cfg.adaptive_sampler_type}"
         )
+
+    def _initialize_assigned_motion_tracks(self) -> None:
+        """Assign one unique motion trajectory to each environment.
+
+        This mode is intended for deterministic evaluation or dataset
+        playback. Each environment starts from the first valid center frame of
+        its assigned motion and then advances monotonically without resampling.
+
+        Raises:
+            AssertionError: If the number of environments does not match the
+                number of motions while one-to-one assignment is requested.
+        """
+        assert (
+            self.num_envs == self.motion.num_motions
+        ), (
+            "assigned_sequential sampling requires num_envs to equal the number "
+            "of loaded motion trajectories."
+        )
+        self.assigned_motion_ids = torch.arange(
+            self.num_envs, dtype=torch.long, device=self.device
+        )
+        assigned_motion_ranges = self.motion.motion_indices[self.assigned_motion_ids]
+        self.assigned_motion_starts = assigned_motion_ranges[:, 0]
+        self.assigned_motion_ends = assigned_motion_ranges[:, 1]
+        self.assigned_last_center_steps = (
+            self.assigned_motion_ends - self.cfg.future_frames - 1
+        )
+        self.time_steps = self.assigned_motion_starts + self.cfg.history_frames
+        print("_initialize_assigned_motion_tracks: ",self.assigned_motion_starts,self.assigned_motion_ends,self.cfg.history_frames,self.time_steps)
+        assert torch.all(
+            self.time_steps <= self.assigned_last_center_steps
+        ), (
+            "assigned_sequential sampling requires every assigned motion to have "
+            "at least history_frames + future_frames + 1 frames."
+        )
+        self.env_motion_ids = self.assigned_motion_ids.clone()
+
+    def _advance_assigned_motion_tracks(self) -> None:
+        """Advance deterministically assigned motions without resampling."""
+        self._previous_time_steps = self.time_steps.clone()
+        self.time_steps += 1
+        print("_advance_assigned_motion_tracks: ",self.assigned_motion_starts,self.assigned_motion_ends,self.time_steps)
+        if self.cfg.freeze_assigned_motion_at_end:
+            self.time_steps = torch.minimum(
+                self.time_steps, self.assigned_last_center_steps
+            )
+        else:
+            overflow_mask = self.time_steps > self.assigned_last_center_steps
+            self.time_steps[overflow_mask] = self.assigned_motion_starts[overflow_mask] + self.cfg.history_frames
 
     def _flatten_window(self, tensor: torch.Tensor | None) -> torch.Tensor:
         """Flatten a temporal-window tensor into `[num_envs, -1]`.
@@ -1106,7 +1174,23 @@ class MotionCommand(CommandTerm):
         """
         if len(env_ids) == 0:
             return
-        self._resample_time_steps(env_ids)
+        if self.cfg.sampling_mode == "assigned_sequential":
+            # In assigned-sequential mode, resampling means restoring the
+            # deterministic per-env motion assignment instead of drawing a new
+            # motion/frame from the adaptive sampler. This branch is required
+            # because Isaac Lab may call `_resample_command()` during reset or
+            # initialization outside of `_update_command()`.
+            env_ids_tensor = torch.as_tensor(
+                env_ids, dtype=torch.long, device=self.device
+            )
+            self.time_steps[env_ids_tensor] = (
+                self.assigned_motion_starts[env_ids_tensor] + self.cfg.history_frames
+            )
+            self.env_motion_ids[env_ids_tensor] = self.assigned_motion_ids[
+                env_ids_tensor
+            ]
+        else:
+            self._resample_time_steps(env_ids)
         # Refresh motion caches so the reset uses the newly sampled frame.
         self._update_motion_data()
         self._resample_reset_robot_state(env_ids)
@@ -1182,6 +1266,12 @@ class MotionCommand(CommandTerm):
 
     def _update_command(self) -> None:
         """Advance the active frame and resample environments when needed."""
+        if self.cfg.sampling_mode == "assigned_sequential":
+            self._advance_assigned_motion_tracks()
+            self._update_motion_data()
+            self._update_state_data()
+            return
+
         # Keep a snapshot of the frame that produced the current transition so
         # failed episodes can attribute their sampling credit correctly.
         self._previous_time_steps = self.time_steps.clone()
@@ -1500,6 +1590,10 @@ class MotionCommandCfg(CommandTermCfg):
         velocity_range: Root velocity perturbation applied during reset.
         joint_position_range: Joint position perturbation applied during reset.
         joint_velocity_range: Reserved for future use.
+        sampling_mode: High-level motion playback mode. Use `assigned_sequential`
+            to bind one environment to one motion and run it from start to end.
+        freeze_assigned_motion_at_end: Whether assigned-sequential mode should
+            stop at the final valid center frame instead of looping.
         adaptive_sampler_type: Name of the adaptive sampling module to use.
         adaptive_bin_duration_s: Duration of each adaptive-sampling bin in
             seconds. When left unset, the implementation falls back to the
@@ -1531,6 +1625,8 @@ class MotionCommandCfg(CommandTermCfg):
     joint_position_range: tuple[float, float] = (-0.52, 0.52)
     joint_velocity_range: tuple[float, float] = (-0.52, 0.52)
 
+    sampling_mode: str = "assigned_sequential"  # "adaptive" | "assigned_sequential"
+    freeze_assigned_motion_at_end: bool = True
     adaptive_sampler_type: str = "sonic" # "sonic" | "legacy_bin"
     adaptive_bin_duration_s: float | None = None
     adaptive_kernel_size: int = 1

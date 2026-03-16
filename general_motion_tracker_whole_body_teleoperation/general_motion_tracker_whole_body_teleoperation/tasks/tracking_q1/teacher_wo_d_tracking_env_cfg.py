@@ -561,7 +561,7 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
         # self.decimation = 20
         # self.sim.dt = 0.001
 
-        self.episode_length_s = 10.0
+        self.episode_length_s = 100000000.0
         # simulation settings
         self.sim.render_interval = self.decimation
         self.sim.physics_material = self.scene.terrain.physics_material
