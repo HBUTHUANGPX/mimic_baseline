@@ -100,7 +100,7 @@ class cfg:
     policy_path = (
         current_path
         + "/"
-        + "deploy_mujoco/deploy_policy/Q1/2026-03-12_14-51-15_Q1_slowly_walk"
+        + "deploy_mujoco/deploy_policy/Q1/2026-03-18_15-38-27_xsens_all"
         + "/policy.onnx"
     )
     asset_path = "/deploy_mujoco/assets/Q1"
@@ -111,7 +111,9 @@ class cfg:
         + "/deploy_mujoco/artifacts/Q1/"
         # + "xsens_bvh/251020_21/251021_05_xingyiquan_120Hz.npz"
         # + "xsens_bvh/251020_21/251021_04_boxing_120Hz.npz"
-        + "xsens_bvh/251021/251021_01_slowly_walk_120Hz.npz"
+        # + "xsens_bvh/251021/251021_01_slowly_walk_120Hz.npz"
+        # + "xsens_bvh/251021/251021_03_saw_120Hz.npz"
+        + "xsens_bvh/251202/01_stand_right_wave_120Hz.npz"
     )
     only_leg_flag = False  # True, False
     with_wrist_flag = True  # True, False
@@ -119,20 +121,20 @@ class cfg:
     ###################################################
     # stiffness damping and joint maximum torqueparam #
     ###################################################
-    leg_P_gains = [350, 50, 450, 300, 70.0, 70.0] * 2
     leg_tq_max = [158.7, 64.4, 158.7, 158.7, 75.9, 75.9] * (2)
-    leg_D_gains = [6.0, 2.5, 12.0, 6.0, 1.5, 1.5] * 2
+    leg_P_gains = [350, 150, 450, 300, 70.0, 70.0] * 2
+    leg_D_gains = [6.0, 2.5, 12.0, 12.0, 1.5, 1.5] * 2
 
-    pelvis_P_gains = [280.0]
     pelvis_tq_max = [158.7]
+    pelvis_P_gains = [280.0]
     pelvis_D_gains = [4.5]
 
-    arm_P_gains = [70.0, 70.0, 70.0, 70.0, 20.0, 20.0, 20.0] * (2)
     arm_tq_max = [42.0, 42.0, 23.0, 23.0, 8.3, 3.3, 3.3] * (2)
+    arm_P_gains = [70.0, 70.0, 70.0, 70.0, 20.0, 20.0, 20.0] * (2)
     arm_D_gains = [1.5, 1.5, 2.0, 2.0, 1.0, 1.0, 1.0] * (2)
 
-    head_P_gains = [3.0, 1.5]
     head_tq_max = [2.52, 1.26]
+    head_P_gains = [3.0, 1.5]
     head_D_gains = [0.6, 0.3]
     ########################
     # joint maximum torque #
