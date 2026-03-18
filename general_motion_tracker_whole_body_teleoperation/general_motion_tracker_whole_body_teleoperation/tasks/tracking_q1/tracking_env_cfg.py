@@ -401,7 +401,6 @@ class ObservationsCfg:
     command: CommandCfg = CommandCfg()  # 无噪 特权 cmd
     # command: CommandWindowCfg = CommandWindowCfg()  # 无噪 特权 cmd
     proprioception: ProprioceptionCfg = ProprioceptionCfg() # 无噪 特权 本体
-    
     last_action: LastActionCfg = LastActionCfg()
 
     motion_id: MotionIdCfg = MotionIdCfg()
