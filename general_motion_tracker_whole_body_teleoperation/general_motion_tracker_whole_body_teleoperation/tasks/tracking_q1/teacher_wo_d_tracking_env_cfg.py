@@ -561,12 +561,12 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
         # self.decimation = 20
         # self.sim.dt = 0.001
 
-        self.episode_length_s = 100000000.0
+        self.episode_length_s = 10.0
         # simulation settings
         self.sim.render_interval = self.decimation
         self.sim.physics_material = self.scene.terrain.physics_material
         self.sim.physx.gpu_max_rigid_patch_count = 10 * 2**15
         # viewer settings
-        self.viewer.eye = (3, 3, 1.5)
-        self.viewer.origin_type = "asset_root"
-        self.viewer.asset_name = "robot"
+        # self.viewer.eye = (3, 3, 1.5)
+        # self.viewer.origin_type = "asset_root"
+        # self.viewer.asset_name = "robot"

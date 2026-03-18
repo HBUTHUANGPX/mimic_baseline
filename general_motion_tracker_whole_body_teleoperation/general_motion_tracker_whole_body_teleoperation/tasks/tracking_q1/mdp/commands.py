@@ -1625,7 +1625,7 @@ class MotionCommandCfg(CommandTermCfg):
     joint_position_range: tuple[float, float] = (-0.52, 0.52)
     joint_velocity_range: tuple[float, float] = (-0.52, 0.52)
 
-    sampling_mode: str = "assigned_sequential"  # "adaptive" | "assigned_sequential"
+    sampling_mode: str = "adaptive"  # "adaptive" | "assigned_sequential"
     freeze_assigned_motion_at_end: bool = True
     adaptive_sampler_type: str = "sonic" # "sonic" | "legacy_bin"
     adaptive_bin_duration_s: float | None = None

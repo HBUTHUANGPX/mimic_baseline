@@ -34,7 +34,7 @@ ImplicitActuator_actuators = {
             ".*_hip_roll_joint": scale
             * 138.0,  # 保守稳定运行 130.0，临界堵转 138.0  峰值 330.0
             ".*_hip_yaw_joint": scale
-            * 56.0,  # 保守稳定运行 40.0，临界堵转 56.0  峰值 125.0
+            * 56.0,  # 保守稳定运行 25.0，临界堵转 56.0  峰值 125.0
             ".*_hip_pitch_joint": scale
             * 138.0,  # 保守稳定运行 130.0，临界堵转 138.0  峰值 330.0
             ".*_knee_joint": scale
@@ -48,15 +48,15 @@ ImplicitActuator_actuators = {
         },
         stiffness={
             ".*_hip_roll_joint": 350,
-            ".*_hip_yaw_joint": 50,
+            ".*_hip_yaw_joint": 150,
             ".*_hip_pitch_joint": 450,
-            ".*_knee_joint": 300,
+            ".*_knee_joint": 450,
         },
         damping={
             ".*_hip_roll_joint": 6.0,
-            ".*_hip_yaw_joint": 2.5,
+            ".*_hip_yaw_joint": 4.5,
             ".*_hip_pitch_joint": 12.0,
-            ".*_knee_joint": 6.0,
+            ".*_knee_joint": 12.0,
         },
         armature={
             ".*_hip_roll_joint": 70017 * 1e-6,
