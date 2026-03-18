@@ -344,7 +344,7 @@ class ObservationsCfg:
             func=mdp.joint_pos_delta_window, params={"command_name": "motion"}
         )
         target_joint_pos = ObsTerm(
-            func=mdp.motion_joint_pos_window, params={"command_name": "motion"},
+            func=mdp.joint_pos_delta_window, params={"command_name": "motion"},
         )
         motion_ref_pos_b = ObsTerm(
             func=mdp.motion_ref_pos_b_window,
@@ -355,11 +355,11 @@ class ObservationsCfg:
             params={"command_name": "motion"},
         )
         body_pos = ObsTerm(
-            func=mdp.motion_body_pos_b_window,
+            func=mdp.robot_body_pos_b_window,
             params={"command_name": "motion"},
         )
         body_ori = ObsTerm(
-            func=mdp.motion_body_ori_b_window,
+            func=mdp.robot_body_ori_b_window,
             params={"command_name": "motion"},
         )
 

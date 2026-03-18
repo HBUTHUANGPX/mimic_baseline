@@ -685,6 +685,8 @@ class MotionCommand(CommandTerm):
         self._body_pos_w_window = None
         self._motion_ref_pos_b_window = None
         self._motion_ref_ori_b_mat_window = None
+        self._robot_body_pos_b_window = None
+        self._robot_body_ori_b_mat_window = None
         self._motion_body_pos_b_window = None
         self._motion_body_ori_b_mat_window = None
         self._joint_pos_delta_window = None
@@ -1413,6 +1415,29 @@ class MotionCommand(CommandTerm):
             + quat_apply(delta_ori_w, self.body_pos_w - ref_pos_repeat)
         )
 
+        # Express the robot's current tracked bodies in the robot reference
+        # frame itself.
+        #
+        # Inputs:
+        #   1. `robot_ref_pos_repeat`, `robot_ref_quat_repeat`
+        #      The current robot reference-body pose in world frame, expanded
+        #      to one copy per tracked body.
+        #   2. `selected_robot_body_pos_w`, `selected_robot_body_quat_w`
+        #      The current simulator-measured pose of each tracked robot body
+        #      in world frame.
+        #
+        # Outputs:
+        #   1. `robot_body_pos_b`
+        #      Body positions represented in the robot reference frame.
+        #   2. `robot_body_ori_b`
+        #      Body orientations represented relative to the robot reference
+        #      frame.
+        #
+        # Role in the command pipeline:
+        #   This branch describes "what the robot is doing now" in a body-local
+        #   coordinate system that is invariant to the robot's global position
+        #   and heading. Downstream observations use it as the proprioceptive
+        #   body-pose baseline that can be compared against motion targets.
         robot_body_pos_b, robot_body_ori_b = subtract_frame_transforms(
             robot_ref_pos_repeat,
             robot_ref_quat_repeat,
@@ -1422,6 +1447,29 @@ class MotionCommand(CommandTerm):
         self._robot_body_pos_b = robot_body_pos_b
         self._robot_body_ori_b_mat = matrix_from_quat(robot_body_ori_b)
 
+        # Express the motion reference body in the current robot reference
+        # frame.
+        #
+        # Inputs:
+        #   1. `robot_ref_pos_w`, `robot_ref_quat_w`
+        #      The robot's current reference-body pose in world frame.
+        #   2. `ref_pos_w`, `ref_quat_w`
+        #      The sampled motion's reference-body pose at the current center
+        #      frame in world frame.
+        #
+        # Outputs:
+        #   1. `motion_ref_pos_b`
+        #      The translation from the current robot reference body to the
+        #      motion reference body, expressed in the robot reference frame.
+        #   2. `motion_ref_ori_b`
+        #      The relative orientation from the current robot reference body
+        #      to the motion reference body.
+        #
+        # Role in the command pipeline:
+        #   This branch describes "where the motion target is" relative to the
+        #   robot's current pose. In other words, the previous block encodes the
+        #   robot's present body configuration, while this block encodes the
+        #   motion target anchor that the policy should track.
         motion_ref_pos_b, motion_ref_ori_b = subtract_frame_transforms(
             robot_ref_pos_w,
             robot_ref_quat_w,
@@ -1463,6 +1511,30 @@ class MotionCommand(CommandTerm):
         robot_ref_quat_w_window = robot_ref_quat_w[:, None, :].expand(
             -1, window_size, -1
         )
+        # Window version of `motion_ref_pos_b` / `motion_ref_ori_b`.
+        #
+        # Inputs:
+        #   1. `robot_ref_pos_w_window`, `robot_ref_quat_w_window`
+        #      The current robot reference-body pose, broadcast to every time
+        #      slot in the command window. This means the whole window is
+        #      always interpreted relative to the robot's current pose.
+        #   2. `motion_ref_pos_w_window`, `motion_ref_quat_w_window`
+        #      The sampled motion reference-body pose for each temporal offset
+        #      in `[t-n, ..., t, ..., t+m]`.
+        #
+        # Outputs:
+        #   1. `motion_ref_pos_b_window`
+        #      For every window element, the motion reference-body translation
+        #      expressed in the current robot reference frame.
+        #   2. `motion_ref_ori_b_window`
+        #      For every window element, the motion reference-body orientation
+        #      relative to the current robot reference frame.
+        #
+        # Role in the command pipeline:
+        #   This is the temporal extension of the single-frame target-anchor
+        #   observation. It tells the policy where the motion reference body
+        #   was, is, and will be, all described in one consistent coordinate
+        #   frame tied to the robot's current state.
         motion_ref_pos_b_window, motion_ref_ori_b_window = subtract_frame_transforms(
             robot_ref_pos_w_window,
             robot_ref_quat_w_window,
@@ -1478,14 +1550,43 @@ class MotionCommand(CommandTerm):
         robot_ref_quat_w_body = robot_ref_quat_w[:, None, None, :].expand(
             -1, window_size, num_bodies, -1
         )
-        motion_body_pos_b_window, motion_body_ori_b_window = subtract_frame_transforms(
+        # Window version of `robot_body_pos_b` / `robot_body_ori_b`.
+        #
+        # Inputs:
+        #   1. `robot_ref_pos_w_body`, `robot_ref_quat_w_body`
+        #      The current robot reference-body pose, broadcast to every body
+        #      and every time slot in the command window.
+        #   2. `self._body_pos_w_window`, `self._motion_body_quat_w_window`
+        #      The world-frame body pose sequence associated with the sampled
+        #      command window, ordered as `[t-n, ..., t, ..., t+m]`.
+        #
+        # Outputs:
+        #   1. `robot_body_pos_b_window`
+        #      Body positions for each time slot, expressed in the current
+        #      robot reference frame.
+        #   2. `robot_body_ori_b_window`
+        #      Body orientations for each time slot, expressed relative to the
+        #      current robot reference frame.
+        #
+        # Role in the command pipeline:
+        #   This is the temporal extension of the body-pose observation. It
+        #   lets downstream window observations compare a full body-pose
+        #   trajectory against the current robot-centered coordinate frame
+        #   rather than only seeing the center frame.
+        robot_body_pos_b_window, robot_body_ori_b_window = subtract_frame_transforms(
             robot_ref_pos_w_body,
             robot_ref_quat_w_body,
             self._body_pos_w_window,
             self._motion_body_quat_w_window,
         )
-        self._motion_body_pos_b_window = motion_body_pos_b_window
-        self._motion_body_ori_b_mat_window = matrix_from_quat(motion_body_ori_b_window)
+        self._robot_body_pos_b_window = robot_body_pos_b_window
+        self._robot_body_ori_b_mat_window = matrix_from_quat(robot_body_ori_b_window)
+
+        # Preserve the legacy cache names so existing downstream code continues
+        # to work while the window-observation API is migrated to the aligned
+        # `robot_body_*_window` naming scheme.
+        self._motion_body_pos_b_window = self._robot_body_pos_b_window
+        self._motion_body_ori_b_mat_window = self._robot_body_ori_b_mat_window
 
         robot_joint_pos_window = robot_joint_pos[:, None, :].expand(-1, window_size, -1)
         self._joint_pos_delta_window = (
@@ -1636,7 +1737,7 @@ class MotionCommandCfg(CommandTermCfg):
     sonic_mix_alpha: float = 0.1
     sonic_failure_cap_beta: float = 200.0
     history_frames: int = 0
-    future_frames: int = 0
+    future_frames: int = 4
     profile_properties: bool = True
 
     ref_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(

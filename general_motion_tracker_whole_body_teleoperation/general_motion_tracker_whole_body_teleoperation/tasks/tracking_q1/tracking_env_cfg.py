@@ -204,7 +204,7 @@ class ObservationsCfg:
 
         def __post_init__(self):
             self.enable_corruption = True
-            self.history_length = 24
+            self.history_length = 8
 
     @configclass
     class ProprioceptionCfg(ObsGroup):  # 无噪 特权 本体
@@ -217,7 +217,7 @@ class ObservationsCfg:
 
         def __post_init__(self):
             self.enable_corruption = True
-            # self.history_length = 24
+            # self.history_length = 8
 
     @configclass
     class ProprioceptionWOPrivilegeCfg(ObsGroup):  # 无噪 无特权 本体
@@ -229,7 +229,7 @@ class ObservationsCfg:
 
         def __post_init__(self):
             self.enable_corruption = True
-            self.history_length = 24
+            self.history_length = 8
 
     @configclass
     class CommandWithNoiseCfg(ObsGroup):  # 有噪 特权 cmd
@@ -398,8 +398,11 @@ class ObservationsCfg:
     command_with_noise_wo_privilege : CommandWithNoiseWOPrivilegeCfg = CommandWithNoiseWOPrivilegeCfg()  # 有噪 无特权 cmd
     proprioception_with_noise_wo_privilege : ProprioceptionWithNoiseWOPrivilegeCfg = ProprioceptionWithNoiseWOPrivilegeCfg()  # 有噪 无特权 本体
 
-    command: CommandCfg = CommandCfg()  # 无噪 特权 cmd
-    # command: CommandWindowCfg = CommandWindowCfg()  # 无噪 特权 cmd
+    # Use the window-backed command observations. When history_frames and
+    # future_frames are both zero, these terms reduce exactly to the original
+    # single-frame observations and can be used to validate correctness before
+    # enabling larger temporal windows.
+    command: CommandWindowCfg = CommandWindowCfg()  # 无噪 特权 cmd
     proprioception: ProprioceptionCfg = ProprioceptionCfg() # 无噪 特权 本体
     last_action: LastActionCfg = LastActionCfg()
 

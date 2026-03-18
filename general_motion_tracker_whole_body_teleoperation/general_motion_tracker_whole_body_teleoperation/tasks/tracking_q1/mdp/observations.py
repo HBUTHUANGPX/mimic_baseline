@@ -211,3 +211,103 @@ def robot_joint_pos(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     """
     command = _get_command(env, command_name)
     return command.joint_pos
+
+
+def joint_pos_delta_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    """Return joint-position deltas for the full temporal window.
+
+    Args:
+        env: Environment instance.
+        command_name: Name of the motion command term.
+
+    Returns:
+        Flattened tensor with time order `[t - n, ..., t, ..., t + m]`.
+    """
+    command = _get_command(env, command_name)
+    return command._flatten_window(command._joint_pos_delta_window)
+
+
+def robot_joint_pos_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    """Return target joint positions for the full temporal window.
+
+    The historical single-frame function `robot_joint_pos()` returns the target
+    motion joint positions at the center frame. The window version extends that
+    behavior to the full command window.
+
+    Args:
+        env: Environment instance.
+        command_name: Name of the motion command term.
+
+    Returns:
+        Flattened target joint-position tensor in temporal order.
+    """
+    command = _get_command(env, command_name)
+    return command._flatten_window(command.joint_pos_window)
+
+
+def motion_ref_pos_b_window(
+    env: ManagerBasedEnv, command_name: str
+) -> torch.Tensor:
+    """Return motion reference-body positions for the full temporal window.
+
+    Args:
+        env: Environment instance.
+        command_name: Name of the motion command term.
+
+    Returns:
+        Flattened tensor in temporal order.
+    """
+    command = _get_command(env, command_name)
+    return command._flatten_window(command._motion_ref_pos_b_window)
+
+
+def motion_ref_ori_b_window(
+    env: ManagerBasedEnv, command_name: str
+) -> torch.Tensor:
+    """Return motion reference-body orientations for the full temporal window.
+
+    Args:
+        env: Environment instance.
+        command_name: Name of the motion command term.
+
+    Returns:
+        Flattened 6D rotation representation in temporal order.
+    """
+    command = _get_command(env, command_name)
+    return command._flatten_window(command._motion_ref_ori_b_mat_window[..., :2])
+
+
+def robot_body_pos_b_window(
+    env: ManagerBasedEnv, command_name: str
+) -> torch.Tensor:
+    """Return body positions for the full temporal window.
+
+    The command module caches a window-aligned body-position tensor, so the
+    window observation should consume that cache directly instead of repeating
+    the center-frame tensor.
+
+    Args:
+        env: Environment instance.
+        command_name: Name of the motion command term.
+
+    Returns:
+        Flattened body-position tensor in temporal order.
+    """
+    command = _get_command(env, command_name)
+    return command._flatten_window(command._robot_body_pos_b_window)
+
+
+def robot_body_ori_b_window(
+    env: ManagerBasedEnv, command_name: str
+) -> torch.Tensor:
+    """Return body orientations for the full temporal window.
+
+    Args:
+        env: Environment instance.
+        command_name: Name of the motion command term.
+
+    Returns:
+        Flattened 6D rotation representation in temporal order.
+    """
+    command = _get_command(env, command_name)
+    return command._flatten_window(command._robot_body_ori_b_mat_window[..., :2])
