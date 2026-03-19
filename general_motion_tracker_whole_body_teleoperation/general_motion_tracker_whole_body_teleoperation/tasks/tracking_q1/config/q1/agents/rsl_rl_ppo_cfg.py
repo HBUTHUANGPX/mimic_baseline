@@ -56,6 +56,15 @@ class Q1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         clip_param=0.2,
     )
 
+@configclass
+class Q1FlatPPOSingleFSQRunnerCfg(Q1FlatPPORunnerCfg):
+    ...
+    def __post_init__(self):
+        super().__post_init__()
+        self.class_name = "OnPolicyRunnerFSQ"
+        self.policy.class_name = "ActorCriticSingleFSQ"
+        self.algorithm.class_name = "PPOSingleFSQ"
+
 @configclass  # 有特权信息WO DR 的训练
 class Q1FlatTeacherPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 24

@@ -101,7 +101,7 @@ import torch
 import glob
 from typing import List
 
-from rsl_rl.runners import DistillationRunner, OnPolicyRunner
+from rsl_rl.runners import DistillationRunner, OnPolicyRunner, OnPolicyRunnerFSQ
 
 from isaaclab.envs import (
     DirectMARLEnv,
@@ -224,6 +224,10 @@ def main(
     # load previously trained model
     if agent_cfg.class_name == "OnPolicyRunner":
         runner = OnPolicyRunner(
+            env, agent_cfg.to_dict(), log_dir=None, device=agent_cfg.device
+        )
+    elif agent_cfg.class_name == "OnPolicyRunnerFSQ":
+        runner = OnPolicyRunnerFSQ(
             env, agent_cfg.to_dict(), log_dir=None, device=agent_cfg.device
         )
     elif agent_cfg.class_name == "DistillationRunner":
