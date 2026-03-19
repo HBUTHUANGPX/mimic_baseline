@@ -341,6 +341,28 @@ class ObservationsCfg:
         def __post_init__(self):
             self.enable_corruption = True
 
+    @configclass
+    class CommandWindowWithNoiseWOPrivilegeCfg(ObsGroup):  # 有噪 无特权 cmd
+        """Observations for command group with noise."""
+
+        joint_pos_delta = ObsTerm(
+            func=mdp.joint_pos_delta_window,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.02, n_max=0.02),
+        )
+        target_joint_pos = ObsTerm(
+            func=mdp.robot_joint_pos_window,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.02, n_max=0.02),
+        )
+        motion_ref_ori_b = ObsTerm(
+            func=mdp.motion_ref_ori_b_window,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.05, n_max=0.05),
+        )
+
+        def __post_init__(self):
+            self.enable_corruption = True
 
     @configclass
     class CommandWindowCfg(ObsGroup):  # 无噪 特权 cmd
@@ -395,14 +417,17 @@ class ObservationsCfg:
     critic: PrivilegedCfg = PrivilegedCfg()
 
 
-    command_with_noise_wo_privilege : CommandWithNoiseWOPrivilegeCfg = CommandWithNoiseWOPrivilegeCfg()  # 有噪 无特权 cmd
-    proprioception_with_noise_wo_privilege : ProprioceptionWithNoiseWOPrivilegeCfg = ProprioceptionWithNoiseWOPrivilegeCfg()  # 有噪 无特权 本体
-
+    
     # Use the window-backed command observations. When history_frames and
     # future_frames are both zero, these terms reduce exactly to the original
     # single-frame observations and can be used to validate correctness before
     # enabling larger temporal windows.
+    command_with_noise_wo_privilege : CommandWindowWithNoiseWOPrivilegeCfg = CommandWindowWithNoiseWOPrivilegeCfg()  # 有噪 无特权 cmd
+    # command_with_noise_wo_privilege : CommandWithNoiseWOPrivilegeCfg = CommandWithNoiseWOPrivilegeCfg()  # 有噪 无特权 cmd
+    proprioception_with_noise_wo_privilege : ProprioceptionWithNoiseWOPrivilegeCfg = ProprioceptionWithNoiseWOPrivilegeCfg()  # 有噪 无特权 本体
+
     command: CommandWindowCfg = CommandWindowCfg()  # 无噪 特权 cmd
+    # command: CommandCfg = CommandCfg()  # 无噪 特权 cmd
     proprioception: ProprioceptionCfg = ProprioceptionCfg() # 无噪 特权 本体
     last_action: LastActionCfg = LastActionCfg()
 
