@@ -26,8 +26,15 @@ import general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp as 
 ##
 # Scene definition
 ##
-
-VELOCITY_RANGE = {
+VELOCITY_RANGE_ZERO = {
+    "x": (-0.0, 0.0),
+    "y": (-0.0, 0.0),
+    "z": (-0.0, 0.0),
+    "roll": (-0.0, 0.0),
+    "pitch": (-0.0, 0.0),
+    "yaw": (-0.0, 0.0),
+}
+VELOCITY_RANGE_MID = {
     "x": (-1.2, 1.2),
     "y": (-0.5, 0.5),
     "z": (-0.2, 0.2),
@@ -35,7 +42,40 @@ VELOCITY_RANGE = {
     "pitch": (-0.52, 0.52),
     "yaw": (-0.78, 0.78),
 }
+VELOCITY_RANGE_HIGH = {
+    "x": (-2.4, 2.4),
+    "y": (-1.2, 1.2),
+    "z": (-0.5, 0.5),
+    "roll": (-1.52, 01.52),
+    "pitch": (-1.52, 1.52),
+    "yaw": (-1.78, 1.78),
+}
 
+
+POSE_RANGE_ZERO = {
+    "x": (-0.0, 0.0),
+    "y": (-0.0, 0.0),
+    "z": (-0.0, 0.0),
+    "roll": (-0., 0.),
+    "pitch": (-0., 0.),
+    "yaw": (-0., 0.),
+}
+POSE_RANGE_NORMAL = {
+    "x": (-0.1, 0.1),
+    "y": (-0.1, 0.1),
+    "z": (-0.0, 0.2),
+    "roll": (-0.1, 0.1),
+    "pitch": (-0.1, 0.1),
+    "yaw": (-0.2, 0.2),
+}
+POSE_RANGE_HIGH = {
+    "x": (-0.2, 0.2),
+    "y": (-0.2, 0.2),
+    "z": (-0.0, 0.3),
+    "roll": (-0.2, 0.2),
+    "pitch": (-0.2, 0.2),
+    "yaw": (-0.3, 0.3),
+}
 
 @configclass
 class MySceneCfg(InteractiveSceneCfg):
@@ -81,6 +121,9 @@ class MySceneCfg(InteractiveSceneCfg):
 # MDP settings
 ##
 
+JOINTS_POSITION_RANGE_NORMAL = (-0.1, 0.1)
+JOINTS_POSITION_RANGE_HIGH = (-0.2, 0.2)
+JOINTS_POSITION_RANGE_ZERO = (-0.0, 0.0)
 
 @configclass
 class CommandsCfg:
@@ -90,25 +133,9 @@ class CommandsCfg:
         asset_name="robot",
         resampling_time_range=(1.0e9, 1.0e9),
         debug_vis=True,
-        pose_range={
-            # "x": (-0.0, 0.0),
-            # "y": (-0.0, 0.0),
-            # "z": (-0.0, 0.0),
-            # "roll": (-0., 0.),
-            # "pitch": (-0., 0.),
-            # "yaw": (-0., 0.),
-            "x": (-0.1, 0.1),
-            "z": (-0.0, 0.2),
-            "y": (-0.1, 0.1),
-            "roll": (-0.1, 0.1),
-            "pitch": (-0.1, 0.1),
-            "yaw": (-0.2, 0.2),
-        },
-        velocity_range=VELOCITY_RANGE,
-        # joint_position_range=(-0., 0.),
-        # joint_velocity_range=(-0., 0.),
-        joint_position_range=(-0.1, 0.1),
-        # joint_velocity_range=(-0.1, 0.1),
+        pose_range=POSE_RANGE_NORMAL,
+        velocity_range=VELOCITY_RANGE_MID,
+        joint_position_range=JOINTS_POSITION_RANGE_NORMAL,
     )
 
 
@@ -229,7 +256,7 @@ class ObservationsCfg:
 
         def __post_init__(self):
             self.enable_corruption = True
-            self.history_length = 8
+            # self.history_length = 8
 
     @configclass
     class CommandWithNoiseCfg(ObsGroup):  # 有噪 特权 cmd
@@ -513,7 +540,7 @@ class EventCfg:
         func=mdp.push_by_setting_velocity,
         mode="interval",
         interval_range_s=(1.0, 3.0),
-        params={"velocity_range": VELOCITY_RANGE},
+        params={"velocity_range": VELOCITY_RANGE_MID},
     )
 
     # reset robot
@@ -643,48 +670,3 @@ class CurriculumCfg:
 
     pass
 
-
-##
-# Environment configuration
-##
-
-
-@configclass
-class TrackingEnvCfg(ManagerBasedRLEnvCfg):
-    """Configuration for the locomotion velocity-tracking environment."""
-
-    # Scene settings
-    scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
-    # scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
-    # Basic settings
-    observations: ObservationsCfg = ObservationsCfg()
-    actions: ActionsCfg = ActionsCfg()
-    commands: CommandsCfg = CommandsCfg()
-    # MDP settings
-    rewards: RewardsCfg = RewardsCfg()
-    terminations: TerminationsCfg = TerminationsCfg()
-    events: EventCfg = EventCfg()
-    curriculum: CurriculumCfg = CurriculumCfg()
-
-    def __post_init__(self):
-        """Post initialization."""
-        # general settings
-        # self.decimation = 4
-        # self.sim.dt = 0.005
-
-        self.decimation = 1
-        self.sim.dt = 0.02
-
-        self.observations.proprioception_with_noise_wo_privilege.history_length = 0
-        self.commands.motion.future_frames = 0
-        # self.decimation = 20
-        # self.sim.dt = 0.001
-        self.episode_length_s = 10.0
-        # simulation settings
-        self.sim.render_interval = self.decimation
-        self.sim.physics_material = self.scene.terrain.physics_material
-        self.sim.physx.gpu_max_rigid_patch_count = 10 * 2**15
-        # viewer settings
-        self.viewer.eye = (3, 3, 1.5)
-        self.viewer.origin_type = "asset_root"
-        self.viewer.asset_name = "robot"
