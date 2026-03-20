@@ -656,8 +656,8 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
 
     # Scene settings
     # scene: MySceneCfg = MySceneCfg(num_envs=64, env_spacing=2.5)
-    scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
-    # scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
+    # scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
+    scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
@@ -677,8 +677,8 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
         self.decimation = 1
         self.sim.dt = 0.02
 
-        self.observations.proprioception_with_noise_wo_privilege.history_length = 0
-        self.commands.motion.future_frames = 0
+        self.observations.proprioception_with_noise_wo_privilege.history_length = 8
+        self.commands.motion.future_frames = 10
         # self.decimation = 20
         # self.sim.dt = 0.001
         self.episode_length_s = 10.0

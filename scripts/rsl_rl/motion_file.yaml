@@ -83,7 +83,8 @@ motion_group:
       # "artifacts/Q1/xsens_bvh/251021/251021_05_xingyiquan_120Hz.npz"
       ]
     folder_name: [
-      "artifacts/Q1/xsens_bvh"
+      "artifacts/Q1/xsens_bvh",
+      "artifacts/Q1/100STYLE",
     ]
     # file_name: []
     # folder_name: []
