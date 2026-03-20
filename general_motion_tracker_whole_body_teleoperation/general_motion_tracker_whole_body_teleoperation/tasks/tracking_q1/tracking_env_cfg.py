@@ -422,13 +422,14 @@ class ObservationsCfg:
     # future_frames are both zero, these terms reduce exactly to the original
     # single-frame observations and can be used to validate correctness before
     # enabling larger temporal windows.
-    command_with_noise_wo_privilege : CommandWindowWithNoiseWOPrivilegeCfg = CommandWindowWithNoiseWOPrivilegeCfg()  # 有噪 无特权 cmd
-    # command_with_noise_wo_privilege : CommandWithNoiseWOPrivilegeCfg = CommandWithNoiseWOPrivilegeCfg()  # 有噪 无特权 cmd
+    command_window_with_noise_wo_privilege : CommandWindowWithNoiseWOPrivilegeCfg = CommandWindowWithNoiseWOPrivilegeCfg()  # 有噪 无特权 cmd
+    command_with_noise_wo_privilege : CommandWithNoiseWOPrivilegeCfg = CommandWithNoiseWOPrivilegeCfg()  # 有噪 无特权 cmd
     proprioception_with_noise_wo_privilege : ProprioceptionWithNoiseWOPrivilegeCfg = ProprioceptionWithNoiseWOPrivilegeCfg()  # 有噪 无特权 本体
 
-    command: CommandWindowCfg = CommandWindowCfg()  # 无噪 特权 cmd
-    # command: CommandCfg = CommandCfg()  # 无噪 特权 cmd
+    command_window: CommandWindowCfg = CommandWindowCfg()  # 无噪 特权 cmd
+    command: CommandCfg = CommandCfg()  # 无噪 特权 cmd
     proprioception: ProprioceptionCfg = ProprioceptionCfg() # 无噪 特权 本体
+
     last_action: LastActionCfg = LastActionCfg()
 
     motion_id: MotionIdCfg = MotionIdCfg()
@@ -654,6 +655,7 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the locomotion velocity-tracking environment."""
 
     # Scene settings
+    # scene: MySceneCfg = MySceneCfg(num_envs=64, env_spacing=2.5)
     scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
     # scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
     # Basic settings

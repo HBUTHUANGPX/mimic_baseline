@@ -30,6 +30,12 @@ class Q1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
                 "last_action",
                 # "critic"
             ],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
+            "policy_window":[
+                "command_window_with_noise_wo_privilege",
+            ],
+            "critic_window":[
+                "command_window",
+            ]
         },
     )
     experiment_name = "q1_flat"
