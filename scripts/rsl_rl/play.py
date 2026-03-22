@@ -261,13 +261,22 @@ def main(
     # export policy to onnx/jit
     export_model_dir = os.path.join(os.path.dirname(resume_path), "exported")
 
-    export_motion_policy_as_onnx(
-        env.unwrapped,
-        policy_nn,
-        normalizer=normalizer,
-        path=export_model_dir,
-        filename="policy.onnx",
-    )
+    if runner.alg.policy.__class__.__name__ == 'ActorCriticSingleFSQ':
+        _policy = runner.alg.policy
+        _policy.export_policy_as_onnx(
+            env,
+            path=export_model_dir,
+            filename="policy.onnx",
+            verbose=False,
+        )
+    else:
+        export_motion_policy_as_onnx(
+            env.unwrapped,
+            policy_nn,
+            normalizer=normalizer,
+            path=export_model_dir,
+            filename="policy.onnx",
+        )
     
     dt = env.unwrapped.step_dt
 

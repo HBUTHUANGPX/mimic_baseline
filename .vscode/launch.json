@@ -84,6 +84,18 @@
                 "--run_name",  "xsens_all_fsq",
             ]
         },
+        {
+            "name": "single fsq play",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/home/hpx/HPX_LOCO_2/mimic_baseline/scripts/rsl_rl/play.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--task", "Tracking-Flat-Q1-v1",
+                "--num_envs", "4",
+                "--domain_randomization"
+            ]
+        },
 
     ]
 }
