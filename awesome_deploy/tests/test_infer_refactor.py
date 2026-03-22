@@ -47,4 +47,6 @@ def test_minimum_infer_uses_inference_engine_and_updates_target_action():
     assert context.time_step == 3
     assert np.allclose(context.obs, np.asarray([0.1, 0.2], dtype=np.float32))
     assert np.allclose(runner.action, np.asarray([0.5, -0.25], dtype=np.float32))
-    assert np.allclose(runner.target_dof_pos, np.asarray([0.625, -0.3125], dtype=np.float32))
+    assert np.allclose(
+        runner.target_dof_pos, np.asarray([0.625, -0.3125], dtype=np.float32)
+    )

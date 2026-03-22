@@ -17,11 +17,17 @@ class FakeBackend:
         return ModelSignature(
             inputs={
                 "obs": TensorSpec(name="obs", shape=(1, 3), dtype="tensor(float)"),
-                "time_step": TensorSpec(name="time_step", shape=(1, 1), dtype="tensor(float)"),
+                "time_step": TensorSpec(
+                    name="time_step", shape=(1, 1), dtype="tensor(float)"
+                ),
             },
             outputs={
-                "actions": TensorSpec(name="actions", shape=(1, 2), dtype="tensor(float)"),
-                "joint_pos": TensorSpec(name="joint_pos", shape=(1, 2), dtype="tensor(float)"),
+                "actions": TensorSpec(
+                    name="actions", shape=(1, 2), dtype="tensor(float)"
+                ),
+                "joint_pos": TensorSpec(
+                    name="joint_pos", shape=(1, 2), dtype="tensor(float)"
+                ),
             },
         )
 
@@ -56,5 +62,7 @@ def test_inference_engine_updates_buffers_and_parses_mimo_outputs():
     assert np.allclose(result.primary_action, np.asarray([1.0, -1.0], dtype=np.float32))
     assert "joint_pos" in result.outputs
     assert engine.buffers.get("time_step") == 2
-    assert np.allclose(engine.buffers.get("action"), np.asarray([1.0, -1.0], dtype=np.float32))
+    assert np.allclose(
+        engine.buffers.get("action"), np.asarray([1.0, -1.0], dtype=np.float32)
+    )
     assert np.allclose(engine.buffers.get("prev_action"), np.zeros(2, dtype=np.float32))

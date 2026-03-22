@@ -1,29 +1,40 @@
+"""URDF graph traversal helpers used to derive stable joint/link orderings."""
+
 import xml.etree.ElementTree as ET
-from collections import deque, defaultdict
+from collections import defaultdict, deque
 
 
 class UrdfGraph:
+    """Builds a traversable robot graph from a URDF file.
+
+    The deployment pipeline relies on multiple orderings:
+
+    - file order, matching the order defined in the URDF;
+    - BFS order, matching the ordering used by some simulators and datasets;
+    - DFS order, occasionally useful for debugging tree structure.
+    """
+
     def __init__(self, urdf_path):
+        """Parses the URDF and precomputes parent/child adjacency maps."""
         self.urdf_path = urdf_path
         self.tree = ET.parse(urdf_path)
         self.root = self.tree.getroot()
-
         self._parent_to_children_joints = defaultdict(list)
         self._parent_to_children_links = defaultdict(list)
         self._child_links = set()
         self._parent_links = set()
         self._joints = []
-
         self._build_graph()
 
     def _build_graph(self):
-        for j in self.root.findall("joint"):
-            name = j.get("name")
-            jtype = j.get("type")
+        """Collects non-fixed joints and corresponding link connectivity."""
+        for joint in self.root.findall("joint"):
+            name = joint.get("name")
+            jtype = joint.get("type")
             if jtype == "fixed":
                 continue
-            parent = j.find("parent").get("link")
-            child = j.find("child").get("link")
+            parent = joint.find("parent").get("link")
+            child = joint.find("child").get("link")
             self._joints.append((name, parent, child, jtype))
             self._parent_to_children_joints[parent].append((child, name))
             self._parent_to_children_links[parent].append(child)
@@ -31,22 +42,25 @@ class UrdfGraph:
             self._parent_links.add(parent)
 
     def root_link(self):
+        """Returns the inferred root link of the robot tree."""
         roots = list(self._parent_links - self._child_links)
         if roots:
             return roots[0]
         return self._joints[0][1] if self._joints else None
 
     def joint_order_by_file(self):
+        """Returns movable joint names in the order they appear in the URDF."""
         order = []
-        for j in self.root.findall("joint"):
-            name = j.get("name")
-            jtype = j.get("type")
+        for joint in self.root.findall("joint"):
+            name = joint.get("name")
+            jtype = joint.get("type")
             if jtype in ("fixed", "floating"):
                 continue
             order.append(name)
         return order
 
     def link_order_by_file(self):
+        """Returns link names in file order."""
         order = []
         for link in self.root.findall("link"):
             name = link.get("name")
@@ -56,19 +70,21 @@ class UrdfGraph:
         return order
 
     def bfs_joint_order(self):
+        """Returns movable joint names in breadth-first tree order."""
         root_link = self.root_link()
         if root_link is None:
             return []
         order = []
-        q = deque([root_link])
-        while q:
-            link = q.popleft()
+        queue = deque([root_link])
+        while queue:
+            link = queue.popleft()
             for child_link, joint_name in self._parent_to_children_joints.get(link, []):
                 order.append(joint_name)
-                q.append(child_link)
+                queue.append(child_link)
         return order
 
     def dfs_joint_order(self):
+        """Returns movable joint names in depth-first tree order."""
         root_link = self.root_link()
         if root_link is None:
             return []
@@ -83,29 +99,15 @@ class UrdfGraph:
         return order
 
     def bfs_link_order(self):
+        """Returns link names in breadth-first tree order."""
         root_link = self.root_link()
         if root_link is None:
             return []
         order = []
-        q = deque([root_link])
-        while q:
-            link = q.popleft()
+        queue = deque([root_link])
+        while queue:
+            link = queue.popleft()
             order.append(link)
             for child in self._parent_to_children_links.get(link, []):
-                q.append(child)
+                queue.append(child)
         return order
-
-
-if __name__ == "__main__":
-    urdf_path = "deploy_mujoco/assets/Q1/urdf/Q1_wo_hand_rl.urdf"
-    urdf = UrdfGraph(urdf_path)
-
-    isaac_sim_joint_names = urdf.bfs_joint_order()
-    isaac_sim_link_names = urdf.bfs_link_order()
-    mujoco_joint_names = urdf.joint_order_by_file()
-    mujoco_link_names = urdf.link_order_by_file()
-
-    print(isaac_sim_joint_names)
-    print(isaac_sim_link_names)
-    print(mujoco_joint_names)
-    print(mujoco_link_names)

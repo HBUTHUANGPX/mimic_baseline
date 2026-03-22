@@ -1,3 +1,5 @@
+"""Robot configuration definitions for deployment-time simulation."""
+
 from awesome_deploy.utils.urdf_graph import UrdfGraph
 from awesome_deploy.utils.motor_conf import *
 from awesome_deploy import AWESOME_DIR
@@ -5,15 +7,23 @@ from awesome_deploy import AWESOME_DIR
 import os
 import sys
 
-print(AWESOME_DIR)
 current_path = AWESOME_DIR
 
 
 class BaseRobotCfg:
+    """Base configuration shared by all supported robots.
+
+    The class centralizes policy asset paths, timing parameters, and name
+    mappings required to translate between MuJoCo ordering and dataset ordering.
+    Concrete robot subclasses are expected to provide robot-specific assets and
+    motor parameters through class attributes.
+    """
+
     group: dict
     urdf_path: str
 
     def __init__(self):
+        """Initializes paths and shared deployment parameters for one robot."""
 
         self.simulator_dt = 0.002
         self.policy_dt = 0.02
@@ -28,46 +38,37 @@ class BaseRobotCfg:
             + self.group["motion"]
             + ".npz"
         )
-        ################
-        # action param #
-        ################
+        # Action scaling is applied after the neural policy output is produced
+        # and before the target joint position is sent to the PD controller.
         self.action_clip = 10.0
         self.action_scale = 0.25
 
-        ####################
-        # motion play mode #
-        ####################
-        """
-        if motion_play is true, robots in mujoco will set 
-        qpos and qvel through the retargeting dataset 
-        """
-        self.motion_play = False  # False, True
+        # When enabled, the simulator follows the motion dataset directly
+        # instead of applying policy actions through the PD controller.
+        self.motion_play = False
 
-        ###########################################
-        # Data conversion of isaac sim and mujoco #
-        ###########################################
+        # Build name mappings once so runtime code can cheaply convert among
+        # URDF order, MuJoCo order, and motion dataset order.
         self.urdf_graph = UrdfGraph(self.urdf_path)
         self.isaac_sim_joint_name = self.urdf_graph.bfs_joint_order()
-
-        self.isaac_sim_link_name = (
-            self.urdf_graph.bfs_link_order()
-        )  # env.unwrapped.scene["robot"].body_names
+        self.isaac_sim_link_name = self.urdf_graph.bfs_link_order()
 
 
 class G1RobotCfg(BaseRobotCfg):
+    """Concrete deployment configuration for the Unitree G1 robot."""
+
     group = {
         "policy": "policy/g1/2026-02-26_22-16-14_G1_slowly_walk",
         "motion": "03_fast_forward_walk_120Hz",
-        # "motion": "01_slowly_forward_walk_120Hz"
     }
 
     asset_path = current_path + "/assets/unitree_g1"
     mjcf_path = asset_path + "/g1_29dof_rev_1_0.xml"
     urdf_path = asset_path + "/g1_29dof_mode_15.urdf"
 
-    ###################################################
-    # stiffness damping and joint maximum torqueparam #
-    ###################################################
+    # Motor groups are stored separately to match the physical robot's
+    # kinematic layout while still allowing runtime code to flatten them into a
+    # single MuJoCo joint vector.
     motor_cfg = {
         "leg": {
             "stiffness": [
@@ -146,6 +147,7 @@ class G1RobotCfg(BaseRobotCfg):
     motion_reference_body = "torso_link"
 
     def __init__(self):
+        """Initializes the base configuration with G1-specific metadata."""
         super().__init__()
 
 
@@ -159,6 +161,17 @@ def resolve_robot_name(
     env_var: str = "AWESOME_DEPLOY_ROBOT_NAME",
     default: str = "g1",
 ) -> str:
+    """Resolves the active robot name from CLI arguments or environment.
+
+    Args:
+        argv: Optional argument list. Defaults to ``sys.argv``.
+        env_var: Environment variable checked when CLI arguments do not specify
+            the robot.
+        default: Fallback robot name.
+
+    Returns:
+        The resolved robot identifier, such as ``"g1"``.
+    """
     argv = argv if argv is not None else sys.argv
     for index, arg in enumerate(argv):
         if arg.startswith("robot_name="):
@@ -172,8 +185,18 @@ def resolve_robot_name(
 
 
 def build_robot_cfg(robot_name: str) -> BaseRobotCfg:
+    """Builds the concrete configuration object for one robot name.
+
+    Args:
+        robot_name: Registry key identifying the robot configuration class.
+
+    Returns:
+        Instantiated robot configuration.
+
+    Raises:
+        ValueError: If the requested robot is not registered.
+    """
     try:
-        print(robot_name)
         cfg_cls = ROBOT_CFG_REGISTRY[robot_name]
     except KeyError as exc:
         supported = ", ".join(sorted(ROBOT_CFG_REGISTRY))
@@ -187,5 +210,6 @@ cfg: G1RobotCfg | BaseRobotCfg = build_robot_cfg(resolve_robot_name())
 
 
 def get_robot_cfg(robot_name=None):
+    """Returns the active robot config or resolves a specific robot on demand."""
     resolved_robot_name = robot_name or resolve_robot_name()
     return build_robot_cfg(resolved_robot_name)
