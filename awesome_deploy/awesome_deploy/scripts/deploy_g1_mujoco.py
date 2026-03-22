@@ -1,12 +1,7 @@
-from bootstrap import ensure_repo_root_on_path
-
-ensure_repo_root_on_path(__file__)
-
-from awesome_deploy.utils.video_recorder import VideoRecorder
+from awesome_deploy.utils import VideoRecorder
 from awesome_deploy.utils.math_func import *
 from awesome_deploy.utils.cfg import cfg,current_path
 from awesome_deploy.utils.infer import infere
-
 import numpy as np
 import time
 import os
