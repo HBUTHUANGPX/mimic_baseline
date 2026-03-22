@@ -62,20 +62,18 @@ class infere:
         self.single_obs = np.zeros(self.obs_num, dtype=np.float32)
 
     def _init_robot_conf(self):
-        sorted_keys = sorted(cfg.motor_cfg.keys())
-
         self.default_pos = np.array(
             [value for part in cfg.motor_cfg.values() for value in part["default_pos"]],
             dtype=np.float32,
-        )  # [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        ) 
         self.P_gains = np.array(
             [value for part in cfg.motor_cfg.values() for value in part["stiffness"]],
             dtype=np.float32,
-        )  # [70.0, 70.0, 3.0, 70.0, 70.0, 70.0, 1.5, 180.0, 180.0, 70.0, 70.0, 180.0, 180.0, 70.0, 70.0, 330.0, 330.0, 20.0, 20.0, 330.0, 330.0, 20.0, 20.0, 70.0, 70.0, 20.0, 20.0, 70.0, 70.0]
+        ) 
         self.D_gains = np.array(
             [value for part in cfg.motor_cfg.values() for value in part["damping"]],
             dtype=np.float32,
-        )  # [1.5, 1.5, 0.6, 1.5, 1.5, 1.5, 0.3, 2.5, 2.5, 2.0, 2.0, 2.5, 2.5, 2.0, 2.0, 3.0, 3.0, 1.0, 1.0, 3.0, 3.0, 1.0, 1.0, 1.5, 1.5, 1.0, 1.0, 1.5, 1.5]
+        ) 
         self.tq_max = np.array(
             [value for part in cfg.motor_cfg.values() for value in part["torque_max"]],
             dtype=np.float32,
@@ -233,3 +231,4 @@ class infere:
 
     def _obs_actions(self):
         raise NotImplementedError
+
