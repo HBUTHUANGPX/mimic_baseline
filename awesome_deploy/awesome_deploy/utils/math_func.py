@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def matrix_from_quat(quaternions: np.ndarray) -> np.ndarray:
     """Convert rotations given as quaternions to rotation matrices.
 

@@ -10,7 +10,14 @@ class VideoRecorder(object):
     Simple video record that creates a video from a stream of images.
     """
 
-    def __init__(self, path="./LocoMuJoCo_recordings", tag=None, video_name=None, fps=60, compress=True):
+    def __init__(
+        self,
+        path="./LocoMuJoCo_recordings",
+        tag=None,
+        video_name=None,
+        fps=60,
+        compress=True,
+    ):
         """
         Constructor.
 
@@ -64,8 +71,12 @@ class VideoRecorder(object):
         path = self._path / name
 
         self._video_writer_path = str(path)
-        self._video_writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc('m', 'p', '4', 'v'),
-                                             self._fps, (width, height))
+        self._video_writer = cv2.VideoWriter(
+            str(path),
+            cv2.VideoWriter_fourcc("m", "p", "4", "v"),
+            self._fps,
+            (width, height),
+        )
 
     def stop(self):
         try:
@@ -83,21 +94,30 @@ class VideoRecorder(object):
                 subprocess.run(
                     [
                         "ffmpeg",
-                        "-i", self._video_writer_path,  # Input video
-                        "-c:v", "libx264",  # H.264 codec
-                        "-profile:v", "baseline",  # Set to Baseline profile (can change to main if needed)
-                        "-preset", "fast",  # Encoding preset
-                        "-crf", "23",  # Quality setting
+                        "-i",
+                        self._video_writer_path,  # Input video
+                        "-c:v",
+                        "libx264",  # H.264 codec
+                        "-profile:v",
+                        "baseline",  # Set to Baseline profile (can change to main if needed)
+                        "-preset",
+                        "fast",  # Encoding preset
+                        "-crf",
+                        "23",  # Quality setting
                         "-an",  # Remove audio
-                        "-r", "30",  # Frame rate
+                        "-r",
+                        "30",  # Frame rate
                         "-y",  # Overwrite existing file
-                        tmp_file  # Output file
+                        tmp_file,  # Output file
                     ],
                     stdout=subprocess.DEVNULL,  # Suppress standard output
-                    check=True  # Raise an error if ffmpeg fails
+                    check=True,  # Raise an error if ffmpeg fails
                 )
                 os.replace(tmp_file, self._video_writer_path)
-                print("Successfully compressed recorded video and saved at: ", self._video_writer_path)
+                print(
+                    "Successfully compressed recorded video and saved at: ",
+                    self._video_writer_path,
+                )
 
             except subprocess.CalledProcessError as e:
                 print(f"Video compression failed: {e}")

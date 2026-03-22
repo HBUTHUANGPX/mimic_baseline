@@ -2,11 +2,11 @@ import os
 import numpy as np
 from collections.abc import Sequence
 
+
 class MotionLoader:
     def __init__(
         self, motion_file: str, body_indexes: Sequence[int], device: str = "cpu"
     ):
-        
 
         if isinstance(motion_file, str):
             self.motion_file = [motion_file]
@@ -33,18 +33,10 @@ class MotionLoader:
                     self.fps == data["fps"]
                 ), "All motion files must have the same fps."
 
-            joint_pos_list.append(
-                np.asarray(data["joint_pos"], dtype=np.float32)
-            )
-            joint_vel_list.append(
-                np.asarray(data["joint_vel"], dtype=np.float32)
-            )
-            body_pos_w_list.append(
-                np.asarray(data["body_pos_w"], dtype=np.float32)
-            )
-            body_quat_w_list.append(
-                np.asarray(data["body_quat_w"], dtype=np.float32)
-            )
+            joint_pos_list.append(np.asarray(data["joint_pos"], dtype=np.float32))
+            joint_vel_list.append(np.asarray(data["joint_vel"], dtype=np.float32))
+            body_pos_w_list.append(np.asarray(data["body_pos_w"], dtype=np.float32))
+            body_quat_w_list.append(np.asarray(data["body_quat_w"], dtype=np.float32))
             body_lin_vel_w_list.append(
                 np.asarray(data["body_lin_vel_w"], dtype=np.float32)
             )
@@ -59,12 +51,12 @@ class MotionLoader:
         self._body_lin_vel_w = np.concatenate(body_lin_vel_w_list, axis=0)
         self._body_ang_vel_w = np.concatenate(body_ang_vel_w_list, axis=0)
         print("motion clips:")
-        print("self.joint_pos.shape: ",self.joint_pos.shape)
-        print("self.joint_vel.shape: ",self.joint_vel.shape)
-        print("self._body_pos_w.shape: ",self._body_pos_w.shape)
-        print("self._body_quat_w.shape: ",self._body_quat_w.shape)
-        print("self._body_lin_vel_w.shape: ",self._body_lin_vel_w.shape)
-        print("self._body_ang_vel_w.shape: ",self._body_ang_vel_w.shape)
+        print("self.joint_pos.shape: ", self.joint_pos.shape)
+        print("self.joint_vel.shape: ", self.joint_vel.shape)
+        print("self._body_pos_w.shape: ", self._body_pos_w.shape)
+        print("self._body_quat_w.shape: ", self._body_quat_w.shape)
+        print("self._body_lin_vel_w.shape: ", self._body_lin_vel_w.shape)
+        print("self._body_ang_vel_w.shape: ", self._body_ang_vel_w.shape)
         self._body_indexes = body_indexes
         self.time_step_total = self.joint_pos.shape[0]
 

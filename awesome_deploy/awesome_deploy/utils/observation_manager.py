@@ -1,6 +1,7 @@
 import inspect
 import numpy as np
 
+
 class SimpleObservationManager:
     """简化版 ObservationManager：从 cfg 解析观测组/项，支持 history/clip/scale/拼接。"""
 
@@ -60,7 +61,9 @@ class SimpleObservationManager:
             # 记录拼接策略
             self._group_concat[group_name] = bool(group_cfg.concatenate_terms)
             concat_dim = getattr(group_cfg, "concatenate_dim", -1)
-            self._group_concat_dim[group_name] = concat_dim + 1 if concat_dim >= 0 else concat_dim
+            self._group_concat_dim[group_name] = (
+                concat_dim + 1 if concat_dim >= 0 else concat_dim
+            )
 
             # 组级 history/flatten，可覆盖 term 级配置
             group_history = getattr(group_cfg, "history_length", None)
@@ -123,7 +126,9 @@ class SimpleObservationManager:
                 }
             # 调试输出：打印当前解析到的 group/term
             term_names = [t["name"] for t in self._group_terms[group_name]]
-            print(f"[SimpleObservationManager] group='{group_name}', terms={term_names}")
+            print(
+                f"[SimpleObservationManager] group='{group_name}', terms={term_names}"
+            )
 
     def _to_numpy(self, obs):
         # 统一为 numpy.ndarray，便于后续处理（支持 numpy / list / 标量 / torch.Tensor）
@@ -185,7 +190,11 @@ class SimpleObservationManager:
         # 5) 按组配置决定拼接或返回 dict
         if self._group_concat[group_name]:
             return np.concatenate(group_obs, axis=self._group_concat_dim[group_name])
-        return {term["name"]: obs for term, obs in zip(self._group_terms[group_name], group_obs)}
+        return {
+            term["name"]: obs
+            for term, obs in zip(self._group_terms[group_name], group_obs)
+        }
+
 
 class TermCfg:
     """观测项配置：func 可省略，默认解析为 env._obs_{term_name}。"""

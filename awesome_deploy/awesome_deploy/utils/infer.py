@@ -1,21 +1,29 @@
-from awesome_deploy.utils.observation_manager import SimpleObservationManager, TermCfg, GroupCfg
+from awesome_deploy.utils.observation_manager import (
+    SimpleObservationManager,
+    TermCfg,
+    GroupCfg,
+)
 from awesome_deploy.utils.motion_loader import MotionLoader
 from awesome_deploy.utils.obscfg import ObsCfg
-from awesome_deploy.utils.cfg import cfg,current_path
+from awesome_deploy.utils.cfg import cfg, current_path
 from awesome_deploy.utils.pinocchio_func import pin_mj
 import copy
 import onnxruntime as ort
 import numpy as np
 
+
 class infere:
     policy: ort.InferenceSession
+
     def __init__(self):
         print("==infere init==")
         self._init_robot_conf()
         self._init_policy_conf()
         self.pin = pin_mj(cfg)
         self.obs_manager = SimpleObservationManager(ObsCfg(), self)
-        self.first_frame_pos = np.copy(self.motion.joint_pos[0])[self.isaac_sim2mujoco_index]
+        self.first_frame_pos = np.copy(self.motion.joint_pos[0])[
+            self.isaac_sim2mujoco_index
+        ]
 
     def _init_policy_conf(self):
         self.body_indexes = np.asarray(
@@ -35,11 +43,11 @@ class infere:
         print("control_decimation: ", self.control_decimation)
         self.policy = self.load_onnx_model(cfg.policy_path)
         if hasattr(self.policy, "_outputs_meta"):
-            for (idx,meta) in enumerate(self.policy._outputs_meta):
+            for idx, meta in enumerate(self.policy._outputs_meta):
                 if meta.name == "actions":
                     self.action_num = meta.shape[1]
         if hasattr(self.policy, "_inputs_meta"):
-            for (idx,meta) in enumerate(self.policy._inputs_meta):
+            for idx, meta in enumerate(self.policy._inputs_meta):
                 if meta.name == "obs":
                     self.obs_num = meta.shape[1]
         self.h2_action = np.zeros(self.action_num, dtype=np.float32)
@@ -49,25 +57,27 @@ class infere:
 
         self.action_scale = cfg.action_scale
         self.action_num = self.action_num
-        self.obs = np.zeros(self.obs_num * cfg.frame_stack, dtype=np.float32)
+        self.obs = np.zeros(self.obs_num, dtype=np.float32)
         self.time_step = 1
         self.single_obs = np.zeros(self.obs_num, dtype=np.float32)
 
     def _init_robot_conf(self):
+        sorted_keys = sorted(cfg.motor_cfg.keys())
+
         self.default_pos = np.array(
-            cfg.leg_default_pos
-            + cfg.pelvis_default_pos
-            + cfg.arm_default_pos,
+            [value for part in cfg.motor_cfg.values() for value in part["default_pos"]],
             dtype=np.float32,
         )  # [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         self.P_gains = np.array(
-            cfg.leg_P_gains + cfg.pelvis_P_gains + cfg.arm_P_gains,
+            [value for part in cfg.motor_cfg.values() for value in part["stiffness"]],
+            dtype=np.float32,
         )  # [70.0, 70.0, 3.0, 70.0, 70.0, 70.0, 1.5, 180.0, 180.0, 70.0, 70.0, 180.0, 180.0, 70.0, 70.0, 330.0, 330.0, 20.0, 20.0, 330.0, 330.0, 20.0, 20.0, 70.0, 70.0, 20.0, 20.0, 70.0, 70.0]
         self.D_gains = np.array(
-            cfg.leg_D_gains + cfg.pelvis_D_gains + cfg.arm_D_gains,
+            [value for part in cfg.motor_cfg.values() for value in part["damping"]],
+            dtype=np.float32,
         )  # [1.5, 1.5, 0.6, 1.5, 1.5, 1.5, 0.3, 2.5, 2.5, 2.0, 2.0, 2.5, 2.5, 2.0, 2.0, 3.0, 3.0, 1.0, 1.0, 3.0, 3.0, 1.0, 1.0, 1.5, 1.5, 1.0, 1.0, 1.5, 1.5]
         self.tq_max = np.array(
-            cfg.leg_tq_max + cfg.pelvis_tq_max + cfg.arm_tq_max,
+            [value for part in cfg.motor_cfg.values() for value in part["torque_max"]],
             dtype=np.float32,
         )
         self.P_n = np.zeros_like(self.default_pos)
@@ -181,7 +191,7 @@ class infere:
         self.h_action = self.action.copy()
         self._policy_reasoning()
         self.post_action()
-        self.time_step+=1
+        self.time_step += 1
         # self.time_step=0
 
     def update_obs(self):
@@ -223,4 +233,3 @@ class infere:
 
     def _obs_actions(self):
         raise NotImplementedError
-

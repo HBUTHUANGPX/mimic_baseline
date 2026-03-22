@@ -1,4 +1,10 @@
-from awesome_deploy.utils.observation_manager import SimpleObservationManager, TermCfg, GroupCfg
+from awesome_deploy.utils.observation_manager import (
+    SimpleObservationManager,
+    TermCfg,
+    GroupCfg,
+)
+
+
 class ObsCfg:
     """观测总配置：每个属性是一个 GroupCfg 实例。"""
 

@@ -1,8 +1,6 @@
 from .video_recorder import VideoRecorder
 
-__all__ = [
-    "VideoRecorder"
-]
+__all__ = ["VideoRecorder"]
 
 import os
 

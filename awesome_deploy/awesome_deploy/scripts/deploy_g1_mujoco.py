@@ -1,6 +1,6 @@
 from awesome_deploy.utils import VideoRecorder
 from awesome_deploy.utils.math_func import *
-from awesome_deploy.utils.cfg import cfg,current_path
+from awesome_deploy.utils.cfg import cfg, current_path
 from awesome_deploy.utils.infer import infere
 import numpy as np
 import time
@@ -9,8 +9,8 @@ import os
 import mujoco.viewer
 import mujoco
 
-
 np.set_printoptions(precision=16, linewidth=100, threshold=np.inf, suppress=True)
+
 
 class simulator(infere):
 
@@ -39,9 +39,7 @@ class simulator(infere):
 
     def motion_play(self):
         t = int(self.time_step)
-        self.d.qpos[0:3] = np.asarray(
-            self.motion.body_pos_w[t, 7, :]
-        )
+        self.d.qpos[0:3] = np.asarray(self.motion.body_pos_w[t, 7, :])
         self.d.qpos[0:2] = 0
         q = np.asarray(self.motion.body_quat_w[t, 0, :])
         self.d.qpos[3:7] = q
@@ -105,7 +103,7 @@ class simulator(infere):
             "P_gain": [self.P_gains],
             "D_gain": [self.D_gains],
             "target_pos": [],
-            "qfrc_actuator":[],
+            "qfrc_actuator": [],
         }
 
         while self.viewer.is_running():
@@ -160,7 +158,7 @@ class simulator(infere):
             "xpos",
             "xquat",
             "cvel",
-            "qfrc_actuator"
+            "qfrc_actuator",
         ):
             log[k] = np.stack(log[k], axis=0)
         save_path = current_path + "/tmp/motion.npz"
@@ -217,7 +215,9 @@ class simulator(infere):
         _quat = self.pin.get_link_quaternion(cfg.motion_reference_body)
         self.robot_ref_quat_w = np.expand_dims(_quat, axis=0)  # shape [n,4]
         self.ref_quat_w = self.motion.body_quat_w[
-            int(self.time_step), cfg.motion_body_names.index(cfg.motion_reference_body), :
+            int(self.time_step),
+            cfg.motion_body_names.index(cfg.motion_reference_body),
+            :,
         ]  # shape [n,4]
         q01 = self.robot_ref_quat_w
         q02 = self.ref_quat_w
