@@ -29,8 +29,6 @@ class cfg:
         + group["motion"]
         + ".npz"
     )
-    only_leg_flag = False  # True, False
-    with_wrist_flag = True  # True, False
 
     ###################################################
     # stiffness damping and joint maximum torqueparam #
@@ -46,10 +44,6 @@ class cfg:
     arm_P_gains = [STIFFNESS_5020, STIFFNESS_5020, STIFFNESS_5020, STIFFNESS_5020, STIFFNESS_5020, STIFFNESS_4010, STIFFNESS_4010] * (2)
     arm_D_gains = [DAMPING_5020, DAMPING_5020, DAMPING_5020, DAMPING_5020, DAMPING_5020, DAMPING_4010, DAMPING_4010] * (2)
     arm_tq_max = [25.0, 25.0, 25.0, 25.0, 25.0, 5.0, 5.0] * (2)
-
-    ########################
-    # joint maximum torque #
-    ########################
 
     #####################
     # joint default pos #
