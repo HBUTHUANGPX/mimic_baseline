@@ -1,31 +1,28 @@
-from awesome_deploy.utils.observation_manager import (
-    SimpleObservationManager,
-    TermCfg,
-    GroupCfg,
-)
+from awesome_deploy.utils.observation_manager import SimpleObservationManager
 from awesome_deploy.utils.motion_loader import MotionLoader
 from awesome_deploy.utils.obscfg import ObsCfg
 from awesome_deploy.utils.cfg import cfg, current_path
 from awesome_deploy.utils.pinocchio_func import pin_mj
+from awesome_deploy.inference import InferenceContext
+from awesome_deploy.inference.backends import OnnxBackend
+from awesome_deploy.inference.engine import InferenceEngine
+from awesome_deploy.inference.io_adapters import DefaultMimoAdapter
 import copy
-import onnxruntime as ort
 import numpy as np
 
 
 class infere:
-    policy: ort.InferenceSession
-
     def __init__(self):
         print("==infere init==")
         self._init_robot_conf()
-        self._init_policy_conf()
+        self._init_inference()
         self.pin = pin_mj(cfg)
         self.obs_manager = SimpleObservationManager(ObsCfg(), self)
         self.first_frame_pos = np.copy(self.motion.joint_pos[0])[
             self.isaac_sim2mujoco_index
         ]
 
-    def _init_policy_conf(self):
+    def _init_inference(self):
         self.body_indexes = np.asarray(
             self.motion_body_names_in_isaacsim_index, dtype=np.int64
         )
@@ -41,24 +38,30 @@ class infere:
             self.policy_dt = cfg.policy_dt
         self.control_decimation = int(self.policy_dt / cfg.simulator_dt)
         print("control_decimation: ", self.control_decimation)
-        self.policy = self.load_onnx_model(cfg.policy_path)
-        if hasattr(self.policy, "_outputs_meta"):
-            for idx, meta in enumerate(self.policy._outputs_meta):
-                if meta.name == "actions":
-                    self.action_num = meta.shape[1]
-        if hasattr(self.policy, "_inputs_meta"):
-            for idx, meta in enumerate(self.policy._inputs_meta):
-                if meta.name == "obs":
-                    self.obs_num = meta.shape[1]
-        self.h2_action = np.zeros(self.action_num, dtype=np.float32)
-        self.h_action = np.zeros(self.action_num, dtype=np.float32)
+        self.inference_engine = InferenceEngine(
+            backend=OnnxBackend(),
+            io_adapter=DefaultMimoAdapter(),
+            model_path=cfg.policy_path,
+            device="cpu",
+        )
+        self.inference_engine.load()
+        self.latest_inference = None
+        signature = self.inference_engine.signature
+        if signature is None:
+            raise RuntimeError("Inference engine signature is not available after load.")
+        action_spec = signature.outputs.get("actions")
+        if action_spec is None or len(action_spec.shape) < 2 or action_spec.shape[1] is None:
+            raise RuntimeError("Inference output 'actions' must have a fixed second dimension.")
+        obs_spec = signature.inputs.get("obs")
+        if obs_spec is None or len(obs_spec.shape) < 2 or obs_spec.shape[1] is None:
+            raise RuntimeError("Inference input 'obs' must have a fixed second dimension.")
+        self.action_num = int(action_spec.shape[1])
+        self.obs_num = int(obs_spec.shape[1])
         self.action = np.zeros(self.action_num, dtype=np.float32)
         self.action_clip = cfg.action_clip
 
         self.action_scale = cfg.action_scale
-        self.action_num = self.action_num
         self.obs = np.zeros(self.obs_num, dtype=np.float32)
-        self.time_step = 1
         self.single_obs = np.zeros(self.obs_num, dtype=np.float32)
 
     def _init_robot_conf(self):
@@ -112,62 +115,19 @@ class infere:
         ]
         print("motion_body_index:\r\n", self.motion_body_names_in_isaacsim_index)
 
-    def load_onnx_model(self, onnx_path, device="cpu"):
-        providers = (
-            ["CPUExecutionProvider"] if device == "cpu" else ["CUDAExecutionProvider"]
-        )
-        session = ort.InferenceSession(onnx_path, providers=providers)
-        return session
+    @property
+    def time_step(self) -> int:
+        if hasattr(self, "inference_engine"):
+            return int(self.inference_engine.buffers.get("time_step", 1))
+        return 1
 
-    def run_onnx_inference(self, session, obs, time_step):
-        # 转换为numpy array并确保数据类型正确
-        obs = np.asarray(obs)
-        time_step = np.asarray(time_step, dtype=np.float32)
-        # 获取输入名称
-        obs_name = session.get_inputs()[0].name
-        time_step_name = session.get_inputs()[1].name
-        # 运行推理
-        (
-            actions,
-            joint_pos,
-            joint_vel,
-            body_pos_w,
-            body_quat_w,
-            body_lin_vel_w,
-            body_ang_vel_w,
-        ) = session.run(
-            None,
-            {
-                obs_name: obs.reshape(1, self.obs_num),
-                time_step_name: time_step.reshape(1, 1),
-            },
-        )
-        return (
-            actions,
-            joint_pos,
-            joint_vel,
-            body_pos_w,
-            body_quat_w,
-            body_lin_vel_w,
-            body_ang_vel_w,
-        )  # 默认返回第一个输出
+    @time_step.setter
+    def time_step(self, value: int) -> None:
+        if hasattr(self, "inference_engine"):
+            self.inference_engine.buffers.set("time_step", int(value))
 
-    def _policy_reasoning(self):
-
-        (
-            act,
-            self.r_joint_pos,
-            self.r_joint_vel,
-            self.r_body_pos_w,
-            self.r_body_quat_w,
-            self.r_body_lin_vel_w,
-            self.r_body_ang_vel_w,
-        ) = self.run_onnx_inference(
-            self.policy, self.obs.astype(np.float32), self.time_step
-        )
-        self.action[:] = act.copy()
-
-    def post_action(self):
+    def post_action(self, action):
+        self.action[:] = np.asarray(action, dtype=np.float32).reshape(-1)
         action = (
             np.clip(
                 copy.deepcopy(self.action[self.isaac_sim2mujoco_index]),
@@ -180,17 +140,21 @@ class infere:
             + self.default_pos
         )
         target_q = action.clip(-self.action_clip, self.action_clip)
-        # print(target_q)
-        self.target_dof_pos = target_q  # + self.default_pos[: self.action_num]
+        self.target_dof_pos = target_q
 
     def minimum_infer(self):
-        self.update_obs()
-        self.h2_action = self.h_action.copy()
-        self.h_action = self.action.copy()
-        self._policy_reasoning()
-        self.post_action()
-        self.time_step += 1
-        # self.time_step=0
+        obs = self.update_obs()
+        context = InferenceContext(
+            obs=obs,
+            time_step=self.time_step,
+            command=self.cmd,
+            extras={"motion": getattr(self, "motion", None)},
+        )
+        result = self.inference_engine.step(context)
+        self.latest_inference = result
+        if result.primary_action is None:
+            raise RuntimeError("Inference result does not contain a primary action.")
+        self.post_action(result.primary_action)
 
     def update_obs(self):
         """
@@ -210,6 +174,7 @@ class infere:
         self.obs = np.clip(
             self.obs_manager.compute_group("policy", update_history=True), -10, 10
         )
+        return self.obs
 
     def _obs_motion_joint_pos_command(self):
         raise NotImplementedError
@@ -231,4 +196,3 @@ class infere:
 
     def _obs_actions(self):
         raise NotImplementedError
-
