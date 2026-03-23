@@ -28,15 +28,14 @@ class BaseRobotCfg:
         self.simulator_dt = 0.002
         self.policy_dt = 0.02
 
-        self.policy_path = current_path + "/" + self.group["policy"] + "/policy.onnx"
+        # Keep all policy-related assets colocated so a robot can switch model,
+        # protocol, and motion files by changing one policy directory entry.
+        self.policy_dir = current_path + "/" + self.group["policy"]
+        self.policy_path = self.policy_dir + "/policy.onnx"
+        self.protocol_path = self.policy_dir + "/policy.protocol.yaml"
 
         self.motion_file = (
-            current_path
-            + "/"
-            + self.group["policy"]
-            + "/"
-            + self.group["motion"]
-            + ".npz"
+            self.policy_dir + "/" + self.group["motion"] + ".npz"
         )
         # Action scaling is applied after the neural policy output is produced
         # and before the target joint position is sent to the PD controller.
@@ -149,10 +148,109 @@ class G1RobotCfg(BaseRobotCfg):
     def __init__(self):
         """Initializes the base configuration with G1-specific metadata."""
         super().__init__()
+class Q1RobotCfg(BaseRobotCfg):
+    """Concrete deployment configuration for the Unitree G1 robot."""
+
+    group = {
+        "policy": "policy/q1/2026-03-20_15-37-52_xsens_all_fsq_s",
+        "motion": "251014_single_action_forward_walk",
+    }
+
+    asset_path = current_path + "/assets/Q1"
+    mjcf_path = asset_path + "/mjcf/Q1_wo_hand.xml"
+    urdf_path = asset_path + "/urdf/Q1_wo_hand_rl.urdf"
+
+    # Motor groups are stored separately to match the physical robot's
+    # kinematic layout while still allowing runtime code to flatten them into a
+    # single MuJoCo joint vector.
+    motor_cfg = {
+        "leg": {
+            "stiffness": [
+                350,
+                150,
+                450,
+                450,
+                70.0,
+                70.0,
+            ]
+            * 2,
+            "damping": [
+                6.0,
+                4.5,
+                12.0,
+                12.0,
+                1.5,
+                1.5,
+            ]
+            * 2,
+            "torque_max": [158.7, 64.4, 158.7, 158.7, 75.9, 75.9] * (2),
+            "default_pos": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0] * (2),
+        },
+        "pelvis": {
+            "stiffness": [280],
+            "damping": [4.5],
+            "torque_max": [158.7],
+            "default_pos": [0.0],
+        },
+        "arm": {
+            "stiffness": [
+                70,
+                70,
+                70,
+                70,
+                20,
+                20,
+                20,
+            ]
+            * (2),
+            "damping": [
+                1.5,
+                1.5,
+                2,
+                2,
+                1.0,
+                1.0,
+                1.0,
+            ]
+            * (2),
+            "torque_max": [42.0, 42.0, 23.0, 23.0, 8.3, 3.3, 3.3] * (2),
+            "default_pos": [0.0] * (7 * 2),
+        },
+        "head": {
+            "stiffness": [3.0, 1.5],
+            "damping": [0.6, 0.3],
+            "torque_max": [2.52, 1.26],
+            "default_pos": [0.0, 0.0],
+        },
+    }
+
+    motion_body_names = [
+        "pelvis_link",
+        "L_hip_yaw_link",
+        "L_knee_link",
+        "L_ankle_roll_link",
+        "R_hip_yaw_link",
+        "R_knee_link",
+        "R_ankle_roll_link",
+        "torso_link",
+        "L_shoulder_roll_link",
+        "L_elbow_link",
+        "L_wrist_pitch_link",
+        "R_shoulder_roll_link",
+        "R_elbow_link",
+        "R_wrist_pitch_link",
+        "head_pitch_link",
+    ]
+    motion_reference_body = "torso_link"
+
+    def __init__(self):
+        """Initializes the base configuration with Q1-specific metadata."""
+        super().__init__()
 
 
 ROBOT_CFG_REGISTRY = {
     "g1": G1RobotCfg,
+    "q1": Q1RobotCfg,
 }
 
 
@@ -206,7 +304,7 @@ def build_robot_cfg(robot_name: str) -> BaseRobotCfg:
     return cfg_cls()
 
 
-cfg: G1RobotCfg | BaseRobotCfg = build_robot_cfg(resolve_robot_name())
+cfg: G1RobotCfg | Q1RobotCfg | BaseRobotCfg = build_robot_cfg(resolve_robot_name())
 
 
 def get_robot_cfg(robot_name=None):

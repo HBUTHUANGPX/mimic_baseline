@@ -1,5 +1,9 @@
 import numpy as np
+import pytest
 
+from awesome_deploy.inference import InputBinding, ModelProtocol
+from awesome_deploy.utils.cfg import G1RobotCfg
+from awesome_deploy.utils import infer as infer_module
 from awesome_deploy.inference.types import InferenceResult
 from awesome_deploy.utils.infer import infere
 
@@ -52,3 +56,49 @@ def test_minimum_infer_uses_inference_engine_and_updates_target_action():
     assert np.allclose(
         runner.target_dof_pos, np.asarray([0.625, -0.3125], dtype=np.float32)
     )
+
+
+def test_robot_cfg_exposes_default_protocol_path():
+    robot_cfg = G1RobotCfg()
+
+    assert robot_cfg.protocol_path.endswith("/policy.protocol.yaml")
+    assert robot_cfg.protocol_path.startswith(robot_cfg.policy_dir)
+
+
+def test_load_model_protocol_uses_cfg_protocol_path(monkeypatch):
+    captured = {}
+    expected_protocol = ModelProtocol(input_bindings={}, output_bindings={})
+
+    def fake_loader(protocol_path, transform_registry):
+        captured["protocol_path"] = protocol_path
+        captured["transform_registry"] = transform_registry
+        return expected_protocol
+
+    monkeypatch.setattr(infer_module, "load_protocol_from_file", fake_loader)
+
+    runner = infere.__new__(infere)
+    protocol = runner._load_model_protocol()
+
+    assert protocol is expected_protocol
+    assert captured["protocol_path"] == infer_module.cfg.protocol_path
+    assert captured["transform_registry"] is infer_module.TRANSFORM_REGISTRY
+
+
+def test_get_single_observation_input_name_rejects_multiple_state_inputs():
+    protocol = ModelProtocol(
+        input_bindings={
+            "actor_obs": InputBinding(
+                source_kind="state",
+                source_key="actor_obs",
+            ),
+            "actor_fsq_obs": InputBinding(
+                source_kind="state",
+                source_key="actor_fsq_obs",
+            ),
+        },
+        output_bindings={},
+    )
+    runner = infere.__new__(infere)
+
+    with pytest.raises(RuntimeError, match="single observation"):
+        runner._get_single_observation_input_name(protocol)

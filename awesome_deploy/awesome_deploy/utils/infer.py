@@ -5,11 +5,10 @@ import copy
 import numpy as np
 
 from awesome_deploy.inference import (
-    BufferInitializer,
-    InputBinding,
     ModelProtocol,
-    OutputBinding,
     RuntimeState,
+    TRANSFORM_REGISTRY,
+    load_protocol_from_file,
 )
 from awesome_deploy.inference.backends import OnnxBackend
 from awesome_deploy.inference.engine import InferenceEngine
@@ -61,7 +60,7 @@ class infere:
             self.policy_dt = cfg.policy_dt
         self.control_decimation = int(self.policy_dt / cfg.simulator_dt)
         print("control_decimation: ", self.control_decimation)
-        protocol = self._build_model_protocol()
+        protocol = self._load_model_protocol()
         self.inference_engine = InferenceEngine(
             backend=OnnxBackend(),
             io_adapter=ProtocolAdapter(protocol),
@@ -76,7 +75,7 @@ class infere:
                 "Inference engine signature is not available after load."
             )
         action_output_name = self._get_primary_output_name(protocol)
-        obs_input_name = self._get_bound_input_name(protocol, "policy_obs", "state")
+        obs_input_name = self._get_single_observation_input_name(protocol)
         action_spec = signature.outputs.get(action_output_name)
         if (
             action_spec is None
@@ -99,71 +98,16 @@ class infere:
         self.obs = np.zeros(self.obs_num, dtype=np.float32)
         self.single_obs = np.zeros(self.obs_num, dtype=np.float32)
 
-    def _build_model_protocol(self) -> ModelProtocol:
-        """Builds the model-specific protocol for the current exported policy."""
-        return ModelProtocol(
-            input_bindings={
-                "obs": InputBinding(
-                    source_kind="state",
-                    source_key="policy_obs",
-                    transform=lambda value: np.asarray(value, dtype=np.float32).reshape(1, -1),
-                ),
-                "time_step": InputBinding(
-                    source_kind="buffer",
-                    source_key="time_step",
-                    transform=lambda value: np.asarray([[value]], dtype=np.float32),
-                ),
-            },
-            output_bindings={
-                "actions": OutputBinding(
-                    target_kind="primary",
-                    target_key="policy_action",
-                    transform=lambda value: np.asarray(value, dtype=np.float32).reshape(-1),
-                ),
-                "joint_pos": OutputBinding(target_kind="output", target_key="joint_pos"),
-                "joint_vel": OutputBinding(target_kind="output", target_key="joint_vel"),
-                "body_pos_w": OutputBinding(target_kind="output", target_key="body_pos_w"),
-                "body_quat_w": OutputBinding(target_kind="output", target_key="body_quat_w"),
-                "body_lin_vel_w": OutputBinding(target_kind="output", target_key="body_lin_vel_w"),
-                "body_ang_vel_w": OutputBinding(target_kind="output", target_key="body_ang_vel_w"),
-            },
-            buffer_initializers={
-                "time_step": BufferInitializer(init_kind="constant", value=1),
-                "action": BufferInitializer(
-                    init_kind="zeros_from_output",
-                    tensor_name="actions",
-                    axis=1,
-                ),
-                "prev_action": BufferInitializer(
-                    init_kind="zeros_from_output",
-                    tensor_name="actions",
-                    axis=1,
-                ),
-                "prev_prev_action": BufferInitializer(
-                    init_kind="zeros_from_output",
-                    tensor_name="actions",
-                    axis=1,
-                ),
-            },
-            per_step_buffer_updates={
-                "time_step": InputBinding(
-                    source_kind="buffer",
-                    source_key="time_step",
-                    transform=lambda value: int(value) + 1,
-                ),
-                "prev_prev_action": InputBinding(
-                    source_kind="buffer",
-                    source_key="prev_action",
-                ),
-                "prev_action": InputBinding(
-                    source_kind="buffer",
-                    source_key="action",
-                ),
-                "action": InputBinding(
-                    source_kind="result",
-                    source_key="primary_action",
-                ),
-            },
+    def _load_model_protocol(self) -> ModelProtocol:
+        """Loads the model protocol declared next to the active policy asset.
+
+        The protocol file is the single source of truth for model IO naming and
+        buffer semantics. ``infer.py`` intentionally does not reconstruct those
+        bindings in code anymore.
+        """
+        return load_protocol_from_file(
+            cfg.protocol_path,
+            TRANSFORM_REGISTRY,
         )
 
     def _get_primary_output_name(self, protocol: ModelProtocol) -> str:
@@ -186,6 +130,38 @@ class infere:
         raise RuntimeError(
             f"Model protocol does not bind source '{source_kind}:{source_key}'."
         )
+
+    def _get_single_observation_input_name(self, protocol: ModelProtocol) -> str:
+        """Returns the sole state-driven observation input supported today.
+
+        The current simulator wrapper still constructs exactly one observation
+        vector through ``update_obs()`` and publishes it as ``policy_obs`` in
+        the runtime state. The protocol layer is already capable of describing
+        multiple state-fed observation tensors, but that runtime-state builder
+        refactor has not been completed yet. This method therefore fails fast
+        when a protocol requests multiple state inputs.
+
+        Args:
+            protocol: Declarative protocol bound to the active model.
+
+        Returns:
+            Raw backend input tensor name that receives the single observation.
+
+        Raises:
+            RuntimeError: If the protocol has zero or multiple state inputs.
+        """
+        state_input_names = [
+            input_name
+            for input_name, binding in protocol.input_bindings.items()
+            if binding.source_kind == "state"
+        ]
+        if len(state_input_names) != 1:
+            raise RuntimeError(
+                "infer.py currently supports exactly one single observation "
+                "state input. Please refactor runtime-state construction "
+                "before using a protocol with multiple state-fed observations."
+            )
+        return state_input_names[0]
 
     def _init_robot_conf(self):
         """Initializes flattened motor parameters and name mapping indices."""
