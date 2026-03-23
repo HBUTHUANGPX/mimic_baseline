@@ -45,7 +45,7 @@ class OnnxBackend:
         """
         if self.session is None:
             raise RuntimeError("Backend session is not loaded.")
-        return ModelSignature(
+        ms = ModelSignature(
             inputs={
                 meta.name: TensorSpec(
                     name=meta.name,
@@ -63,6 +63,8 @@ class OnnxBackend:
                 for meta in self.session.get_outputs()
             },
         )
+        print(ms)
+        return ms 
 
     def infer(self, inputs: ArrayDict) -> ArrayDict:
         """Runs one forward pass and returns outputs keyed by tensor name.
