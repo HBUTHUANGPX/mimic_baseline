@@ -1,0 +1,80 @@
+version: 1
+
+inputs:
+  obs:
+    source_kind: state
+    source_key: policy_obs
+    transform: as_batch_vector
+
+  time_step:
+    source_kind: buffer
+    source_key: time_step
+    transform: as_batch_scalar
+
+outputs:
+  actions:
+    target_kind: primary
+    target_key: policy_action
+    transform: flatten_float32
+
+  joint_pos:
+    target_kind: output
+    target_key: joint_pos
+
+  joint_vel:
+    target_kind: output
+    target_key: joint_vel
+
+  body_pos_w:
+    target_kind: output
+    target_key: body_pos_w
+
+  body_quat_w:
+    target_kind: output
+    target_key: body_quat_w
+
+  body_lin_vel_w:
+    target_kind: output
+    target_key: body_lin_vel_w
+
+  body_ang_vel_w:
+    target_kind: output
+    target_key: body_ang_vel_w
+
+buffer_initializers:
+  time_step:
+    init_kind: constant
+    value: 1
+
+  action:
+    init_kind: zeros_from_output
+    tensor_name: actions
+    axis: 1
+
+  prev_action:
+    init_kind: zeros_from_output
+    tensor_name: actions
+    axis: 1
+
+  prev_prev_action:
+    init_kind: zeros_from_output
+    tensor_name: actions
+    axis: 1
+
+per_step_buffer_updates:
+  time_step:
+    source_kind: buffer
+    source_key: time_step
+    transform: increment_int
+
+  prev_prev_action:
+    source_kind: buffer
+    source_key: prev_action
+
+  prev_action:
+    source_kind: buffer
+    source_key: action
+
+  action:
+    source_kind: result
+    source_key: policy_action
