@@ -35,21 +35,16 @@ class ModelSignature:
 
 
 @dataclass
-class InferenceContext:
-    """Semantic runtime context consumed by ``InferenceEngine.step``.
+class RuntimeState:
+    """Opaque runtime resource container consumed by the inference engine.
 
     Attributes:
-        obs: Flattened observation vector for the current policy step.
-        time_step: Logical rollout step index consumed by some exported models.
-        command: Optional high-level command vector associated with the step.
-        extras: Arbitrary named runtime state for adapters that require more
-            than the default observation and step counter.
+        values: Named runtime resources collected from the simulator, controller,
+            or task layer. The engine does not interpret their semantic meaning;
+            it only exposes them to protocol bindings.
     """
 
-    obs: np.ndarray
-    time_step: int
-    command: np.ndarray | None = None
-    extras: dict[str, Any] = field(default_factory=dict)
+    values: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -57,9 +52,9 @@ class InferenceResult:
     """Semantic result returned by one inference step.
 
     Attributes:
-        outputs: All backend outputs keyed by model output name.
+        outputs: Named outputs promoted by the protocol.
         primary_action: Main action vector to be consumed by the simulator when
-            the model exposes one.
+            the protocol marks one output as the primary action.
         state_updates: Buffer mutations that should be committed after the step
             succeeds.
     """

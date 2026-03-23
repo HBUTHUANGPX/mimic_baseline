@@ -4,10 +4,16 @@ import copy
 
 import numpy as np
 
-from awesome_deploy.inference import InferenceContext
+from awesome_deploy.inference import (
+    BufferInitializer,
+    InputBinding,
+    ModelProtocol,
+    OutputBinding,
+    RuntimeState,
+)
 from awesome_deploy.inference.backends import OnnxBackend
 from awesome_deploy.inference.engine import InferenceEngine
-from awesome_deploy.inference.io_adapters import DefaultMimoAdapter
+from awesome_deploy.inference.io_adapters import ProtocolAdapter
 from awesome_deploy.utils.cfg import cfg
 from awesome_deploy.utils.motion_loader import MotionLoader
 from awesome_deploy.utils.obscfg import ObsCfg
@@ -55,11 +61,10 @@ class infere:
             self.policy_dt = cfg.policy_dt
         self.control_decimation = int(self.policy_dt / cfg.simulator_dt)
         print("control_decimation: ", self.control_decimation)
-        # Keep the current ONNX implementation behind a generic engine so the
-        # simulator no longer depends on any concrete backend API.
+        protocol = self._build_model_protocol()
         self.inference_engine = InferenceEngine(
             backend=OnnxBackend(),
-            io_adapter=DefaultMimoAdapter(),
+            io_adapter=ProtocolAdapter(protocol),
             model_path=cfg.policy_path,
             device="cpu",
         )
@@ -70,7 +75,9 @@ class infere:
             raise RuntimeError(
                 "Inference engine signature is not available after load."
             )
-        action_spec = signature.outputs.get("actions")
+        action_output_name = self._get_primary_output_name(protocol)
+        obs_input_name = self._get_bound_input_name(protocol, "policy_obs", "state")
+        action_spec = signature.outputs.get(action_output_name)
         if (
             action_spec is None
             or len(action_spec.shape) < 2
@@ -79,7 +86,7 @@ class infere:
             raise RuntimeError(
                 "Inference output 'actions' must have a fixed second dimension."
             )
-        obs_spec = signature.inputs.get("obs")
+        obs_spec = signature.inputs.get(obs_input_name)
         if obs_spec is None or len(obs_spec.shape) < 2 or obs_spec.shape[1] is None:
             raise RuntimeError(
                 "Inference input 'obs' must have a fixed second dimension."
@@ -91,6 +98,94 @@ class infere:
         self.action_scale = cfg.action_scale
         self.obs = np.zeros(self.obs_num, dtype=np.float32)
         self.single_obs = np.zeros(self.obs_num, dtype=np.float32)
+
+    def _build_model_protocol(self) -> ModelProtocol:
+        """Builds the model-specific protocol for the current exported policy."""
+        return ModelProtocol(
+            input_bindings={
+                "obs": InputBinding(
+                    source_kind="state",
+                    source_key="policy_obs",
+                    transform=lambda value: np.asarray(value, dtype=np.float32).reshape(1, -1),
+                ),
+                "time_step": InputBinding(
+                    source_kind="buffer",
+                    source_key="time_step",
+                    transform=lambda value: np.asarray([[value]], dtype=np.float32),
+                ),
+            },
+            output_bindings={
+                "actions": OutputBinding(
+                    target_kind="primary",
+                    target_key="policy_action",
+                    transform=lambda value: np.asarray(value, dtype=np.float32).reshape(-1),
+                ),
+                "joint_pos": OutputBinding(target_kind="output", target_key="joint_pos"),
+                "joint_vel": OutputBinding(target_kind="output", target_key="joint_vel"),
+                "body_pos_w": OutputBinding(target_kind="output", target_key="body_pos_w"),
+                "body_quat_w": OutputBinding(target_kind="output", target_key="body_quat_w"),
+                "body_lin_vel_w": OutputBinding(target_kind="output", target_key="body_lin_vel_w"),
+                "body_ang_vel_w": OutputBinding(target_kind="output", target_key="body_ang_vel_w"),
+            },
+            buffer_initializers={
+                "time_step": BufferInitializer(init_kind="constant", value=1),
+                "action": BufferInitializer(
+                    init_kind="zeros_from_output",
+                    tensor_name="actions",
+                    axis=1,
+                ),
+                "prev_action": BufferInitializer(
+                    init_kind="zeros_from_output",
+                    tensor_name="actions",
+                    axis=1,
+                ),
+                "prev_prev_action": BufferInitializer(
+                    init_kind="zeros_from_output",
+                    tensor_name="actions",
+                    axis=1,
+                ),
+            },
+            per_step_buffer_updates={
+                "time_step": InputBinding(
+                    source_kind="buffer",
+                    source_key="time_step",
+                    transform=lambda value: int(value) + 1,
+                ),
+                "prev_prev_action": InputBinding(
+                    source_kind="buffer",
+                    source_key="prev_action",
+                ),
+                "prev_action": InputBinding(
+                    source_kind="buffer",
+                    source_key="action",
+                ),
+                "action": InputBinding(
+                    source_kind="result",
+                    source_key="primary_action",
+                ),
+            },
+        )
+
+    def _get_primary_output_name(self, protocol: ModelProtocol) -> str:
+        """Returns the raw backend output name bound as the primary action."""
+        for output_name, binding in protocol.output_bindings.items():
+            if binding.target_kind == "primary":
+                return output_name
+        raise RuntimeError("Model protocol does not define a primary output binding.")
+
+    def _get_bound_input_name(
+        self,
+        protocol: ModelProtocol,
+        source_key: str,
+        source_kind: str,
+    ) -> str:
+        """Returns the backend input name bound to a given runtime resource."""
+        for input_name, binding in protocol.input_bindings.items():
+            if binding.source_key == source_key and binding.source_kind == source_kind:
+                return input_name
+        raise RuntimeError(
+            f"Model protocol does not bind source '{source_kind}:{source_key}'."
+        )
 
     def _init_robot_conf(self):
         """Initializes flattened motor parameters and name mapping indices."""
@@ -186,13 +281,15 @@ class infere:
     def minimum_infer(self):
         """Runs one minimal policy inference step and updates target positions."""
         obs = self.update_obs()
-        context = InferenceContext(
-            obs=obs,
-            time_step=self.time_step,
-            command=self.cmd,
-            extras={"motion": getattr(self, "motion", None)},
+        runtime_state = RuntimeState(
+            values={
+                "policy_obs": obs,
+                "time_step": self.time_step,
+                "command": self.cmd,
+                "motion": getattr(self, "motion", None),
+            }
         )
-        result = self.inference_engine.step(context)
+        result = self.inference_engine.step(runtime_state)
         self.latest_inference = result
         if result.primary_action is None:
             raise RuntimeError("Inference result does not contain a primary action.")

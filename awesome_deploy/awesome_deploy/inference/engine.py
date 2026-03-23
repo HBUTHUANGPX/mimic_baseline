@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from awesome_deploy.inference.buffers import BufferManager
 from awesome_deploy.inference.types import (
-    InferenceContext,
     InferenceResult,
     ModelSignature,
+    RuntimeState,
 )
 
 
@@ -49,17 +49,17 @@ class InferenceEngine:
         if self.signature is not None:
             self.io_adapter.initialize(self.signature, self.buffers)
 
-    def step(self, context: InferenceContext) -> InferenceResult:
+    def step(self, runtime_state: RuntimeState) -> InferenceResult:
         """Executes one inference step from semantic context to semantic result.
 
         Args:
-            context: Per-step runtime information collected from the simulator.
+            runtime_state: Per-step runtime resources collected from the simulator.
 
         Returns:
             Parsed inference result with named outputs and buffer updates.
         """
-        # Convert simulator-side semantic state into backend tensor inputs.
-        raw_inputs = self.io_adapter.build_inputs(context, self.buffers)
+        # Convert simulator-side semantic resources into backend tensor inputs.
+        raw_inputs = self.io_adapter.build_inputs(runtime_state, self.buffers)
         # Execute the concrete backend without exposing backend details to the
         # caller.
         raw_outputs = self.backend.infer(raw_inputs)
