@@ -5,6 +5,7 @@ from awesome_deploy.inference import InputBinding, ModelProtocol
 from awesome_deploy.inference.types import InferenceResult, ModelSignature, TensorSpec
 from awesome_deploy.utils.cfg import G1RobotCfg
 from awesome_deploy.utils import infer as infer_module
+from awesome_deploy.utils import obscfg as obscfg_module
 from awesome_deploy.utils.infer import infere
 
 
@@ -74,6 +75,14 @@ def test_robot_cfg_exposes_default_protocol_path():
     assert robot_cfg.protocol_path.startswith(robot_cfg.policy_dir)
 
 
+def test_get_obs_cfg_can_select_q1_independently():
+    obs_cfg = obscfg_module.get_obs_cfg("q1")
+
+    assert isinstance(obs_cfg, obscfg_module.Q1ObsCfg)
+    assert obs_cfg.input_group_map["actor_obs"] == "policy"
+    assert obs_cfg.input_group_map["actor_fsq_obs"] == "policy_window"
+
+
 def test_load_model_protocol_uses_cfg_protocol_path(monkeypatch):
     captured = {}
     expected_protocol = ModelProtocol(input_bindings={}, output_bindings={})
@@ -119,7 +128,7 @@ def test_runtime_state_builder_primary_observation_dim_uses_first_state_input():
     assert builder.get_primary_observation_dim() == 581
 
 
-def test_runtime_state_builder_reuses_policy_obs_for_multiple_state_inputs():
+def test_runtime_state_builder_uses_obs_group_mapping_for_multiple_state_inputs():
     protocol = ModelProtocol(
         input_bindings={
             "actor_obs": InputBinding(source_kind="state", source_key="actor_obs"),
@@ -145,14 +154,21 @@ def test_runtime_state_builder_reuses_policy_obs_for_multiple_state_inputs():
     runner.inference_engine.buffers.values["time_step"] = 7
     runner.cmd = np.asarray([0.0, 0.0, 0.0], dtype=np.float32)
     runner.motion = "motion"
-    runner.update_obs = lambda: np.asarray([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+    runner.obs_cfg = obscfg_module.Q1ObsCfg()
+    runner.compute_obs_group = lambda group_name: {
+        "policy": np.asarray([1.0, 2.0, 3.0], dtype=np.float32),
+        "policy_window": np.asarray([4.0, 5.0, 6.0, 7.0, 8.0], dtype=np.float32),
+    }[group_name]
 
     runtime_state = builder.build(runner)
 
-    assert np.allclose(runtime_state.values["actor_obs"], np.asarray([1.0, 2.0, 3.0], dtype=np.float32))
+    assert np.allclose(
+        runtime_state.values["actor_obs"],
+        np.asarray([1.0, 2.0, 3.0], dtype=np.float32),
+    )
     assert np.allclose(
         runtime_state.values["actor_fsq_obs"],
-        np.asarray([1.0, 2.0, 3.0, 4.0, 0.0], dtype=np.float32),
+        np.asarray([4.0, 5.0, 6.0, 7.0, 8.0], dtype=np.float32),
     )
     assert runtime_state.values["time_step"] == 7
     assert np.allclose(runtime_state.values["command"], runner.cmd)

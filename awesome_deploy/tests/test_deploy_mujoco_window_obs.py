@@ -1,10 +1,13 @@
 """Tests for window observations exposed by the MuJoCo deployment simulator."""
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
 
-from awesome_deploy.scripts.deploy_g1_mujoco import simulator
+import awesome_deploy.scripts.deploy_g1_mujoco as deploy_mujoco_module
+
+simulator = deploy_mujoco_module.simulator
 
 
 class _FakeBuffers:
@@ -112,3 +115,43 @@ def test_obs_motion_ref_ori_b_window_returns_flattened_6d_rotations():
         dtype=np.float32,
     )
     assert np.allclose(obs, expected)
+
+
+def test_init_motion_window_offsets_supports_python_yaml_tags(tmp_path: Path, monkeypatch):
+    """Window config loader should handle exported IsaacLab YAML tags."""
+    sim = simulator.__new__(simulator)
+    sim.command_window_offsets = np.asarray([0], dtype=np.int64)
+    protocol_dir = tmp_path / "policy"
+    protocol_dir.mkdir()
+    env_yaml = protocol_dir / "env.yaml"
+    env_yaml.write_text(
+        "\n".join(
+            [
+                "viewer:",
+                "  eye: !!python/tuple",
+                "  - 1",
+                "  - 2",
+                "  - 3",
+                "events:",
+                "  physics_material:",
+                "    params:",
+                "      body_ids: !!python/object/apply:builtins.slice",
+                "      - null",
+                "      - null",
+                "      - null",
+                "commands:",
+                "  motion:",
+                "    history_frames: 2",
+                "    future_frames: 4",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(deploy_mujoco_module.cfg, "policy_dir", str(protocol_dir))
+
+    sim._init_motion_window_offsets()
+
+    assert np.array_equal(
+        sim.command_window_offsets,
+        np.asarray([-2, -1, 0, 1, 2, 3, 4], dtype=np.int64),
+    )

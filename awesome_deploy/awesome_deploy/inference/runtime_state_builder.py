@@ -42,9 +42,7 @@ class RuntimeStateBuilder:
             RuntimeState populated with semantic values referenced by protocol
             state bindings and legacy shared resources.
         """
-        policy_obs = np.asarray(infer_runner.update_obs(), dtype=np.float32).reshape(-1)
         values = {
-            "policy_obs": policy_obs,
             "time_step": infer_runner.time_step,
             "command": infer_runner.cmd,
             "motion": getattr(infer_runner, "motion", None),
@@ -55,8 +53,9 @@ class RuntimeStateBuilder:
                 continue
             if binding.source_key in values:
                 continue
-            values[binding.source_key] = self._adapt_policy_obs(
-                policy_obs=policy_obs,
+            values[binding.source_key] = self._build_state_input(
+                infer_runner=infer_runner,
+                source_key=binding.source_key,
                 input_name=input_name,
             )
         return RuntimeState(values=values)
@@ -89,27 +88,31 @@ class RuntimeStateBuilder:
             return int(feature_dim)
         raise RuntimeError("Model protocol does not define a compatible state input.")
 
-    def _adapt_policy_obs(self, policy_obs: np.ndarray, input_name: str) -> np.ndarray:
-        """Adapts the shared policy observation to one input tensor width.
+    def _build_state_input(
+        self,
+        infer_runner: Any,
+        source_key: str,
+        input_name: str,
+    ) -> np.ndarray:
+        """Builds one state-fed model input from the configured obs groups."""
+        group_name = self._resolve_group_name(infer_runner, source_key)
+        group_obs = np.asarray(
+            infer_runner.compute_obs_group(group_name),
+            dtype=np.float32,
+        ).reshape(-1)
+        return self._fit_to_input_dim(group_obs, input_name)
 
-        The current bridge strategy is intentionally simple:
+    def _resolve_group_name(self, infer_runner: Any, source_key: str) -> str:
+        """Resolves which observation group should feed one protocol state key."""
+        input_group_map = getattr(getattr(infer_runner, "obs_cfg", None), "input_group_map", {})
+        if source_key in input_group_map:
+            return input_group_map[source_key]
+        if source_key == "policy_obs":
+            return "policy"
+        return source_key
 
-        - If the target width is shorter, truncate.
-        - If the target width is longer, zero-pad.
-
-        Args:
-            policy_obs: Flattened observation vector produced by the existing
-                ``policy`` observation group.
-            input_name: Raw backend input tensor name used to query the model
-                signature.
-
-        Returns:
-            1-D float32 vector sized for the target input.
-
-        Raises:
-            RuntimeError: If the target input does not expose a static
-                batch-first feature width.
-        """
+    def _fit_to_input_dim(self, obs: np.ndarray, input_name: str) -> np.ndarray:
+        """Fits one observation vector to the target input feature width."""
         tensor_spec = self.signature.inputs.get(input_name)
         if tensor_spec is None or len(tensor_spec.shape) < 2:
             raise RuntimeError(
@@ -123,6 +126,6 @@ class RuntimeStateBuilder:
 
         target_width = int(feature_dim)
         adapted = np.zeros(target_width, dtype=np.float32)
-        copy_width = min(target_width, policy_obs.shape[0])
-        adapted[:copy_width] = policy_obs[:copy_width]
+        copy_width = min(target_width, obs.shape[0])
+        adapted[:copy_width] = obs[:copy_width]
         return adapted

@@ -16,7 +16,7 @@ from awesome_deploy.inference.engine import InferenceEngine
 from awesome_deploy.inference.io_adapters import ProtocolAdapter
 from awesome_deploy.utils.cfg import cfg
 from awesome_deploy.utils.motion_loader import MotionLoader
-from awesome_deploy.utils.obscfg import ObsCfg
+from awesome_deploy.utils.obscfg import get_obs_cfg
 from awesome_deploy.utils.observation_manager import SimpleObservationManager
 from awesome_deploy.utils.pinocchio_func import pin_mj
 
@@ -39,7 +39,8 @@ class infere:
         self._init_robot_conf()
         self._init_inference()
         self.pin = pin_mj(cfg)
-        self.obs_manager = SimpleObservationManager(ObsCfg(), self)
+        self.obs_cfg = get_obs_cfg()
+        self.obs_manager = SimpleObservationManager(self.obs_cfg, self)
         self.first_frame_pos = np.copy(self.motion.joint_pos[0])[
             self.isaac_sim2mujoco_index
         ]
@@ -223,9 +224,13 @@ class infere:
             Flattened observation vector in the order specified by ``ObsCfg``.
         """
         self.obs = np.clip(
-            self.obs_manager.compute_group("policy", update_history=True), -10, 10
+            self.compute_obs_group("policy"), -10, 10
         )
         return self.obs
+
+    def compute_obs_group(self, group_name: str):
+        """Computes one named observation group through the manager."""
+        return self.obs_manager.compute_group(group_name, update_history=True)
 
     def _obs_motion_joint_pos_command(self):
         """Returns the reference motion joint position term.

@@ -153,7 +153,8 @@ class Q1RobotCfg(BaseRobotCfg):
 
     group = {
         "policy": "policy/q1/2026-03-20_15-37-52_xsens_all_fsq_s",
-        "motion": "251014_single_action_forward_walk",
+        "motion": "Aeroplane_BR",
+        # "motion": "251014_single_action_forward_walk",
     }
 
     asset_path = current_path + "/assets/Q1"

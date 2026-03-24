@@ -22,8 +22,15 @@ buffer_initializers:
     init_kind: zeros_from_output
     tensor_name: actions
     axis: 1
+  time_step:
+    init_kind: constant
+    value: 1
 
 per_step_buffer_updates:
   action:
     source_kind: result
     source_key: policy_action
+  time_step:
+    source_kind: buffer
+    source_key: time_step
+    transform: increment_int
