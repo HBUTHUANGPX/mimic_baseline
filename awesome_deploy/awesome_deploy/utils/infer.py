@@ -7,6 +7,7 @@ import numpy as np
 from awesome_deploy.inference import (
     ModelProtocol,
     RuntimeState,
+    RuntimeStateBuilder,
     TRANSFORM_REGISTRY,
     load_protocol_from_file,
 )
@@ -74,8 +75,11 @@ class infere:
             raise RuntimeError(
                 "Inference engine signature is not available after load."
             )
+        self.runtime_state_builder = RuntimeStateBuilder(
+            protocol=protocol,
+            signature=signature,
+        )
         action_output_name = self._get_primary_output_name(protocol)
-        obs_input_name = self._get_single_observation_input_name(protocol)
         action_spec = signature.outputs.get(action_output_name)
         if (
             action_spec is None
@@ -85,13 +89,8 @@ class infere:
             raise RuntimeError(
                 "Inference output 'actions' must have a fixed second dimension."
             )
-        obs_spec = signature.inputs.get(obs_input_name)
-        if obs_spec is None or len(obs_spec.shape) < 2 or obs_spec.shape[1] is None:
-            raise RuntimeError(
-                "Inference input 'obs' must have a fixed second dimension."
-            )
         self.action_num = int(action_spec.shape[1])
-        self.obs_num = int(obs_spec.shape[1])
+        self.obs_num = self.runtime_state_builder.get_primary_observation_dim()
         self.action = np.zeros(self.action_num, dtype=np.float32)
         self.action_clip = cfg.action_clip
         self.action_scale = cfg.action_scale
@@ -116,52 +115,6 @@ class infere:
             if binding.target_kind == "primary":
                 return output_name
         raise RuntimeError("Model protocol does not define a primary output binding.")
-
-    def _get_bound_input_name(
-        self,
-        protocol: ModelProtocol,
-        source_key: str,
-        source_kind: str,
-    ) -> str:
-        """Returns the backend input name bound to a given runtime resource."""
-        for input_name, binding in protocol.input_bindings.items():
-            if binding.source_key == source_key and binding.source_kind == source_kind:
-                return input_name
-        raise RuntimeError(
-            f"Model protocol does not bind source '{source_kind}:{source_key}'."
-        )
-
-    def _get_single_observation_input_name(self, protocol: ModelProtocol) -> str:
-        """Returns the sole state-driven observation input supported today.
-
-        The current simulator wrapper still constructs exactly one observation
-        vector through ``update_obs()`` and publishes it as ``policy_obs`` in
-        the runtime state. The protocol layer is already capable of describing
-        multiple state-fed observation tensors, but that runtime-state builder
-        refactor has not been completed yet. This method therefore fails fast
-        when a protocol requests multiple state inputs.
-
-        Args:
-            protocol: Declarative protocol bound to the active model.
-
-        Returns:
-            Raw backend input tensor name that receives the single observation.
-
-        Raises:
-            RuntimeError: If the protocol has zero or multiple state inputs.
-        """
-        state_input_names = [
-            input_name
-            for input_name, binding in protocol.input_bindings.items()
-            if binding.source_kind == "state"
-        ]
-        if len(state_input_names) != 1:
-            raise RuntimeError(
-                "infer.py currently supports exactly one single observation "
-                "state input. Please refactor runtime-state construction "
-                "before using a protocol with multiple state-fed observations."
-            )
-        return state_input_names[0]
 
     def _init_robot_conf(self):
         """Initializes flattened motor parameters and name mapping indices."""
@@ -256,15 +209,7 @@ class infere:
 
     def minimum_infer(self):
         """Runs one minimal policy inference step and updates target positions."""
-        obs = self.update_obs()
-        runtime_state = RuntimeState(
-            values={
-                "policy_obs": obs,
-                "time_step": self.time_step,
-                "command": self.cmd,
-                "motion": getattr(self, "motion", None),
-            }
-        )
+        runtime_state = self.runtime_state_builder.build(self)
         result = self.inference_engine.step(runtime_state)
         self.latest_inference = result
         if result.primary_action is None:

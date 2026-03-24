@@ -73,3 +73,17 @@ def test_load_protocol_from_file_rejects_unknown_transform(tmp_path: Path):
 
     with pytest.raises(ValueError, match="missing_transform"):
         load_protocol_from_file(protocol_path, TRANSFORM_REGISTRY)
+
+
+def test_checked_in_q1_protocol_matches_expected_bindings():
+    protocol_path = Path(
+        "awesome_deploy/awesome_deploy/policy/q1/"
+        "2026-03-20_15-37-52_xsens_all_fsq_s/policy.protocol.yaml"
+    )
+
+    protocol = load_protocol_from_file(protocol_path, TRANSFORM_REGISTRY)
+
+    assert set(protocol.input_bindings) == {"actor_obs", "actor_fsq_obs"}
+    assert protocol.output_bindings["actions"].target_key == "policy_action"
+    assert protocol.buffer_initializers["action"].tensor_name == "actions"
+    assert protocol.per_step_buffer_updates["action"].source_key == "policy_action"

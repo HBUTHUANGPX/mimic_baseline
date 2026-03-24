@@ -8,6 +8,7 @@ from awesome_deploy.inference.protocol import (
     ModelProtocol,
     OutputBinding,
 )
+from awesome_deploy.inference.runtime_state_builder import RuntimeStateBuilder
 from awesome_deploy.inference.types import (
     InferenceResult,
     ModelSignature,
@@ -25,6 +26,7 @@ __all__ = [
     "ModelSignature",
     "ModelProtocol",
     "OutputBinding",
+    "RuntimeStateBuilder",
     "RuntimeState",
     "TRANSFORM_REGISTRY",
     "TensorSpec",
