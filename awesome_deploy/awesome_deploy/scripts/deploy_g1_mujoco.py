@@ -6,6 +6,7 @@ import time
 import mujoco
 import mujoco.viewer
 import numpy as np
+import yaml
 
 from awesome_deploy.utils import VideoRecorder
 from awesome_deploy.utils.cfg import cfg, current_path
@@ -64,7 +65,30 @@ class simulator(infere):
             mujoco.mj_name2id(self.m, mujoco.mjtObj.mjOBJ_BODY, name)
             for name in self.mujoco_all_body_names
         ]
+        self.motion_reference_body_index = cfg.motion_body_names.index(
+            cfg.motion_reference_body
+        )
+        self._init_motion_window_offsets()
         print("mujoco_all_body_names:\r\n", self.mujoco_all_body_names)
+
+    def _init_motion_window_offsets(self):
+        """Loads the temporal window size used by the exported training setup."""
+        self.command_window_offsets = np.asarray([0], dtype=np.int64)
+        env_cfg_path = os.path.join(cfg.policy_dir, "env.yaml")
+        if not os.path.isfile(env_cfg_path):
+            return
+        with open(env_cfg_path, "r", encoding="utf-8") as file:
+            env_cfg = yaml.safe_load(file) or {}
+        motion_cfg = env_cfg.get("commands", {}).get("motion", {})
+        history_frames = int(motion_cfg.get("history_frames", 0))
+        future_frames = int(motion_cfg.get("future_frames", 0))
+        print("history_frames: ",history_frames)
+        print("future_frames: ",future_frames)
+        self.command_window_offsets = np.arange(
+            -history_frames,
+            future_frames + 1,
+            dtype=np.int64,
+        )
 
     def run(self):
         """Runs the full rollout loop until the viewer closes or motion ends."""
@@ -207,6 +231,14 @@ class simulator(infere):
         """Returns the current reference motion joint velocities."""
         return np.copy(self.motion.joint_vel[int(self.time_step)])
 
+    def _obs_joint_pos_delta(self):
+
+        return np.copy(self.motion.joint_pos[int(self.time_step)])-self._obs_joint_pos()
+    
+    def _obs_robot_joint_pos(self):
+
+        return np.copy(self.motion.joint_pos[int(self.time_step)])
+
     def _obs_motion_ref_ori_b(self):
         """Returns body-frame orientation error to the motion reference."""
         self.pin.mujoco_to_pinocchio(
@@ -216,7 +248,8 @@ class simulator(infere):
         )
         ref_body_index = cfg.motion_body_names.index(cfg.motion_reference_body)
         self.robot_ref_quat_w = np.expand_dims(
-            self.pin.get_link_quaternion(cfg.motion_reference_body), axis=0
+            self.pin.get_link_quaternion(cfg.motion_reference_body), 
+            axis=0
         )
         self.ref_quat_w = self.motion.body_quat_w[
             int(self.time_step), ref_body_index, :
@@ -250,6 +283,47 @@ class simulator(infere):
     def _obs_actions(self):
         """Returns the most recent policy action vector."""
         return self.action
+
+    def _get_motion_window_indices(self):
+        """Returns clipped motion indices for the active temporal window."""
+        window_indices = int(self.time_step) + self.command_window_offsets
+        return np.clip(window_indices, 0, self.motion.time_step_total - 1)
+
+    def _obs_joint_pos_delta_window(self):
+        """Returns flattened joint-position deltas for the temporal window."""
+        motion_joint_pos_window = np.copy(
+            self.motion.joint_pos[self._get_motion_window_indices()]
+        )
+        joint_pos = np.expand_dims(self._obs_joint_pos(), axis=0)
+        return (motion_joint_pos_window - joint_pos).reshape(-1)
+
+    def _obs_robot_joint_pos_window(self):
+        """Returns flattened target joint positions for the temporal window."""
+        return np.copy(
+            self.motion.joint_pos[self._get_motion_window_indices()]
+        ).reshape(-1)
+
+    def _obs_motion_ref_ori_b_window(self):
+        """Returns flattened 6D reference orientations for the temporal window."""
+        self.pin.mujoco_to_pinocchio(
+            self.d.qpos[7:],
+            base_pos=self.d.qpos[0:3],
+            base_quat=self.d.qpos[3:7][[1, 2, 3, 0]],
+        )
+        robot_ref_quat_w = np.expand_dims(
+            self.pin.get_link_quaternion(cfg.motion_reference_body), axis=0
+        )
+        motion_ref_quat_w = np.copy(
+            self.motion.body_quat_w[
+                self._get_motion_window_indices(),
+                self.motion_reference_body_index,
+                :,
+            ]
+        )
+        robot_ref_quat_w = np.repeat(robot_ref_quat_w, len(motion_ref_quat_w), axis=0)
+        rel_quat_b = quat_mul(quat_inv(robot_ref_quat_w), motion_ref_quat_w)
+        rel_mat_b = matrix_from_quat(rel_quat_b)
+        return rel_mat_b[..., :2].reshape(-1)
 
     def sim_loop(self):
         """Advances MuJoCo for one policy interval using PD control."""

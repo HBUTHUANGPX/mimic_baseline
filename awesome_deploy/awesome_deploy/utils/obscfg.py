@@ -38,12 +38,12 @@ class Q1ObsCfg:
     class PolicyCfg(GroupCfg):
         """Observation terms consumed by the deployed policy model."""
 
-        motion_joint_pos_command = TermCfg()
-        motion_joint_vel_command = TermCfg()
+        joint_pos_delta = TermCfg()
+        robot_joint_pos = TermCfg()
         motion_ref_ori_b = TermCfg()
-        base_ang_vel = TermCfg()
-        joint_pos = TermCfg()
-        joint_vel = TermCfg()
+        base_ang_vel = TermCfg(history_length=8)
+        joint_pos = TermCfg(history_length=8)
+        joint_vel = TermCfg(history_length=8)
         actions = TermCfg()
     
     class PolicyWindowCfg(GroupCfg):
@@ -54,5 +54,6 @@ class Q1ObsCfg:
         motion_ref_ori_b_window = TermCfg()
 
     policy = PolicyCfg()
+    policy_window = PolicyWindowCfg()
 
 ObsCfg = G1ObsCfg
