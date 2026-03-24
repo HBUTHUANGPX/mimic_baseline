@@ -2,12 +2,28 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Protocol
 
 import numpy as np
 
 from awesome_deploy.inference.protocol import ModelProtocol
 from awesome_deploy.inference.types import ModelSignature, RuntimeState
+
+
+class SupportsRuntimeStateBuild(Protocol):
+    """Structural interface consumed by ``RuntimeStateBuilder``.
+
+    The builder only depends on a small subset of the simulator wrapper API:
+    logical step count, command vector, optional motion asset, selected
+    observation configuration, and group-based observation computation.
+    """
+
+    obs_cfg: object
+    cmd: np.ndarray
+    time_step: int
+
+    def compute_obs_group(self, group_name: str) -> np.ndarray:
+        """Computes one named observation group."""
 
 
 class RuntimeStateBuilder:
@@ -30,13 +46,12 @@ class RuntimeStateBuilder:
         self.protocol = protocol
         self.signature = signature
 
-    def build(self, infer_runner: Any) -> RuntimeState:
+    def build(self, infer_runner: SupportsRuntimeStateBuild) -> RuntimeState:
         """Builds one runtime state snapshot for a simulator step.
 
         Args:
-            infer_runner: Active ``infere`` instance or compatible object that
-                exposes ``update_obs()``, ``time_step``, ``cmd``, and optional
-                ``motion``.
+            infer_runner: Active simulator-side runtime object that exposes the
+                minimal observation and state API required by the builder.
 
         Returns:
             RuntimeState populated with semantic values referenced by protocol
@@ -90,7 +105,7 @@ class RuntimeStateBuilder:
 
     def _build_state_input(
         self,
-        infer_runner: Any,
+        infer_runner: SupportsRuntimeStateBuild,
         source_key: str,
         input_name: str,
     ) -> np.ndarray:
@@ -102,9 +117,17 @@ class RuntimeStateBuilder:
         ).reshape(-1)
         return self._fit_to_input_dim(group_obs, input_name)
 
-    def _resolve_group_name(self, infer_runner: Any, source_key: str) -> str:
+    def _resolve_group_name(
+        self,
+        infer_runner: SupportsRuntimeStateBuild,
+        source_key: str,
+    ) -> str:
         """Resolves which observation group should feed one protocol state key."""
-        input_group_map = getattr(getattr(infer_runner, "obs_cfg", None), "input_group_map", {})
+        input_group_map = getattr(
+            getattr(infer_runner, "obs_cfg", None),
+            "input_group_map",
+            {},
+        )
         if source_key in input_group_map:
             return input_group_map[source_key]
         if source_key == "policy_obs":

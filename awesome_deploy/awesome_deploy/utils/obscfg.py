@@ -122,6 +122,3 @@ def get_obs_cfg(obs_name=None):
     """Returns the active observation config or resolves one on demand."""
     resolved_obs_name = obs_name or resolve_obs_name()
     return build_obs_cfg(resolved_obs_name)
-
-
-ObsCfg = G1ObsCfg

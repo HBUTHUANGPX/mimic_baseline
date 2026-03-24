@@ -2,7 +2,12 @@ import numpy as np
 import pytest
 
 from awesome_deploy.inference import InputBinding, ModelProtocol
-from awesome_deploy.inference.types import InferenceResult, ModelSignature, TensorSpec
+from awesome_deploy.inference.types import (
+    InferenceResult,
+    ModelSignature,
+    RuntimeState,
+    TensorSpec,
+)
 from awesome_deploy.utils.cfg import G1RobotCfg
 from awesome_deploy.utils import infer as infer_module
 from awesome_deploy.utils import obscfg as obscfg_module
@@ -34,7 +39,7 @@ class FakeEngine:
 def test_minimum_infer_uses_inference_engine_and_updates_target_action():
     class FakeBuilder:
         def build(self, runner):
-            return infer_module.RuntimeState(
+            return RuntimeState(
                 values={
                     "policy_obs": np.asarray([0.1, 0.2], dtype=np.float32),
                     "time_step": 3,
@@ -182,7 +187,7 @@ def test_minimum_infer_uses_runtime_state_builder(monkeypatch):
 
         def build(self, runner):
             self.calls.append(runner)
-            return infer_module.RuntimeState(
+            return RuntimeState(
                 values={
                     "actor_obs": np.asarray([0.1, 0.2], dtype=np.float32),
                     "time_step": 3,

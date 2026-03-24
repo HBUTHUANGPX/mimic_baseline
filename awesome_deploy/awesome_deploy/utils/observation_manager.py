@@ -1,7 +1,14 @@
 """Observation parsing and runtime history management utilities."""
 
+from __future__ import annotations
+
 import inspect
+from typing import Iterable
+
 import numpy as np
+
+
+ObservationValue = np.ndarray | dict[str, np.ndarray]
 
 
 class SimpleObservationManager:
@@ -20,7 +27,7 @@ class SimpleObservationManager:
         "concatenate_dim",
     }
 
-    def __init__(self, cfg, env):
+    def __init__(self, cfg: object, env: object) -> None:
         """Initializes the observation manager.
 
         Args:
@@ -38,7 +45,7 @@ class SimpleObservationManager:
         self._group_concat_dim = {}
         self._prepare()
 
-    def _iter_cfg_items(self, cfg_obj):
+    def _iter_cfg_items(self, cfg_obj: object) -> Iterable[tuple[str, object]]:
         """Iterates over config items while preserving declaration order."""
         if inspect.isclass(cfg_obj):
             return []
@@ -57,7 +64,7 @@ class SimpleObservationManager:
             items.append((k, v))
         return items
 
-    def _prepare(self):
+    def _prepare(self) -> None:
         """Resolves all configured groups and terms into executable metadata."""
         for group_name, group_cfg in self._iter_cfg_items(self.cfg):
             if group_cfg is None or not hasattr(group_cfg, "concatenate_terms"):
@@ -128,7 +135,7 @@ class SimpleObservationManager:
                 f"[SimpleObservationManager] group='{group_name}', terms={term_names}"
             )
 
-    def _to_numpy(self, obs):
+    def _to_numpy(self, obs: object) -> np.ndarray:
         """Converts a supported observation value to ``numpy.ndarray``."""
         if isinstance(obs, np.ndarray):
             return obs
@@ -138,11 +145,15 @@ class SimpleObservationManager:
             return obs.detach().cpu().numpy()
         return np.asarray(obs)
 
-    def compute_group(self, group_name, update_history=True):
+    def compute_group(
+        self,
+        group_name: str,
+        update_history: bool = True,
+    ) -> ObservationValue:
         """Computes one configured observation group.
 
         Args:
-            group_name: Group key defined in ``ObsCfg``.
+            group_name: Group key defined in the active observation config.
             update_history: Whether term history buffers should advance.
 
         Returns:

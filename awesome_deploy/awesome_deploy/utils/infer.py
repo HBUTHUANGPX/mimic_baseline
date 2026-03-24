@@ -6,7 +6,6 @@ import numpy as np
 
 from awesome_deploy.inference import (
     ModelProtocol,
-    RuntimeState,
     RuntimeStateBuilder,
     TRANSFORM_REGISTRY,
     load_protocol_from_file,
@@ -217,20 +216,18 @@ class infere:
             raise RuntimeError("Inference result does not contain a primary action.")
         self.post_action(result.primary_action)
 
-    def update_obs(self):
-        """Computes and clips the current policy observation vector.
+    def compute_obs_group(self, group_name: str) -> np.ndarray:
+        """Computes one named observation group through the manager.
+
+        Args:
+            group_name: Observation group defined by the active observation
+                configuration.
 
         Returns:
-            Flattened observation vector in the order specified by ``ObsCfg``.
+            Flattened numpy observation vector for the requested group.
         """
-        self.obs = np.clip(
-            self.compute_obs_group("policy"), -10, 10
-        )
-        return self.obs
-
-    def compute_obs_group(self, group_name: str):
-        """Computes one named observation group through the manager."""
-        return self.obs_manager.compute_group(group_name, update_history=True)
+        group_obs = self.obs_manager.compute_group(group_name, update_history=True)
+        return np.clip(np.asarray(group_obs, dtype=np.float32).reshape(-1), -10, 10)
 
     def _obs_motion_joint_pos_command(self):
         """Returns the reference motion joint position term.
