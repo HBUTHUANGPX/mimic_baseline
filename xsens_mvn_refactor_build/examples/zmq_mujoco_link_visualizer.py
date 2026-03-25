@@ -146,6 +146,7 @@ def draw_link_frames(viewer, message, axis_length, shaft_width, show_labels):
             state.pose.orientation.w,
         )
 
+        # print(state.name)
         for axis_index in range(3):
             if viewer.user_scn.ngeom >= viewer.user_scn.maxgeom:
                 return
@@ -193,15 +194,15 @@ def main():
                 if topic != args.topic:
                     print("topic != args.topic")
                     continue
-                print("=============================")
-                print("start",time.time())
+                # print("=============================")
+                # print("start",time.time())
                 payload = subscriber.recv()
-                print("payload",time.time())
+                # print("payload",time.time())
                 # print("recv")
                 message = proto_module.LinkStateArray()
-                print("message",time.time())
+                # print("message",time.time())
                 message.ParseFromString(payload)
-                print("ParseFromString",time.time())
+                # print("ParseFromString",time.time())
                 draw_link_frames(
                     viewer,
                     message,
@@ -209,11 +210,11 @@ def main():
                     args.shaft_width,
                     args.show_labels,
                 )
-                print("draw_link_frames",time.time())
+                # print("draw_link_frames",time.time())
                 viewer.sync()
-                print("sync",time.time())
+                # print("sync",time.time())
             except zmq.error.Again:
-                print("zmq.error.Again")
+                # print("zmq.error.Again")
                 viewer.sync()
                 continue
 

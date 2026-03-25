@@ -101,3 +101,15 @@ target_link_libraries(
     GTest::gtest_main
 )
 add_test(NAME test_xsens_link_state_runner COMMAND test_xsens_link_state_runner)
+
+add_executable(test_link_state_frame_filter test_link_state_frame_filter.cpp)
+target_include_directories(test_link_state_frame_filter PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/../include
+)
+target_link_libraries(
+  test_link_state_frame_filter
+  PRIVATE
+    xsens_app_support
+    GTest::gtest_main
+)
+add_test(NAME test_link_state_frame_filter COMMAND test_link_state_frame_filter)

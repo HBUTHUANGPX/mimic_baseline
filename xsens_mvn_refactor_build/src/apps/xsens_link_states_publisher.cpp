@@ -7,6 +7,7 @@
 #include <string>
 
 #include "xsens_apps/XsensLinkStateRunner.h"
+#include "xsens_apps/LinkStateFrameFilter.h"
 #include "xsens_core/XSensClient.h"
 #include "xsens_transport/LinkStatePublisher.h"
 
@@ -52,7 +53,29 @@ int main(int argc, char** argv)
 
     xsens::transport::LinkStatePublisher publisher(bind_address, topic);
     xsens::apps::XSensClientFrameSource frame_source(*client);
-    xsens::apps::ZmqFrameSink frame_sink(publisher);
+    class FilteringFrameSink final : public xsens::apps::FrameSink
+    {
+    public:
+      explicit FilteringFrameSink(xsens::transport::LinkStatePublisher& publisher)
+        : publisher_(publisher)
+      {
+      }
+
+      void publish(const xsens::core::XsensFrame& frame) override
+      {
+        xsens::core::XsensFrame filtered_frame = frame;
+        xsens::apps::filterOutHandLinks(filtered_frame);
+        if (!filtered_frame.links.empty())
+        {
+          publisher_.publish(filtered_frame);
+        }
+      }
+
+    private:
+      xsens::transport::LinkStatePublisher& publisher_;
+    };
+
+    FilteringFrameSink frame_sink(publisher);
     xsens::apps::XsensLinkStateRunner runner(frame_source, frame_sink, publish_rate_hz);
 
     std::cout << "publisher_ready=true" << std::endl;

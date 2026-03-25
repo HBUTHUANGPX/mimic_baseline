@@ -63,6 +63,7 @@ target_link_libraries(xsens_transport PUBLIC
 )
 
 add_library(xsens_app_support
+  apps/LinkStateFrameFilter.cpp
   apps/XsensLinkStateRunner.cpp
   apps/TestFrameFactory.cpp
 )

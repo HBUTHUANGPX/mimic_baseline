@@ -85,6 +85,15 @@ ctest --test-dir build -R 'test_zmq_loopback|test_link_states_test_publisher_pro
 - 该程序依赖真实 XSens MVN UDP 数据源
 - 本仓库自动化测试验证了 runner、protobuf、ZMQ 回环与进程级订阅行为
 - 未接入真实 XSens 设备时，无法在当前环境完成真正的 live UDP 采集验收
+- 发布语义是：只有收到新的 UDP 更新后，才发布一帧新的 ZMQ `link_states`
+- 发布前会对 `link_states` 做裁剪，当前过滤规则为：
+  - 去掉 `prop1` 到 `prop4`
+  - 去掉 `left_carpus` / `right_carpus`
+  - 去掉所有手指 segment：
+    - `left_first_*` 到 `left_fifth_*`
+    - `right_first_*` 到 `right_fifth_*`
+  - 保留 `left_hand` / `right_hand`
+- 因此当前真实发布结果会保留人体主骨架和手掌 link，但不会发送 props、腕部 carpus 和各手指细分 link
 
 ## Python 订阅示例
 
