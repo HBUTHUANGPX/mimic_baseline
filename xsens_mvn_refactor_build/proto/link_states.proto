@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package xsens.transport;
+
+message Header {
+  uint32 schema_version = 1;
+  int32 stamp_sec = 2;
+  uint32 stamp_nanosec = 3;
+  string frame_id = 4;
+}
+
+message Vector3 {
+  double x = 1;
+  double y = 2;
+  double z = 3;
+}
+
+message Quaternion {
+  double x = 1;
+  double y = 2;
+  double z = 3;
+  double w = 4;
+}
+
+message Pose {
+  Vector3 position = 1;
+  Quaternion orientation = 2;
+}
+
+message Twist {
+  Vector3 linear = 1;
+  Vector3 angular = 2;
+}
+
+message Accel {
+  Vector3 linear = 1;
+  Vector3 angular = 2;
+}
+
+message LinkState {
+  string name = 1;
+  Pose pose = 2;
+  Twist twist = 3;
+  Accel accel = 4;
+}
+
+message LinkStateArray {
+  Header header = 1;
+  repeated LinkState states = 2;
+}
