@@ -5,6 +5,8 @@
 
 #include <thread>
 #include <memory>
+#include <atomic>
+#include <cstdint>
 #include <vector>
 #include <string>
 #include "xsens_core/Socket.h"
@@ -21,7 +23,7 @@ public:
     bool init();
 
     hrii::ergonomics::HumanDataHandler::Ptr getHumanData();
-    bool copyFrame(xsens::core::XsensFrame& frame) const;
+    bool copyFrame(xsens::core::XsensFrame& frame, std::uint64_t& frame_sequence) const;
     std::string getURDFString();
 
 private:
@@ -39,6 +41,7 @@ private:
     void dataAcquisitionCallback();
     char data_buffer_[MAX_MVN_DATAGRAM_SIZE];
     bool client_active_;
+    std::atomic<std::uint64_t> frame_sequence_;
 
     std::vector<Eigen::Quaternionf> m_leftFingerQuats;
     std::vector<Eigen::Quaternionf> m_rightFingerQuats;

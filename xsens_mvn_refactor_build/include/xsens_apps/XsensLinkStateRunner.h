@@ -2,6 +2,7 @@
 #define XSENS_APPS_XSENS_LINK_STATE_RUNNER_H
 
 #include <chrono>
+#include <cstdint>
 
 #include "xsens_core/XsensFrame.h"
 
@@ -23,7 +24,7 @@ class FrameSource
 {
 public:
   virtual ~FrameSource() = default;
-  virtual bool copyFrame(xsens::core::XsensFrame& frame) = 0;
+  virtual bool copyFrame(xsens::core::XsensFrame& frame, std::uint64_t& frame_sequence) = 0;
 };
 
 class FrameSink
@@ -50,7 +51,7 @@ class XSensClientFrameSource : public FrameSource
 {
 public:
   explicit XSensClientFrameSource(::XSensClient& client);
-  bool copyFrame(xsens::core::XsensFrame& frame) override;
+  bool copyFrame(xsens::core::XsensFrame& frame, std::uint64_t& frame_sequence) override;
 
 private:
   ::XSensClient& client_;
@@ -83,6 +84,7 @@ private:
   FrameSource& frame_source_;
   FrameSink& frame_sink_;
   double publish_rate_hz_;
+  std::uint64_t last_published_sequence_;
   ThreadSleepStrategy owned_sleep_strategy_;
   SleepStrategy* sleep_strategy_;
 };

@@ -6,6 +6,7 @@
 XSensClient::XSensClient(const int& udp_port) :
     udp_port_(udp_port),
     client_active_(false),
+    frame_sequence_(0),
     has_finger_data_(false),
     prop_count_(0),
     m_hasStoredFingerQuats(false),
@@ -82,6 +83,7 @@ void XSensClient::dataAcquisitionCallback()
                 updateFingerJointAngles();
                 // std::cout << "DEBUG: Finished updating finger joint angles" << std::endl;
             }
+            ++frame_sequence_;
             // std::cout << "DEBUG: Updating data cycle completed" << std::endl;
         }
     }
@@ -865,7 +867,7 @@ hrii::ergonomics::HumanDataHandler::Ptr XSensClient::getHumanData()
     return human_data_;
 }
 
-bool XSensClient::copyFrame(xsens::core::XsensFrame& frame) const
+bool XSensClient::copyFrame(xsens::core::XsensFrame& frame, std::uint64_t& frame_sequence) const
 {
     if (!human_data_)
     {
@@ -873,6 +875,7 @@ bool XSensClient::copyFrame(xsens::core::XsensFrame& frame) const
     }
 
     frame = xsens::core::XsensFrame{};
+    frame_sequence = frame_sequence_.load();
     frame.center_of_mass = human_data_->getCOM();
 
     for (const auto& joint_entry : human_data_->getJoints())
@@ -915,7 +918,7 @@ std::pair<std::vector<Eigen::Quaternionf>, std::vector<Eigen::Quaternionf>> XSen
     int left_finger_base = 24 + prop_count_;
     int right_finger_base = left_finger_base + 20;
 
-    std::cout << "Left finger base index: " << left_finger_base << ", Right finger base index: " << right_finger_base << std::endl;
+    // std::cout << "Left finger base index: " << left_finger_base << ", Right finger base index: " << right_finger_base << std::endl;
     
     leftFingerQuats.resize(20, Eigen::Quaternionf::Identity());
     rightFingerQuats.resize(20, Eigen::Quaternionf::Identity());

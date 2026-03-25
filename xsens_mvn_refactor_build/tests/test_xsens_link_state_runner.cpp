@@ -11,8 +11,9 @@ class FakeFrameSource : public xsens::apps::FrameSource
 public:
   bool should_succeed = true;
   xsens::core::XsensFrame frame;
+  std::uint64_t sequence = 0;
 
-  bool copyFrame(xsens::core::XsensFrame& output) override
+  bool copyFrame(xsens::core::XsensFrame& output, std::uint64_t& output_sequence) override
   {
     if (!should_succeed)
     {
@@ -20,6 +21,7 @@ public:
     }
 
     output = frame;
+    output_sequence = sequence;
     return true;
   }
 };
@@ -57,6 +59,7 @@ TEST(XsensLinkStateRunnerTest, PublishesNonEmptyFrameFromClientSnapshot)
   FakeFrameSink frame_sink;
 
   frame_source.frame.frame_id = "world";
+  frame_source.sequence = 1;
   xsens::core::LinkSample link_sample;
   link_sample.name = "pelvis";
   frame_source.frame.links.push_back(link_sample);
@@ -96,10 +99,35 @@ TEST(XsensLinkStateRunnerTest, SleepsAccordingToConfiguredPublishRate)
   xsens::core::LinkSample link_sample;
   link_sample.name = "pelvis";
   frame_source.frame.links.push_back(link_sample);
+  frame_source.sequence = 1;
 
   xsens::apps::XsensLinkStateRunner runner(frame_source, frame_sink, 240.0, sleep_strategy);
 
   EXPECT_TRUE(runner.runOnce());
   EXPECT_EQ(sleep_strategy.sleep_call_count, 1);
   EXPECT_EQ(sleep_strategy.last_duration.count(), 4166666);
+}
+
+TEST(XsensLinkStateRunnerTest, PublishesOnlyWhenSequenceAdvances)
+{
+  FakeFrameSource frame_source;
+  FakeFrameSink frame_sink;
+  FakeSleepStrategy sleep_strategy;
+
+  xsens::core::LinkSample link_sample;
+  link_sample.name = "pelvis";
+  frame_source.frame.links.push_back(link_sample);
+
+  xsens::apps::XsensLinkStateRunner runner(frame_source, frame_sink, 240.0, sleep_strategy);
+
+  frame_source.sequence = 1;
+  EXPECT_TRUE(runner.runOnce());
+  EXPECT_EQ(frame_sink.publish_count, 1);
+
+  EXPECT_FALSE(runner.runOnce());
+  EXPECT_EQ(frame_sink.publish_count, 1);
+
+  frame_source.sequence = 2;
+  EXPECT_TRUE(runner.runOnce());
+  EXPECT_EQ(frame_sink.publish_count, 2);
 }

@@ -19,9 +19,9 @@ XSensClientFrameSource::XSensClientFrameSource(::XSensClient& client)
 {
 }
 
-bool XSensClientFrameSource::copyFrame(xsens::core::XsensFrame& frame)
+bool XSensClientFrameSource::copyFrame(xsens::core::XsensFrame& frame, std::uint64_t& frame_sequence)
 {
-  return client_.copyFrame(frame);
+  return client_.copyFrame(frame, frame_sequence);
 }
 
 ZmqFrameSink::ZmqFrameSink(xsens::transport::LinkStatePublisher& publisher)
@@ -41,6 +41,7 @@ XsensLinkStateRunner::XsensLinkStateRunner(
   : frame_source_(frame_source),
     frame_sink_(frame_sink),
     publish_rate_hz_(publish_rate_hz),
+    last_published_sequence_(0),
     sleep_strategy_(&owned_sleep_strategy_)
 {
 }
@@ -53,6 +54,7 @@ XsensLinkStateRunner::XsensLinkStateRunner(
   : frame_source_(frame_source),
     frame_sink_(frame_sink),
     publish_rate_hz_(publish_rate_hz),
+    last_published_sequence_(0),
     sleep_strategy_(&sleep_strategy)
 {
 }
@@ -60,7 +62,8 @@ XsensLinkStateRunner::XsensLinkStateRunner(
 bool XsensLinkStateRunner::runOnce()
 {
   xsens::core::XsensFrame frame;
-  if (!frame_source_.copyFrame(frame))
+  std::uint64_t frame_sequence = 0;
+  if (!frame_source_.copyFrame(frame, frame_sequence))
   {
     sleep_strategy_->sleepFor(publishPeriod());
     return false;
@@ -72,7 +75,14 @@ bool XsensLinkStateRunner::runOnce()
     return false;
   }
 
+  if (frame_sequence <= last_published_sequence_)
+  {
+    sleep_strategy_->sleepFor(publishPeriod());
+    return false;
+  }
+
   frame_sink_.publish(frame);
+  last_published_sequence_ = frame_sequence;
   sleep_strategy_->sleepFor(publishPeriod());
   return true;
 }
