@@ -13,6 +13,9 @@ class MotionLoader:
     exposes only the body indices required by the active robot configuration.
     """
 
+    joint_order_space = "isaac"
+    body_order_space = "policy"
+
     def __init__(
         self, motion_file: str, body_indexes: Sequence[int], device: str = "cpu"
     ):

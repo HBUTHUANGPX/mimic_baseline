@@ -14,7 +14,7 @@ from awesome_deploy.inference.backends import OnnxBackend
 from awesome_deploy.inference.engine import InferenceEngine
 from awesome_deploy.inference.io_adapters import ProtocolAdapter
 from awesome_deploy.utils.cfg import cfg
-from awesome_deploy.utils.motion_loader import MotionLoader
+from awesome_deploy.utils.motion_source_factory import build_motion_source
 from awesome_deploy.utils.obscfg import get_obs_cfg
 from awesome_deploy.utils.observation_manager import SimpleObservationManager
 from awesome_deploy.utils.pinocchio_func import pin_mj
@@ -40,20 +40,23 @@ class infere:
         self.pin = pin_mj(cfg)
         self.obs_cfg = get_obs_cfg()
         self.obs_manager = SimpleObservationManager(self.obs_cfg, self)
-        self.first_frame_pos = np.copy(self.motion.joint_pos[0])[
-            self.isaac_sim2mujoco_index
-        ]
+        self.first_frame_pos = self._motion_joint_pos_for_mujoco(0)
 
     def _init_inference(self):
         """Builds motion data and the backend-agnostic inference engine."""
         self.body_indexes = np.asarray(
             self.motion_body_names_in_isaacsim_index, dtype=np.int64
         )
-        self.motion = MotionLoader(
-            cfg.motion_file,
-            self.body_indexes,
+        self.motion = build_motion_source(
+            cfg,
+            self.body_indexes.tolist(),
             "cpu",
+            body_names=cfg.motion_body_names,
         )
+        if cfg.motion_play and getattr(self.motion, "is_realtime", False):
+            raise ValueError(
+                "motion_play is not supported with motion_source='realtime'."
+            )
         self.policy_dt = cfg.policy_dt
         if cfg.motion_play:
             self.policy_dt = (1 / self.motion.fps)[0]
@@ -207,8 +210,36 @@ class infere:
         target_q = action.clip(-self.action_clip, self.action_clip)
         self.target_dof_pos = target_q
 
+    def _motion_joint_pos_for_policy(self, index):
+        """Returns reference joint positions in policy joint order."""
+        joint_pos = np.asarray(self.motion.joint_pos[index], dtype=np.float32)
+        if getattr(self.motion, "joint_order_space", "isaac") == "mujoco":
+            return joint_pos[..., self.mujoco2isaac_sim_index]
+        return joint_pos
+
+    def _motion_joint_pos_for_mujoco(self, index):
+        """Returns reference joint positions in MuJoCo joint order."""
+        joint_pos = np.asarray(self.motion.joint_pos[index], dtype=np.float32)
+        if getattr(self.motion, "joint_order_space", "isaac") == "isaac":
+            return joint_pos[..., self.isaac_sim2mujoco_index]
+        return joint_pos
+
+    def _motion_body_pos_for_policy(self, index):
+        """Returns reference body positions in policy body order."""
+        return np.asarray(self.motion.body_pos_w[index], dtype=np.float32)
+
+    def _motion_body_quat_for_policy(self, index, body_index=None):
+        """Returns reference body quaternions in policy body order."""
+        body_quat = np.asarray(self.motion.body_quat_w[index], dtype=np.float32)
+        if body_index is None:
+            return body_quat
+        return body_quat[body_index]
+
     def minimum_infer(self):
         """Runs one minimal policy inference step and updates target positions."""
+        motion = getattr(self, "motion", None)
+        if motion is not None and hasattr(motion, "advance"):
+            motion.advance()
         runtime_state = self.runtime_state_builder.build(self)
         result = self.inference_engine.step(runtime_state)
         self.latest_inference = result

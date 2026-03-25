@@ -45,13 +45,11 @@ class simulator(infere):
     def motion_play(self):
         """Copies reference motion state directly into MuJoCo."""
         t = int(self.time_step)
-        self.d.qpos[0:3] = np.asarray(self.motion.body_pos_w[t, 7, :])
+        self.d.qpos[0:3] = self._motion_body_pos_for_policy(t)[7]
         self.d.qpos[0:2] = 0
-        q = np.asarray(self.motion.body_quat_w[t, 0, :])
+        q = self._motion_body_quat_for_policy(t, 0)
         self.d.qpos[3:7] = q
-        self.d.qpos[7 : 7 + len(self.default_pos)] = np.asarray(
-            self.motion.joint_pos[t]
-        )[self.isaac_sim2mujoco_index]
+        self.d.qpos[7 : 7 + len(self.default_pos)] = self._motion_joint_pos_for_mujoco(t)
         mujoco.mj_forward(self.m, self.d)
 
     def _init_robot_conf(self):
@@ -101,103 +99,121 @@ class simulator(infere):
         self.counter = 0
         self.target_dof_pos = self.default_pos.copy()[: self.action_num]
         self.phase = 0
+        self.viewer = None
+        self.renderer = None
         if save_data_flag:
             if os.path.exists("data.csv"):
                 os.remove("data.csv")
-        self.viewer = mujoco.viewer.launch_passive(
-            self.m, self.d, key_callback=self.key_callback
-        )
-        self.renderer = mujoco.renderer.Renderer(self.m, height=480, width=640)
-        self.init_vel_geom(
-            "Goal Vel: x: {:.2f}, y: {:.2f}, yaw: {:.2f},force_z:{:.2f}".format(
-                self.cmd[0], self.cmd[1], self.cmd[2], 0.0
+        try:
+            self.viewer = mujoco.viewer.launch_passive(
+                self.m, self.d, key_callback=self.key_callback
             )
-        )
-        self.prev_qpos = self.d.qpos
-        first_flag = False
-        log = {
-            "fps": [50],
-            "dof_names": [joint.name for joint in self.spec.joints][1:],
-            "body_names": self.mujoco_all_body_names,
-            "dof_positions": [],
-            "dof_velocities": [],
-            "dof_torque": [],
-            "body_positions": [],
-            "body_rotations": [],
-            "body_linear_velocities": [],
-            "body_angular_velocities": [],
-            "qpos": [],
-            "qvel": [],
-            "xpos": [],
-            "xquat": [],
-            "cvel": [],
-            "P_gain": [self.P_gains],
-            "D_gain": [self.D_gains],
-            "target_pos": [],
-            "qfrc_actuator": [],
-        }
+            renderer_cls = getattr(mujoco, "Renderer", None)
+            if renderer_cls is None and hasattr(mujoco, "renderer"):
+                renderer_cls = getattr(mujoco.renderer, "Renderer", None)
+            if renderer_cls is None:
+                raise AttributeError("MuJoCo Python package does not provide a compatible Renderer API.")
+            self.renderer = renderer_cls(self.m, height=480, width=640)
+            self.init_vel_geom(
+                "Goal Vel: x: {:.2f}, y: {:.2f}, yaw: {:.2f},force_z:{:.2f}".format(
+                    self.cmd[0], self.cmd[1], self.cmd[2], 0.0
+                )
+            )
+            self.prev_qpos = self.d.qpos
+            first_flag = False
+            log = {
+                "fps": [50],
+                "dof_names": [joint.name for joint in self.spec.joints][1:],
+                "body_names": self.mujoco_all_body_names,
+                "dof_positions": [],
+                "dof_velocities": [],
+                "dof_torque": [],
+                "body_positions": [],
+                "body_rotations": [],
+                "body_linear_velocities": [],
+                "body_angular_velocities": [],
+                "qpos": [],
+                "qvel": [],
+                "xpos": [],
+                "xquat": [],
+                "cvel": [],
+                "P_gain": [self.P_gains],
+                "D_gain": [self.D_gains],
+                "target_pos": [],
+                "qfrc_actuator": [],
+            }
 
-        while self.viewer.is_running():
-            if not first_flag:
-                first_flag = True
-                # Align the simulator with the first motion frame before the
-                # closed-loop rollout starts.
-                if cfg.motion_play:
-                    self.motion_play()
-                    self.time_step = 0
-                else:
-                    self.motion_play()
-                mujoco.mj_step(self.m, self.d)
-                self.viewer.sync()
+            while self.viewer.is_running():
+                if not first_flag:
+                    first_flag = True
+                    # Align the simulator with the first motion frame before the
+                    # closed-loop rollout starts.
+                    if cfg.motion_play:
+                        self.motion_play()
+                        self.time_step = 0
+                    else:
+                        self.motion_play()
+                    mujoco.mj_step(self.m, self.d)
+                    self.viewer.sync()
 
-            self.policy_loop()
-            log["dof_positions"].append(np.copy(self.d.qpos[7:]))
-            log["dof_velocities"].append(np.copy(self.d.qvel[6:]))
-            log["dof_torque"].append(np.copy(self.d.qfrc_actuator[6:]))
-            log["body_positions"].append(
-                np.copy(self.d.xpos[self.mujoco_body_names_indices, :])
-            )
-            log["body_rotations"].append(
-                np.copy(self.d.xquat[self.mujoco_body_names_indices, :])
-            )
-            log["body_linear_velocities"].append(
-                np.copy(self.d.cvel[self.mujoco_body_names_indices, 0:3])
-            )
-            log["body_angular_velocities"].append(
-                np.copy(self.d.cvel[self.mujoco_body_names_indices, 3:6])
-            )
-            log["qpos"].append(np.copy(self.d.qpos))
-            log["qvel"].append(np.copy(self.d.qvel))
-            log["xpos"].append(np.copy(self.d.xpos[self.mujoco_body_names_indices, :]))
-            log["xquat"].append(
-                np.copy(self.d.xquat[self.mujoco_body_names_indices, :])
-            )
-            log["cvel"].append(np.copy(self.d.cvel[self.mujoco_body_names_indices, :]))
-            log["target_pos"].append(np.copy(self.target_dof_pos))
-            log["qfrc_actuator"].append(np.copy(self.d.qfrc_actuator))
-            if self.time_step >= self.motion.time_step_total:
-                break
+                self.policy_loop()
+                log["dof_positions"].append(np.copy(self.d.qpos[7:]))
+                log["dof_velocities"].append(np.copy(self.d.qvel[6:]))
+                log["dof_torque"].append(np.copy(self.d.qfrc_actuator[6:]))
+                log["body_positions"].append(
+                    np.copy(self.d.xpos[self.mujoco_body_names_indices, :])
+                )
+                log["body_rotations"].append(
+                    np.copy(self.d.xquat[self.mujoco_body_names_indices, :])
+                )
+                log["body_linear_velocities"].append(
+                    np.copy(self.d.cvel[self.mujoco_body_names_indices, 0:3])
+                )
+                log["body_angular_velocities"].append(
+                    np.copy(self.d.cvel[self.mujoco_body_names_indices, 3:6])
+                )
+                log["qpos"].append(np.copy(self.d.qpos))
+                log["qvel"].append(np.copy(self.d.qvel))
+                log["xpos"].append(np.copy(self.d.xpos[self.mujoco_body_names_indices, :]))
+                log["xquat"].append(
+                    np.copy(self.d.xquat[self.mujoco_body_names_indices, :])
+                )
+                log["cvel"].append(np.copy(self.d.cvel[self.mujoco_body_names_indices, :]))
+                log["target_pos"].append(np.copy(self.target_dof_pos))
+                log["qfrc_actuator"].append(np.copy(self.d.qfrc_actuator))
+                if (
+                    not getattr(self.motion, "is_realtime", False)
+                    and self.time_step >= self.motion.time_step_total
+                ):
+                    break
 
-        for key in (
-            "dof_positions",
-            "dof_velocities",
-            "body_positions",
-            "body_rotations",
-            "body_linear_velocities",
-            "body_angular_velocities",
-            "qpos",
-            "qvel",
-            "xpos",
-            "xquat",
-            "cvel",
-            "qfrc_actuator",
-        ):
-            log[key] = np.stack(log[key], axis=0)
-        save_path = current_path + "/tmp/motion.npz"
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        np.savez(save_path, **log)
-        print("stop")
-        self.video_recorder.stop()
+            for key in (
+                "dof_positions",
+                "dof_velocities",
+                "body_positions",
+                "body_rotations",
+                "body_linear_velocities",
+                "body_angular_velocities",
+                "qpos",
+                "qvel",
+                "xpos",
+                "xquat",
+                "cvel",
+                "qfrc_actuator",
+            ):
+                log[key] = np.stack(log[key], axis=0)
+            save_path = current_path + "/tmp/motion.npz"
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            np.savez(save_path, **log)
+            print("stop")
+        finally:
+            self.video_recorder.stop()
+            if self.renderer is not None:
+                self.renderer.close()
+                self.renderer = None
+            if self.viewer is not None:
+                self.viewer.close()
+                self.viewer = None
 
     def policy_loop(self):
         """Runs one control update including inference, logging, and rendering."""
@@ -206,7 +222,10 @@ class simulator(infere):
         self.P_n = self.qpos - self.default_pos
         self.V_n = self.d.qvel[6:]
 
-        if self.time_step >= self.motion.time_step_total:
+        if (
+            not getattr(self.motion, "is_realtime", False)
+            and self.time_step >= self.motion.time_step_total
+        ):
             self.time_step = 10
 
         if cfg.motion_play:
@@ -230,19 +249,17 @@ class simulator(infere):
 
     def _obs_motion_joint_pos_command(self):
         """Returns the current reference motion joint positions."""
-        return np.copy(self.motion.joint_pos[int(self.time_step)])
+        return np.copy(self._motion_joint_pos_for_policy(int(self.time_step)))
 
     def _obs_motion_joint_vel_command(self):
         """Returns the current reference motion joint velocities."""
         return np.copy(self.motion.joint_vel[int(self.time_step)])
 
     def _obs_joint_pos_delta(self):
-
-        return np.copy(self.motion.joint_pos[int(self.time_step)])-self._obs_joint_pos()
+        return self._motion_joint_pos_for_policy(int(self.time_step)) - self._obs_joint_pos()
     
     def _obs_robot_joint_pos(self):
-
-        return np.copy(self.motion.joint_pos[int(self.time_step)])
+        return np.copy(self._motion_joint_pos_for_policy(int(self.time_step)))
 
     def _obs_motion_ref_ori_b(self):
         """Returns body-frame orientation error to the motion reference."""
@@ -256,9 +273,10 @@ class simulator(infere):
             self.pin.get_link_quaternion(cfg.motion_reference_body), 
             axis=0
         )
-        self.ref_quat_w = self.motion.body_quat_w[
-            int(self.time_step), ref_body_index, :
-        ]
+        self.ref_quat_w = self._motion_body_quat_for_policy(
+            int(self.time_step),
+            ref_body_index,
+        )
         q01 = self.robot_ref_quat_w
         q02 = self.ref_quat_w
         if q02 is not None and q02.ndim == 1:
@@ -297,7 +315,7 @@ class simulator(infere):
     def _obs_joint_pos_delta_window(self):
         """Returns flattened joint-position deltas for the temporal window."""
         motion_joint_pos_window = np.copy(
-            self.motion.joint_pos[self._get_motion_window_indices()]
+            self._motion_joint_pos_for_policy(self._get_motion_window_indices())
         )
         joint_pos = np.expand_dims(self._obs_joint_pos(), axis=0)
         return (motion_joint_pos_window - joint_pos).reshape(-1)
@@ -305,7 +323,7 @@ class simulator(infere):
     def _obs_robot_joint_pos_window(self):
         """Returns flattened target joint positions for the temporal window."""
         return np.copy(
-            self.motion.joint_pos[self._get_motion_window_indices()]
+            self._motion_joint_pos_for_policy(self._get_motion_window_indices())
         ).reshape(-1)
 
     def _obs_motion_ref_ori_b_window(self):
@@ -319,11 +337,9 @@ class simulator(infere):
             self.pin.get_link_quaternion(cfg.motion_reference_body), axis=0
         )
         motion_ref_quat_w = np.copy(
-            self.motion.body_quat_w[
+            self._motion_body_quat_for_policy(
                 self._get_motion_window_indices(),
-                self.motion_reference_body_index,
-                :,
-            ]
+            )[:, self.motion_reference_body_index, :]
         )
         robot_ref_quat_w = np.repeat(robot_ref_quat_w, len(motion_ref_quat_w), axis=0)
         rel_quat_b = quat_mul(quat_inv(robot_ref_quat_w), motion_ref_quat_w)

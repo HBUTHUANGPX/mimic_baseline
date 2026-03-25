@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from awesome_deploy.inference import InputBinding, ModelProtocol
+from awesome_deploy.inference import InputBinding, ModelProtocol, OutputBinding
 from awesome_deploy.inference.types import (
     InferenceResult,
     ModelSignature,
@@ -214,4 +214,250 @@ def test_minimum_infer_uses_runtime_state_builder(monkeypatch):
     assert "policy_obs" not in runtime_state.values
     assert np.allclose(
         runtime_state.values["actor_obs"], np.asarray([0.1, 0.2], dtype=np.float32)
+    )
+
+
+def test_init_inference_builds_motion_via_factory(monkeypatch):
+    """Inference initialization should delegate motion construction to the factory."""
+    fake_motion = type(
+        "FakeMotion",
+        (),
+        {
+            "joint_pos": np.zeros((2, 3), dtype=np.float32),
+            "joint_vel": np.zeros((2, 3), dtype=np.float32),
+            "fps": np.asarray([50.0], dtype=np.float32),
+            "time_step_total": 2,
+        },
+    )()
+    captured = {}
+
+    def fake_build_motion_source(cfg, body_indexes, device, body_names=None):
+        captured["cfg"] = cfg
+        captured["body_indexes"] = body_indexes
+        captured["device"] = device
+        captured["body_names"] = body_names
+        return fake_motion
+
+    protocol = ModelProtocol(
+        input_bindings={},
+        output_bindings={
+            "actions": OutputBinding(
+                target_kind="primary",
+                target_key="actions",
+            )
+        },
+    )
+    signature = ModelSignature(
+        inputs={"actor_obs": TensorSpec("actor_obs", (1, 3), "tensor(float)")},
+        outputs={"actions": TensorSpec("actions", (1, 2), "tensor(float)")},
+    )
+
+    class FakeAdapter:
+        def __init__(self, protocol):
+            self.protocol = protocol
+
+    class FakeInferenceEngine:
+        def __init__(self, backend, io_adapter, model_path, device):
+            self.backend = backend
+            self.io_adapter = io_adapter
+            self.model_path = model_path
+            self.device = device
+            self.signature = signature
+            self.buffers = FakeBuffers()
+
+        def load(self):
+            return None
+
+    class FakeBuilder:
+        def __init__(self, protocol, signature):
+            self.protocol = protocol
+            self.signature = signature
+
+        def get_primary_observation_dim(self):
+            return 3
+
+    monkeypatch.setattr(infer_module, "build_motion_source", fake_build_motion_source)
+    monkeypatch.setattr(infer_module, "ProtocolAdapter", FakeAdapter)
+    monkeypatch.setattr(infer_module, "InferenceEngine", FakeInferenceEngine)
+    monkeypatch.setattr(infer_module, "RuntimeStateBuilder", FakeBuilder)
+    monkeypatch.setattr(infer_module, "OnnxBackend", lambda: "backend")
+
+    runner = infere.__new__(infere)
+    runner.motion_body_names_in_isaacsim_index = [4, 2, 0]
+    runner._load_model_protocol = lambda: protocol
+
+    runner._init_inference()
+
+    assert runner.motion is fake_motion
+    assert captured["cfg"] is infer_module.cfg
+    assert captured["body_indexes"] == [4, 2, 0]
+    assert captured["device"] == "cpu"
+    assert captured["body_names"] == infer_module.cfg.motion_body_names
+
+
+def test_minimum_infer_advances_realtime_motion_before_building_runtime_state():
+    """Realtime motion sources should advance once per policy step before obs build."""
+    calls = []
+
+    class FakeMotion:
+        def advance(self):
+            calls.append("advance")
+
+    class FakeBuilder:
+        def build(self, runner):
+            calls.append("build")
+            return RuntimeState(
+                values={
+                    "actor_obs": np.asarray([0.1, 0.2], dtype=np.float32),
+                    "time_step": 3,
+                }
+            )
+
+    runner = infere.__new__(infere)
+    runner.motion = FakeMotion()
+    runner.runtime_state_builder = FakeBuilder()
+    runner.inference_engine = FakeEngine()
+    runner.cmd = np.asarray([0.0, 0.0, 0.0], dtype=np.float32)
+    runner.tq_max = np.asarray([10.0, 10.0], dtype=np.float32)
+    runner.P_gains = np.asarray([2.0, 2.0], dtype=np.float32)
+    runner.default_pos = np.asarray([0.0, 0.0], dtype=np.float32)
+    runner.isaac_sim2mujoco_index = [0, 1]
+    runner.action_clip = 10.0
+    runner.action_scale = 0.25
+    runner.latest_inference = None
+    runner.action = np.zeros(2, dtype=np.float32)
+
+    runner.minimum_infer()
+
+    assert calls[:2] == ["advance", "build"]
+
+
+def test_init_inference_rejects_motion_play_with_realtime_source(monkeypatch):
+    """Realtime sources should not be used with direct motion-play mode."""
+    fake_motion = type(
+        "FakeRealtimeMotion",
+        (),
+        {
+            "joint_pos": np.zeros((2, 3), dtype=np.float32),
+            "joint_vel": np.zeros((2, 3), dtype=np.float32),
+            "fps": np.asarray([0.0], dtype=np.float32),
+            "time_step_total": 2,
+            "is_realtime": True,
+        },
+    )()
+
+    monkeypatch.setattr(
+        infer_module,
+        "build_motion_source",
+        lambda cfg, body_indexes, device, body_names=None: fake_motion,
+    )
+    monkeypatch.setattr(infer_module.cfg, "motion_play", True)
+
+    runner = infere.__new__(infere)
+    runner.motion_body_names_in_isaacsim_index = [0]
+
+    with pytest.raises(ValueError, match="motion_play.*realtime"):
+        runner._init_inference()
+
+    monkeypatch.setattr(infer_module.cfg, "motion_play", False)
+
+
+def test_motion_joint_pos_for_policy_order_passthrough_for_isaac_motion():
+    runner = infere.__new__(infere)
+    runner.motion = type(
+        "OfflineMotion",
+        (),
+        {
+            "joint_pos": np.asarray([[10.0, 20.0, 30.0]], dtype=np.float32),
+            "joint_order_space": "isaac",
+        },
+    )()
+    runner.mujoco2isaac_sim_index = [2, 0, 1]
+
+    joint_pos = runner._motion_joint_pos_for_policy(0)
+
+    assert np.allclose(joint_pos, np.asarray([10.0, 20.0, 30.0], dtype=np.float32))
+
+
+def test_motion_joint_pos_for_policy_order_reorders_mujoco_motion():
+    runner = infere.__new__(infere)
+    runner.motion = type(
+        "RealtimeMotion",
+        (),
+        {
+            "joint_pos": np.asarray([[100.0, 200.0, 300.0]], dtype=np.float32),
+            "joint_order_space": "mujoco",
+        },
+    )()
+    runner.mujoco2isaac_sim_index = [2, 0, 1]
+
+    joint_pos = runner._motion_joint_pos_for_policy(0)
+
+    assert np.allclose(joint_pos, np.asarray([300.0, 100.0, 200.0], dtype=np.float32))
+
+
+def test_motion_joint_pos_for_mujoco_order_reorders_isaac_motion():
+    runner = infere.__new__(infere)
+    runner.motion = type(
+        "OfflineMotion",
+        (),
+        {
+            "joint_pos": np.asarray([[10.0, 20.0, 30.0]], dtype=np.float32),
+            "joint_order_space": "isaac",
+        },
+    )()
+    runner.isaac_sim2mujoco_index = [1, 2, 0]
+
+    joint_pos = runner._motion_joint_pos_for_mujoco(0)
+
+    assert np.allclose(joint_pos, np.asarray([20.0, 30.0, 10.0], dtype=np.float32))
+
+
+def test_motion_body_quat_for_policy_passthrough():
+    runner = infere.__new__(infere)
+    runner.motion = type(
+        "Motion",
+        (),
+        {
+            "body_quat_w": np.asarray(
+                [[[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0]]],
+                dtype=np.float32,
+            ),
+            "body_order_space": "policy",
+        },
+    )()
+
+    quat = runner._motion_body_quat_for_policy(0, 1)
+
+    assert np.allclose(quat, np.asarray([0.0, 1.0, 0.0, 0.0], dtype=np.float32))
+
+
+def test_motion_body_pos_for_policy_window_passthrough():
+    runner = infere.__new__(infere)
+    runner.motion = type(
+        "Motion",
+        (),
+        {
+            "body_pos_w": np.asarray(
+                [
+                    [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
+                    [[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]],
+                ],
+                dtype=np.float32,
+            ),
+            "body_order_space": "policy",
+        },
+    )()
+
+    body_pos = runner._motion_body_pos_for_policy(np.asarray([0, 1], dtype=np.int64))
+
+    assert np.allclose(
+        body_pos,
+        np.asarray(
+            [
+                [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
+                [[7.0, 8.0, 9.0], [10.0, 11.0, 12.0]],
+            ],
+            dtype=np.float32,
+        ),
     )

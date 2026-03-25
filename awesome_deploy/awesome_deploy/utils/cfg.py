@@ -1,13 +1,16 @@
 """Robot configuration definitions for deployment-time simulation."""
 
+import os
+import sys
+
 from awesome_deploy.utils.urdf_graph import UrdfGraph
 from awesome_deploy.utils.motor_conf import *
 from awesome_deploy import AWESOME_DIR
 
-import os
-import sys
-
 current_path = AWESOME_DIR
+DEFAULT_REALTIME_URI = "tcp://127.0.0.1:5555"
+DEFAULT_REALTIME_TOPIC = "xsens.link_states.v1"
+DEFAULT_REALTIME_BUFFER_SIZE = 16
 
 
 class BaseRobotCfg:
@@ -37,6 +40,13 @@ class BaseRobotCfg:
         self.motion_file = (
             self.policy_dir + "/" + self.group["motion"] + ".npz"
         )
+        self.motion_source = "offline"
+        self.motion_source_uri = self.motion_file
+        self.motion_source_topic = ""
+        self.motion_source_buffer_size = 1
+        self.gmr_robot = "Q1"
+        self.gmr_human_height = 1.66
+        self._apply_motion_source_env_overrides()
         # Action scaling is applied after the neural policy output is produced
         # and before the target joint position is sent to the PD controller.
         self.action_clip = 10.0
@@ -51,6 +61,44 @@ class BaseRobotCfg:
         self.urdf_graph = UrdfGraph(self.urdf_path)
         self.isaac_sim_joint_name = self.urdf_graph.bfs_joint_order()
         self.isaac_sim_link_name = self.urdf_graph.bfs_link_order()
+
+    def _apply_motion_source_env_overrides(self) -> None:
+        """Allows runtime switching between offline and realtime reference sources."""
+        original_motion_source_uri = self.motion_source_uri
+        original_motion_source_topic = self.motion_source_topic
+        original_motion_source_buffer_size = self.motion_source_buffer_size
+        self.motion_source = os.getenv(
+            "AWESOME_DEPLOY_MOTION_SOURCE",
+            self.motion_source,
+        )
+        self.motion_source_uri = os.getenv(
+            "AWESOME_DEPLOY_MOTION_SOURCE_URI",
+            self.motion_source_uri,
+        )
+        self.motion_source_topic = os.getenv(
+            "AWESOME_DEPLOY_MOTION_SOURCE_TOPIC",
+            self.motion_source_topic,
+        )
+        self.motion_source_buffer_size = int(
+            os.getenv(
+                "AWESOME_DEPLOY_MOTION_SOURCE_BUFFER_SIZE",
+                str(self.motion_source_buffer_size),
+            )
+        )
+        self.gmr_robot = os.getenv("AWESOME_DEPLOY_GMR_ROBOT", self.gmr_robot)
+        self.gmr_human_height = float(
+            os.getenv(
+                "AWESOME_DEPLOY_GMR_HUMAN_HEIGHT",
+                str(self.gmr_human_height),
+            )
+        )
+        if self.motion_source == "realtime":
+            if self.motion_source_uri == original_motion_source_uri:
+                self.motion_source_uri = DEFAULT_REALTIME_URI
+            if self.motion_source_topic == original_motion_source_topic:
+                self.motion_source_topic = DEFAULT_REALTIME_TOPIC
+            if self.motion_source_buffer_size == original_motion_source_buffer_size:
+                self.motion_source_buffer_size = DEFAULT_REALTIME_BUFFER_SIZE
 
 
 class G1RobotCfg(BaseRobotCfg):
@@ -148,6 +196,8 @@ class G1RobotCfg(BaseRobotCfg):
     def __init__(self):
         """Initializes the base configuration with G1-specific metadata."""
         super().__init__()
+        self.gmr_robot = "G1"
+
 class Q1RobotCfg(BaseRobotCfg):
     """Concrete deployment configuration for the Unitree G1 robot."""
 
@@ -254,6 +304,7 @@ class Q1RobotCfg(BaseRobotCfg):
     def __init__(self):
         """Initializes the base configuration with Q1-specific metadata."""
         super().__init__()
+        self.gmr_robot = "Q1"
 
 
 ROBOT_CFG_REGISTRY = {

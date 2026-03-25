@@ -2,6 +2,15 @@
 #include <Eigen/Geometry>
 #include <xsens_mvn_sdk/jointanglesdatagram.h>
 #include <chrono>
+#include <cstdlib>
+
+namespace {
+bool xsensVerboseLoggingEnabled()
+{
+    const char* value = std::getenv("XSENS_MVN_VERBOSE");
+    return value != nullptr && std::string(value) == "1";
+}
+}
 
 XSensClient::XSensClient(const int& udp_port) :
     udp_port_(udp_port),
@@ -25,7 +34,6 @@ XSensClient::~XSensClient()
     if (data_acquisition_thread_.joinable()) {
         data_acquisition_thread_.join();
     }
-    std::cout << "~XSensClient()" << std::endl;
 }
 
 bool XSensClient::init()
@@ -61,7 +69,9 @@ void XSensClient::dataAcquisitionCallback()
     }
     else
     {
-        std::cout << "Human model built." << std::endl;
+        if (xsensVerboseLoggingEnabled()) {
+            std::cout << "Human model built." << std::endl;
+        }
         client_active_ = true;
     }
 
@@ -149,7 +159,9 @@ bool XSensClient::buildXSensModel()
     // std::cout << "DEBUG: Finger data available: " << (has_finger_data_ ? "Yes" : "No") << std::endl;
 
     const auto& quaternion_data = quaternion_datagram_ptr_->getData();
-    std::cout << "Available links: " << quaternion_data.size() << std::endl;
+    if (xsensVerboseLoggingEnabled()) {
+        std::cout << "Available links: " << quaternion_data.size() << std::endl;
+    }
 
     for (auto xsens_link: quaternion_data)
     {
@@ -166,7 +178,9 @@ bool XSensClient::buildXSensModel()
             else
             {
                 finger_link_name_list_.push_back(link_name);
-                std::cout << "Added finger link: " << link_name << " (ID: " << finger_id << ")" << std::endl;
+                if (xsensVerboseLoggingEnabled()) {
+                    std::cout << "Added finger link: " << link_name << " (ID: " << finger_id << ")" << std::endl;
+                }
             }
         }
         else if (xsens_link.segmentId < xsens_model_names.links.size())
@@ -194,7 +208,9 @@ bool XSensClient::buildXSensModel()
             else
             {
                 link_name_list_.push_back(prop_name);
-                std::cout << "Added prop: " << prop_name << " (ID: " << xsens_link.segmentId << ")" << std::endl;
+                if (xsensVerboseLoggingEnabled()) {
+                    std::cout << "Added prop: " << prop_name << " (ID: " << xsens_link.segmentId << ")" << std::endl;
+                }
             }
         }
         else
@@ -213,7 +229,9 @@ bool XSensClient::buildXSensModel()
     if (has_initial_joint_angles)
     {
         const auto& joint_data = joint_angles_datagram_ptr_->getData();
-        std::cout << "Available joints: " << joint_data.size() << std::endl;
+        if (xsensVerboseLoggingEnabled()) {
+            std::cout << "Available joints: " << joint_data.size() << std::endl;
+        }
 
         for (size_t joint_cnt = 0; joint_cnt < joint_data.size() && joint_cnt < xsens_model_names.joints.size(); joint_cnt++)
         {
@@ -221,17 +239,21 @@ bool XSensClient::buildXSensModel()
             if (xsens_joint.parentSegmentId > 0 && xsens_joint.parentSegmentId - 1 < link_name_list_.size() &&
                 xsens_joint.childSegmentId > 0 && xsens_joint.childSegmentId - 1 < link_name_list_.size())
             {
-                std::cout << joint_cnt << ") " << link_name_list_[xsens_joint.parentSegmentId - 1]
-                          << "(" << xsens_joint.parentSegmentId - 1 << ") -> "
-                          << link_name_list_[xsens_joint.childSegmentId - 1]
-                          << "(" << xsens_joint.childSegmentId - 1 << ")" << std::endl;
+                if (xsensVerboseLoggingEnabled()) {
+                    std::cout << joint_cnt << ") " << link_name_list_[xsens_joint.parentSegmentId - 1]
+                              << "(" << xsens_joint.parentSegmentId - 1 << ") -> "
+                              << link_name_list_[xsens_joint.childSegmentId - 1]
+                              << "(" << xsens_joint.childSegmentId - 1 << ")" << std::endl;
+                }
             }
             else
             {
                 std::cerr << "Invalid segment IDs for joint " << joint_cnt << ": parent="
                           << xsens_joint.parentSegmentId << ", child=" << xsens_joint.childSegmentId << std::endl;
             }
-            std::cout << xsens_model_names.joints[joint_cnt] << std::endl;
+            if (xsensVerboseLoggingEnabled()) {
+                std::cout << xsens_model_names.joints[joint_cnt] << std::endl;
+            }
         }
     }
 
@@ -355,7 +377,9 @@ void XSensClient::setupFingerJoints(const MvnModelNames& xsens_model_names)
         else
         {
             finger_joint_name_list_.push_back(joint_name);
-            std::cout << "Added finger joint: " << joint_name << std::endl;
+            if (xsensVerboseLoggingEnabled()) {
+                std::cout << "Added finger joint: " << joint_name << std::endl;
+            }
         }
     }
     
@@ -370,7 +394,9 @@ void XSensClient::setupFingerJoints(const MvnModelNames& xsens_model_names)
         else
         {
             finger_joint_name_list_.push_back(joint_name);
-            std::cout << "Added finger joint: " << joint_name << std::endl;
+            if (xsensVerboseLoggingEnabled()) {
+                std::cout << "Added finger joint: " << joint_name << std::endl;
+            }
         }
     }
     // std::cout << "DEBUG: setupFingerJoints completed, added " << finger_joint_name_list_.size() << " finger joints" << std::endl;
@@ -582,7 +608,9 @@ void XSensClient::updateFingerJointAngles()
     }
     
     auto finger_joint_angles = joint_angles_datagram->getFingerJointAngles();
-    std::cout << "Updating " << finger_joint_angles.size() << " finger joint angles" << std::endl;
+    if (xsensVerboseLoggingEnabled()) {
+        std::cout << "Updating " << finger_joint_angles.size() << " finger joint angles" << std::endl;
+    }
     
     int success_count = 0;
     int fail_count = 0;
@@ -928,9 +956,13 @@ std::pair<std::vector<Eigen::Quaternionf>, std::vector<Eigen::Quaternionf>> XSen
     
     // std::cout << "DEBUG: All segment IDs in quaternion data: ";
     for (const auto& quat_kinematics : quaternion_data) {
-        std::cout << quat_kinematics.segmentId << " ";
+        if (xsensVerboseLoggingEnabled()) {
+            std::cout << quat_kinematics.segmentId << " ";
+        }
     }
-    std::cout << std::endl;
+    if (xsensVerboseLoggingEnabled()) {
+        std::cout << std::endl;
+    }
     
     int left_finger_count = 0;
     int right_finger_count = 0;

@@ -25,6 +25,15 @@
 */
 
 #include "xsens_mvn_sdk/jointanglesdatagram.h"
+#include <cstdlib>
+
+namespace {
+bool xsensVerboseLoggingEnabled()
+{
+  const char* value = std::getenv("XSENS_MVN_VERBOSE");
+  return value != nullptr && std::string(value) == "1";
+}
+}
 #include <boost/concept_check.hpp>
 
 
@@ -234,14 +243,18 @@ void JointAnglesDatagram::calculateFingerJointAngles(
   
   // Check if we have finger data
   if (leftHandQuats.empty() && rightHandQuats.empty()) {
-      std::cerr << "JointAnglesDatagram: No finger quaternion data provided" << std::endl;
+      if (xsensVerboseLoggingEnabled()) {
+          std::cerr << "JointAnglesDatagram: No finger quaternion data provided" << std::endl;
+      }
       m_hasFingerData = false;
       return;
   }
   
-  std::cout << "JointAnglesDatagram: Calculating finger joint angles from " 
-            << leftHandQuats.size() << " left quats and " 
-            << rightHandQuats.size() << " right quats" << std::endl;
+  if (xsensVerboseLoggingEnabled()) {
+    std::cout << "JointAnglesDatagram: Calculating finger joint angles from " 
+              << leftHandQuats.size() << " left quats and " 
+              << rightHandQuats.size() << " right quats" << std::endl;
+  }
   
   m_hasFingerData = true;
   

@@ -77,7 +77,7 @@ def test_load_protocol_from_file_rejects_unknown_transform(tmp_path: Path):
 
 def test_checked_in_q1_protocol_matches_expected_bindings():
     protocol_path = Path(
-        "awesome_deploy/awesome_deploy/policy/q1/"
+        "awesome_deploy/policy/q1/"
         "2026-03-20_15-37-52_xsens_all_fsq_s/policy.protocol.yaml"
     )
 
