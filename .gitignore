@@ -26,3 +26,6 @@ awesome_deploy/awesome_deploy/deploy_mujoco_recordings
 
 awesome_deploy/awesome_deploy/tmp
 awesome_deploy/awesome_deploy/assets
+xsens_mvn_refactor_build/build/
+
+GMR/assets

@@ -32,6 +32,7 @@ ctest --test-dir build --output-on-failure
 - `test_zmq_loopback`
 - `test_link_states_test_publisher_process`
 - `test_xsens_link_state_runner`
+- `test_link_state_frame_filter`
 
 ## 本地回环验证
 
@@ -174,6 +175,7 @@ python /home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/examples/zmq
 - `--axis-length`：坐标轴长度
 - `--shaft-width`：箭头粗细
 - `--timeout-ms`：ZMQ 接收超时
+- `--show-labels`：显示 link 名称文字，默认关闭
 
 ## 局域网跨机测试步骤
 
@@ -182,7 +184,7 @@ python /home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/examples/zmq
 发布机：
 
 ```bash
-./build/src/link_states_test_publisher tcp://*:5555 100 50 1000
+./build/src/link_states_test_publisher tcp://*:5555 100 50 1000 xsens.link_states.v1
 ```
 
 订阅机 C++：
