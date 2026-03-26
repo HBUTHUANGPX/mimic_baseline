@@ -96,6 +96,8 @@ export AWESOME_DEPLOY_REALTIME_DRAW_XSENS_FRAMES=0
 
 ## 限制
 
-- `motion_play=True` 只适用于离线 `.npz` 模式
-- `motion_source=realtime` 时，`deploy_g1_mujoco.py` 会在每次推理前抓取最新一帧
-- 如果某次推理前没有收到新 ZMQ 数据，会重复上一帧推进窗口
+- `motion_play=True` 现在同时支持离线和 realtime 模式
+- 离线 `motion_play` 会按参考轨迹顺序逐帧播放，不经过 policy 推理
+- realtime `motion_play` 会在每个播放周期先抓取最新一帧，再直接把该帧写进 MuJoCo
+- `motion_source=realtime` 且 `motion_play=False` 时，`deploy_g1_mujoco.py` 会在每次推理前抓取最新一帧
+- 如果某次播放或推理前没有收到新 ZMQ 数据，realtime 源会重复上一帧推进窗口

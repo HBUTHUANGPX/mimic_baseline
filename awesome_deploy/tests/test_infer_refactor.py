@@ -332,8 +332,8 @@ def test_minimum_infer_advances_realtime_motion_before_building_runtime_state():
     assert calls[:2] == ["advance", "build"]
 
 
-def test_init_inference_rejects_motion_play_with_realtime_source(monkeypatch):
-    """Realtime sources should not be used with direct motion-play mode."""
+def test_init_inference_supports_motion_play_with_realtime_source(monkeypatch):
+    """Realtime sources should support direct motion-play mode."""
     fake_motion = type(
         "FakeRealtimeMotion",
         (),
@@ -343,6 +343,8 @@ def test_init_inference_rejects_motion_play_with_realtime_source(monkeypatch):
             "fps": np.asarray([0.0], dtype=np.float32),
             "time_step_total": 2,
             "is_realtime": True,
+            "joint_order_space": "mujoco",
+            "body_order_space": "policy",
         },
     )()
 
@@ -353,11 +355,53 @@ def test_init_inference_rejects_motion_play_with_realtime_source(monkeypatch):
     )
     monkeypatch.setattr(infer_module.cfg, "motion_play", True)
 
+    protocol = ModelProtocol(
+        input_bindings={},
+        output_bindings={
+            "actions": OutputBinding(
+                target_kind="primary",
+                target_key="actions",
+            )
+        },
+    )
+    signature = ModelSignature(
+        inputs={"actor_obs": TensorSpec("actor_obs", (1, 3), "tensor(float)")},
+        outputs={"actions": TensorSpec("actions", (1, 2), "tensor(float)")},
+    )
+
+    class FakeAdapter:
+        def __init__(self, protocol):
+            self.protocol = protocol
+
+    class FakeInferenceEngine:
+        def __init__(self, backend, io_adapter, model_path, device):
+            self.signature = signature
+            self.buffers = FakeBuffers()
+
+        def load(self):
+            return None
+
+    class FakeBuilder:
+        def __init__(self, protocol, signature):
+            self.protocol = protocol
+            self.signature = signature
+
+        def get_primary_observation_dim(self):
+            return 3
+
+    monkeypatch.setattr(infer_module, "ProtocolAdapter", FakeAdapter)
+    monkeypatch.setattr(infer_module, "InferenceEngine", FakeInferenceEngine)
+    monkeypatch.setattr(infer_module, "RuntimeStateBuilder", FakeBuilder)
+    monkeypatch.setattr(infer_module, "OnnxBackend", lambda: "backend")
+
     runner = infere.__new__(infere)
     runner.motion_body_names_in_isaacsim_index = [0]
+    runner._load_model_protocol = lambda: protocol
 
-    with pytest.raises(ValueError, match="motion_play.*realtime"):
-        runner._init_inference()
+    runner._init_inference()
+
+    assert runner.motion is fake_motion
+    assert runner.policy_dt == infer_module.cfg.policy_dt
 
     monkeypatch.setattr(infer_module.cfg, "motion_play", False)
 

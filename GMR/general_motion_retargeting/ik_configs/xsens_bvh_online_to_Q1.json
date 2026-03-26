@@ -6,23 +6,23 @@
     "use_ik_match_table1": true,
     "use_ik_match_table2": true,
     "human_scale_table": {
-        "pelvis": 1.05,
-        "t8": 1.05,
-        "left_upper_leg": 1.05,
-        "right_upper_leg": 1.05,
-        "left_lower_leg": 1.05,
-        "right_lower_leg": 1.05,
-        "LeftFootMod": 1.05,
-        "RightFootMod": 1.05,
+        "pelvis": 1.13,
+        "t8": 0.97,
+        "left_upper_leg": 0.97,
+        "right_upper_leg": 0.97,
+        "left_lower_leg": 1.16,
+        "right_lower_leg": 1.16,
+        "LeftFootMod": 1.16,
+        "RightFootMod": 1.16,
 
-        "left_upper_arm":1.05,
-        "right_upper_arm":1.05,
-        "left_forearm":1.05,
-        "right_forearm":1.05,
-        "right_hand":1.05,
-        "left_hand":1.05,
+        "left_upper_arm":0.97,
+        "right_upper_arm":0.97,
+        "left_forearm":0.97,
+        "right_forearm":0.97,
+        "right_hand":0.97,
+        "left_hand":0.97,
 
-        "head":1.05
+        "head":0.97
     },
 
     "human_scale_table_000000": {
@@ -47,8 +47,8 @@
     "ik_match_table1": {
         "pelvis_link": [
             "pelvis",
-            0,
-            10,
+            100,
+            2,
             [
                 0.0,
                 0.0,
@@ -129,7 +129,7 @@
         "L_knee_link": [
             "left_lower_leg",
             0,
-            10,
+            4,
             [
                 0.0,
                 0.0,
@@ -145,7 +145,7 @@
         "R_knee_link": [
             "right_lower_leg",
             0,
-            10,
+            4,
             [
                 0.0,
                 0.0,
@@ -291,8 +291,8 @@
     "ik_match_table2": {
         "pelvis_link": [
             "pelvis",
+            50,
             10,
-            5,
             [
                 0.0,
                 0.0,
@@ -308,7 +308,7 @@
         "torso_link": [
             "t8",
             0,
-            0,
+            10,
             [
                 0.0,
                 0.0,
@@ -372,7 +372,7 @@
         "L_knee_link": [
             "left_lower_leg",
             0,
-            5,
+            10,
             [
                 0.0,
                 0.0,
@@ -388,7 +388,7 @@
         "R_knee_link": [
             "right_lower_leg",
             0,
-            5,
+            10,
             [
                 0.0,
                 0.0,
@@ -435,7 +435,7 @@
         ],
         "L_shoulder_yaw_link": [
             "left_upper_arm",
-            5,
+            0,
             5,
             [
                 0.0,
@@ -451,7 +451,7 @@
         ],
         "R_shoulder_yaw_link": [
             "right_upper_arm",
-            5,
+            0,
             5,
             [
                 0.0,

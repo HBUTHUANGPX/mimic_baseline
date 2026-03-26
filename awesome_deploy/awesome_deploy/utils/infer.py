@@ -53,15 +53,11 @@ class infere:
             "cpu",
             body_names=cfg.motion_body_names,
         )
-        if cfg.motion_play and getattr(self.motion, "is_realtime", False):
-            raise ValueError(
-                "motion_play is not supported with motion_source='realtime'."
-            )
         self.policy_dt = cfg.policy_dt
-        if cfg.motion_play:
-            self.policy_dt = (1 / self.motion.fps)[0]
-        else:
-            self.policy_dt = cfg.policy_dt
+        if cfg.motion_play and not getattr(self.motion, "is_realtime", False):
+            motion_fps = float(np.asarray(self.motion.fps, dtype=np.float32).reshape(-1)[0])
+            if motion_fps > 0.0:
+                self.policy_dt = 1.0 / motion_fps
         self.control_decimation = int(self.policy_dt / cfg.simulator_dt)
         print("control_decimation: ", self.control_decimation)
         protocol = self._load_model_protocol()

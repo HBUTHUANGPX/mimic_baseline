@@ -53,6 +53,20 @@ class simulator(infere):
         self.d.qpos[7 : 7 + len(self.default_pos)] = self._motion_joint_pos_for_mujoco(t)
         mujoco.mj_forward(self.m, self.d)
 
+    def _prepare_motion_play_step(self):
+        """Prepares the active reference frame before direct playback."""
+        if not cfg.motion_play:
+            return
+        if getattr(self.motion, "is_realtime", False) and hasattr(self.motion, "advance"):
+            self.motion.advance()
+            self.time_step = max(self.motion.time_step_total - 1, 0)
+
+    def _finalize_motion_play_step(self):
+        """Advances the playback cursor after the current frame is applied."""
+        if not cfg.motion_play or getattr(self.motion, "is_realtime", False):
+            return
+        self.time_step = min(int(self.time_step) + 1, self.motion.time_step_total - 1)
+
     def _init_robot_conf(self):
         """Extends base robot config with MuJoCo body name lookup tables."""
         super()._init_robot_conf()
@@ -144,9 +158,9 @@ class simulator(infere):
                     first_flag = True
                     # Align the simulator with the first motion frame before the
                     # closed-loop rollout starts.
+                    self.time_step = 0
                     if cfg.motion_play:
                         self.motion_play()
-                        self.time_step = 0
                     else:
                         self.motion_play()
                     mujoco.mj_step(self.m, self.d)
@@ -225,12 +239,13 @@ class simulator(infere):
             self.time_step = 10
 
         if cfg.motion_play:
+            self._prepare_motion_play_step()
             self.motion_play()
+            self._finalize_motion_play_step()
         else:
             self.minimum_infer()
-
+            self.sim_loop()
         self.contact_force()
-        self.sim_loop()
         # Render from the same camera/view options shown in the interactive
         # viewer so the saved video matches what the operator sees.
         self.renderer.update_scene(
