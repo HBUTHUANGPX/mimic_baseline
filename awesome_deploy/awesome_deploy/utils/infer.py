@@ -34,7 +34,7 @@ class infere:
 
     def __init__(self):
         """Initializes robot state, inference engine, and observation manager."""
-        print("==infere init==")
+        # print("==infere init==")
         self._init_robot_conf()
         self._init_inference()
         self.pin = pin_mj(cfg)
@@ -138,37 +138,37 @@ class infere:
         self.target_dof_pos = np.zeros_like(self.default_pos)
         self.cmd = np.array([0.0, 0.0, 0.0], dtype=np.float32)
         mujoco_joint_name = cfg.urdf_graph.joint_order_by_file()
-        for i in range(len(mujoco_joint_name)):
-            print(
-                "  - "
-                + mujoco_joint_name[i]
-                + ": {kp: "
-                + str(self.P_gains[i])
-                + ", kd: "
-                + str(self.D_gains[i])
-                + ", torque_max: "
-                + str(self.tq_max[i])
-                + ", default_pos: "
-                + str(self.default_pos[i])
-                + "}"
-            )
-        print("mujoco_joint_name:\r\n", mujoco_joint_name)
+        # for i in range(len(mujoco_joint_name)):
+        #     print(
+        #         "  - "
+        #         + mujoco_joint_name[i]
+        #         + ": {kp: "
+        #         + str(self.P_gains[i])
+        #         + ", kd: "
+        #         + str(self.D_gains[i])
+        #         + ", torque_max: "
+        #         + str(self.tq_max[i])
+        #         + ", default_pos: "
+        #         + str(self.default_pos[i])
+        #         + "}"
+        #     )
+        # print("mujoco_joint_name:\r\n", mujoco_joint_name)
         # ``isaac_sim2mujoco_index`` reorders policy-space actions into MuJoCo
         # joint order for low-level control.
         self.isaac_sim2mujoco_index = [
             cfg.isaac_sim_joint_name.index(name) for name in mujoco_joint_name
         ]
-        print("isaac_sim2mujoco_index:\r\n", self.isaac_sim2mujoco_index)
+        # print("isaac_sim2mujoco_index:\r\n", self.isaac_sim2mujoco_index)
         # ``mujoco2isaac_sim_index`` performs the inverse mapping for
         # observation construction.
         self.mujoco2isaac_sim_index = [
             mujoco_joint_name.index(name) for name in cfg.isaac_sim_joint_name
         ]
-        print("mujoco2isaac_sim_index:\r\n", self.mujoco2isaac_sim_index)
+        # print("mujoco2isaac_sim_index:\r\n", self.mujoco2isaac_sim_index)
         self.motion_body_names_in_isaacsim_index = [
             cfg.isaac_sim_link_name.index(name) for name in cfg.motion_body_names
         ]
-        print("motion_body_index:\r\n", self.motion_body_names_in_isaacsim_index)
+        # print("motion_body_index:\r\n", self.motion_body_names_in_isaacsim_index)
 
     @property
     def time_step(self) -> int:

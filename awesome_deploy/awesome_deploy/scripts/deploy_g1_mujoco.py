@@ -82,7 +82,7 @@ class simulator(infere):
             cfg.motion_reference_body
         )
         self._init_motion_window_offsets()
-        print("mujoco_all_body_names:\r\n", self.mujoco_all_body_names)
+        # print("mujoco_all_body_names:\r\n", self.mujoco_all_body_names)
 
     def _init_motion_window_offsets(self):
         """Loads the temporal window size used by the exported training setup."""

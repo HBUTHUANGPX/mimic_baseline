@@ -45,7 +45,7 @@ def test_draw_viewer_overlays_draws_realtime_xsens_frames(monkeypatch):
     assert calls["label_updated"] is True
 
 
-def test_prepare_motion_play_step_advances_realtime_source_to_latest_frame():
+def test_prepare_motion_play_step_advances_realtime_source_to_latest_frame(monkeypatch):
     calls = []
     runner = deploy_module.simulator.__new__(deploy_module.simulator)
     runner.inference_engine = SimpleNamespace(buffers=_FakeBuffers(time_step=0))
@@ -54,6 +54,7 @@ def test_prepare_motion_play_step_advances_realtime_source_to_latest_frame():
         time_step_total=5,
         advance=lambda: calls.append("advance"),
     )
+    monkeypatch.setattr(deploy_module.cfg, "motion_play", True)
 
     runner._prepare_motion_play_step()
 
@@ -61,13 +62,14 @@ def test_prepare_motion_play_step_advances_realtime_source_to_latest_frame():
     assert runner.time_step == 4
 
 
-def test_finalize_motion_play_step_advances_offline_frame_index():
+def test_finalize_motion_play_step_advances_offline_frame_index(monkeypatch):
     runner = deploy_module.simulator.__new__(deploy_module.simulator)
     runner.inference_engine = SimpleNamespace(buffers=_FakeBuffers(time_step=1))
     runner.motion = SimpleNamespace(
         is_realtime=False,
         time_step_total=3,
     )
+    monkeypatch.setattr(deploy_module.cfg, "motion_play", True)
 
     runner._finalize_motion_play_step()
 

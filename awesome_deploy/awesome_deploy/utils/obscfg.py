@@ -1,6 +1,5 @@
 """Observation configuration used by the simple observation manager."""
 
-import os
 import sys
 
 from awesome_deploy.utils.cfg import resolve_robot_name
@@ -77,15 +76,12 @@ OBS_CFG_REGISTRY = {
 
 def resolve_obs_name(
     argv: list[str] | None = None,
-    env_var: str = "AWESOME_DEPLOY_OBS_NAME",
     default: str | None = None,
 ) -> str:
     """Resolves the active observation configuration name.
 
     Args:
         argv: Optional argument list. Defaults to ``sys.argv``.
-        env_var: Environment variable checked when CLI args do not specify the
-            observation configuration.
         default: Optional fallback. When omitted, the active ``robot_name`` is
             used as the default observation name.
 
@@ -100,7 +96,7 @@ def resolve_obs_name(
             return arg.split("=", 1)[1]
         if arg == "--obs_name" and index + 1 < len(argv):
             return argv[index + 1]
-    return os.getenv(env_var, default or resolve_robot_name(argv=argv))
+    return default or resolve_robot_name(argv=argv)
 
 
 def build_obs_cfg(obs_name: str):

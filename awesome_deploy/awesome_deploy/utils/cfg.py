@@ -1,6 +1,6 @@
 """Robot configuration definitions for deployment-time simulation."""
 
-import os
+import argparse
 import sys
 
 from awesome_deploy.utils.urdf_graph import UrdfGraph
@@ -13,6 +13,64 @@ DEFAULT_REALTIME_TOPIC = "xsens.link_states.v1"
 DEFAULT_REALTIME_BUFFER_SIZE = 16
 DEFAULT_XSENS_FRAME_AXIS_LENGTH = 0.08
 DEFAULT_XSENS_FRAME_SHAFT_WIDTH = 0.006
+
+
+def _build_runtime_override_parser() -> argparse.ArgumentParser:
+    """Builds a tolerant parser for deploy runtime overrides."""
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--motion-source", choices=("offline", "realtime"))
+    parser.add_argument("--motion-source-uri")
+    parser.add_argument("--motion-source-topic")
+    parser.add_argument("--motion-source-buffer-size", type=int)
+    parser.add_argument("--gmr-robot")
+    parser.add_argument("--gmr-human-height", type=float)
+    parser.add_argument("--motion-play", dest="motion_play", action="store_true", default=None)
+    parser.add_argument("--no-motion-play", dest="motion_play", action="store_false")
+    parser.add_argument(
+        "--draw-xsens-frames",
+        dest="realtime_draw_xsens_frames",
+        action="store_true",
+        default=None,
+    )
+    parser.add_argument(
+        "--no-draw-xsens-frames",
+        dest="realtime_draw_xsens_frames",
+        action="store_false",
+    )
+    parser.add_argument(
+        "--draw-xsens-labels",
+        dest="realtime_draw_xsens_labels",
+        action="store_true",
+        default=None,
+    )
+    parser.add_argument(
+        "--no-draw-xsens-labels",
+        dest="realtime_draw_xsens_labels",
+        action="store_false",
+    )
+    parser.add_argument("--xsens-frame-axis-length", type=float)
+    parser.add_argument("--xsens-frame-shaft-width", type=float)
+    return parser
+
+
+def parse_runtime_overrides(argv: list[str] | None = None) -> dict[str, object]:
+    """Parses deploy runtime overrides from CLI arguments."""
+    argv = list(argv if argv is not None else sys.argv)
+    parse_argv = argv[1:] if argv else []
+    parser = _build_runtime_override_parser()
+    namespace, _ = parser.parse_known_args(parse_argv)
+    overrides = {
+        key: value for key, value in vars(namespace).items() if value is not None
+    }
+    if "xsens_frame_axis_length" in overrides:
+        overrides["realtime_xsens_frame_axis_length"] = overrides.pop(
+            "xsens_frame_axis_length"
+        )
+    if "xsens_frame_shaft_width" in overrides:
+        overrides["realtime_xsens_frame_shaft_width"] = overrides.pop(
+            "xsens_frame_shaft_width"
+        )
+    return overrides
 
 
 class BaseRobotCfg:
@@ -48,19 +106,16 @@ class BaseRobotCfg:
         self.motion_source_buffer_size = 1
         self.gmr_robot = "Q1"
         self.gmr_human_height = 1.66
+        self.motion_play = False
         self.realtime_draw_xsens_frames = False
         self.realtime_draw_xsens_labels = False
         self.realtime_xsens_frame_axis_length = DEFAULT_XSENS_FRAME_AXIS_LENGTH
         self.realtime_xsens_frame_shaft_width = DEFAULT_XSENS_FRAME_SHAFT_WIDTH
-        self._apply_motion_source_env_overrides()
+        self.apply_runtime_overrides(parse_runtime_overrides())
         # Action scaling is applied after the neural policy output is produced
         # and before the target joint position is sent to the PD controller.
         self.action_clip = 10.0
         self.action_scale = 0.25
-
-        # When enabled, the simulator follows the motion dataset directly
-        # instead of applying policy actions through the PD controller.
-        self.motion_play = False
 
         # Build name mappings once so runtime code can cheaply convert among
         # URDF order, MuJoCo order, and motion dataset order.
@@ -68,63 +123,81 @@ class BaseRobotCfg:
         self.isaac_sim_joint_name = self.urdf_graph.bfs_joint_order()
         self.isaac_sim_link_name = self.urdf_graph.bfs_link_order()
 
-    def _apply_motion_source_env_overrides(self) -> None:
-        """Allows runtime switching between offline and realtime reference sources."""
-        original_motion_source_uri = self.motion_source_uri
-        original_motion_source_topic = self.motion_source_topic
-        original_motion_source_buffer_size = self.motion_source_buffer_size
-        self.motion_source = os.getenv(
-            "AWESOME_DEPLOY_MOTION_SOURCE",
-            self.motion_source,
-        )
-        self.motion_source_uri = os.getenv(
-            "AWESOME_DEPLOY_MOTION_SOURCE_URI",
-            self.motion_source_uri,
-        )
-        self.motion_source_topic = os.getenv(
-            "AWESOME_DEPLOY_MOTION_SOURCE_TOPIC",
-            self.motion_source_topic,
-        )
-        self.motion_source_buffer_size = int(
-            os.getenv(
-                "AWESOME_DEPLOY_MOTION_SOURCE_BUFFER_SIZE",
-                str(self.motion_source_buffer_size),
+    def apply_runtime_overrides(self, overrides: dict[str, object] | None) -> None:
+        """Applies CLI-driven runtime overrides onto the config object."""
+        overrides = overrides or {}
+        if not overrides:
+            return
+        previous_motion_source = self.motion_source
+        if "motion_source" in overrides:
+            self.motion_source = str(overrides["motion_source"])
+        if "motion_source_uri" in overrides:
+            self.motion_source_uri = str(overrides["motion_source_uri"])
+        if "motion_source_topic" in overrides:
+            self.motion_source_topic = str(overrides["motion_source_topic"])
+        if "motion_source_buffer_size" in overrides:
+            self.motion_source_buffer_size = int(overrides["motion_source_buffer_size"])
+        if "gmr_robot" in overrides:
+            self.gmr_robot = str(overrides["gmr_robot"])
+        if "gmr_human_height" in overrides:
+            self.gmr_human_height = float(overrides["gmr_human_height"])
+        if "motion_play" in overrides:
+            self.motion_play = bool(overrides["motion_play"])
+        if "realtime_draw_xsens_frames" in overrides:
+            self.realtime_draw_xsens_frames = bool(
+                overrides["realtime_draw_xsens_frames"]
             )
-        )
-        self.gmr_robot = os.getenv("AWESOME_DEPLOY_GMR_ROBOT", self.gmr_robot)
-        self.gmr_human_height = float(
-            os.getenv(
-                "AWESOME_DEPLOY_GMR_HUMAN_HEIGHT",
-                str(self.gmr_human_height),
+        if "realtime_draw_xsens_labels" in overrides:
+            self.realtime_draw_xsens_labels = bool(
+                overrides["realtime_draw_xsens_labels"]
             )
-        )
-        self.realtime_draw_xsens_frames = os.getenv(
-            "AWESOME_DEPLOY_REALTIME_DRAW_XSENS_FRAMES",
-            "1" if self.motion_source == "realtime" else ("1" if self.realtime_draw_xsens_frames else "0"),
-        ) == "1"
-        self.realtime_draw_xsens_labels = os.getenv(
-            "AWESOME_DEPLOY_REALTIME_DRAW_XSENS_LABELS",
-            "1" if self.realtime_draw_xsens_labels else "0",
-        ) == "1"
-        self.realtime_xsens_frame_axis_length = float(
-            os.getenv(
-                "AWESOME_DEPLOY_REALTIME_XSENS_FRAME_AXIS_LENGTH",
-                str(self.realtime_xsens_frame_axis_length),
+        if "realtime_xsens_frame_axis_length" in overrides:
+            self.realtime_xsens_frame_axis_length = float(
+                overrides["realtime_xsens_frame_axis_length"]
             )
-        )
-        self.realtime_xsens_frame_shaft_width = float(
-            os.getenv(
-                "AWESOME_DEPLOY_REALTIME_XSENS_FRAME_SHAFT_WIDTH",
-                str(self.realtime_xsens_frame_shaft_width),
+        if "realtime_xsens_frame_shaft_width" in overrides:
+            self.realtime_xsens_frame_shaft_width = float(
+                overrides["realtime_xsens_frame_shaft_width"]
             )
+        self._apply_motion_source_defaults(
+            switched_to_realtime=(
+                "motion_source" in overrides
+                and previous_motion_source != "realtime"
+                and self.motion_source == "realtime"
+            ),
+            explicit_keys=set(overrides),
         )
-        if self.motion_source == "realtime":
-            if self.motion_source_uri == original_motion_source_uri:
-                self.motion_source_uri = DEFAULT_REALTIME_URI
-            if self.motion_source_topic == original_motion_source_topic:
-                self.motion_source_topic = DEFAULT_REALTIME_TOPIC
-            if self.motion_source_buffer_size == original_motion_source_buffer_size:
-                self.motion_source_buffer_size = DEFAULT_REALTIME_BUFFER_SIZE
+
+    def _apply_motion_source_defaults(
+        self,
+        *,
+        switched_to_realtime: bool,
+        explicit_keys: set[str],
+    ) -> None:
+        """Normalizes offline/realtime source defaults after runtime overrides."""
+        if self.motion_source != "realtime":
+            return
+        if switched_to_realtime or "motion_source_uri" not in explicit_keys:
+            self.motion_source_uri = (
+                self.motion_source_uri
+                if "motion_source_uri" in explicit_keys
+                else DEFAULT_REALTIME_URI
+            )
+        if switched_to_realtime or "motion_source_topic" not in explicit_keys:
+            self.motion_source_topic = (
+                self.motion_source_topic
+                if "motion_source_topic" in explicit_keys
+                else DEFAULT_REALTIME_TOPIC
+            )
+        if (
+            switched_to_realtime
+            or "motion_source_buffer_size" not in explicit_keys
+        ):
+            self.motion_source_buffer_size = (
+                self.motion_source_buffer_size
+                if "motion_source_buffer_size" in explicit_keys
+                else DEFAULT_REALTIME_BUFFER_SIZE
+            )
 
 
 class G1RobotCfg(BaseRobotCfg):
@@ -341,15 +414,12 @@ ROBOT_CFG_REGISTRY = {
 
 def resolve_robot_name(
     argv: list[str] | None = None,
-    env_var: str = "AWESOME_DEPLOY_ROBOT_NAME",
     default: str = "g1",
 ) -> str:
-    """Resolves the active robot name from CLI arguments or environment.
+    """Resolves the active robot name from CLI arguments.
 
     Args:
         argv: Optional argument list. Defaults to ``sys.argv``.
-        env_var: Environment variable checked when CLI arguments do not specify
-            the robot.
         default: Fallback robot name.
 
     Returns:
@@ -364,7 +434,7 @@ def resolve_robot_name(
         if arg == "--robot_name" and index + 1 < len(argv):
             return argv[index + 1]
 
-    return os.getenv(env_var, default)
+    return default
 
 
 def build_robot_cfg(robot_name: str) -> BaseRobotCfg:

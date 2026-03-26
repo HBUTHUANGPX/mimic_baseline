@@ -8,6 +8,7 @@ from awesome_deploy.inference.types import (
     RuntimeState,
     TensorSpec,
 )
+from awesome_deploy.utils import cfg as cfg_module
 from awesome_deploy.utils.cfg import G1RobotCfg
 from awesome_deploy.utils import infer as infer_module
 from awesome_deploy.utils import obscfg as obscfg_module
@@ -86,6 +87,26 @@ def test_get_obs_cfg_can_select_q1_independently():
     assert isinstance(obs_cfg, obscfg_module.Q1ObsCfg)
     assert obs_cfg.input_group_map["actor_obs"] == "policy"
     assert obs_cfg.input_group_map["actor_fsq_obs"] == "policy_window"
+
+
+def test_resolve_robot_name_ignores_environment(monkeypatch):
+    monkeypatch.setenv("AWESOME_DEPLOY_ROBOT_NAME", "g1")
+
+    resolved = cfg_module.resolve_robot_name(
+        ["deploy_g1_mujoco.py", "--robot_name", "q1"]
+    )
+
+    assert resolved == "q1"
+
+
+def test_resolve_obs_name_ignores_environment(monkeypatch):
+    monkeypatch.setenv("AWESOME_DEPLOY_OBS_NAME", "g1")
+
+    resolved = obscfg_module.resolve_obs_name(
+        ["deploy_g1_mujoco.py", "--robot_name", "q1"]
+    )
+
+    assert resolved == "q1"
 
 
 def test_load_model_protocol_uses_cfg_protocol_path(monkeypatch):
