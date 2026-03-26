@@ -85,6 +85,26 @@ def test_realtime_motion_source_supports_numpy_style_tuple_indexing():
     assert np.allclose(x_pos_column, np.asarray([0.0, 1.0], dtype=np.float32))
 
 
+def test_realtime_motion_source_exposes_latest_human_frame():
+    initial = _frame(0.0)
+    latest_human_frame = {"pelvis": (np.asarray([1.0, 2.0, 3.0]), np.asarray([1.0, 0.0, 0.0, 0.0]))}
+
+    class FakeProvider:
+        def __call__(self):
+            return initial
+
+        def get_latest_human_frame(self):
+            return latest_human_frame
+
+    source = RealtimeMotionSource(
+        frame_provider=FakeProvider(),
+        buffer_size=2,
+        bootstrap_timeout_sec=0.0,
+    )
+
+    assert source.get_latest_xsens_human_frame() is latest_human_frame
+
+
 def test_build_xsens_online_frame_keeps_hands_and_builds_modified_feet():
     """Xsens conversion should preserve hand links and synthesize foot aliases."""
     def state(name, pos, quat):

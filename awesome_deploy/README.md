@@ -51,6 +51,36 @@ AWESOME_DEPLOY_MOTION_SOURCE_TOPIC=xsens.link_states.v1
 AWESOME_DEPLOY_MOTION_SOURCE_BUFFER_SIZE=16
 ```
 
+## Realtime 可视化叠加
+
+在 `motion_source=realtime` 时，deploy 会默认把 Xsens 原始 `link_states` 的坐标系直接画到 MuJoCo viewer 上，效果与：
+
+- [zmq_mujoco_link_visualizer.py](/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/examples/zmq_mujoco_link_visualizer.py)
+
+一致，但这里是直接叠加在 deploy 的在线仿真窗口里。
+
+默认行为：
+
+- `AWESOME_DEPLOY_REALTIME_DRAW_XSENS_FRAMES=1`
+- `AWESOME_DEPLOY_REALTIME_DRAW_XSENS_LABELS=0`
+- `AWESOME_DEPLOY_REALTIME_XSENS_FRAME_AXIS_LENGTH=0.08`
+- `AWESOME_DEPLOY_REALTIME_XSENS_FRAME_SHAFT_WIDTH=0.006`
+
+如果你想手动控制：
+
+```bash
+export AWESOME_DEPLOY_REALTIME_DRAW_XSENS_FRAMES=1
+export AWESOME_DEPLOY_REALTIME_DRAW_XSENS_LABELS=0
+export AWESOME_DEPLOY_REALTIME_XSENS_FRAME_AXIS_LENGTH=0.08
+export AWESOME_DEPLOY_REALTIME_XSENS_FRAME_SHAFT_WIDTH=0.006
+```
+
+如果你想关闭这层原始动捕坐标轴叠加：
+
+```bash
+export AWESOME_DEPLOY_REALTIME_DRAW_XSENS_FRAMES=0
+```
+
 ## 前置条件
 
 - 先启动 Xsens ZMQ 发布侧，例如 `xsens_mvn_refactor_build` 里的 `xsens_link_states_publisher`

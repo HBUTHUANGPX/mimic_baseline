@@ -12,6 +12,7 @@ from awesome_deploy.utils import VideoRecorder
 from awesome_deploy.utils.cfg import cfg, current_path
 from awesome_deploy.utils.infer import infere
 from awesome_deploy.utils.math_func import matrix_from_quat, quat_inv, quat_mul
+from awesome_deploy.utils.xsens_link_frame_viz import draw_link_frames
 
 np.set_printoptions(precision=16, linewidth=100, threshold=np.inf, suppress=True)
 
@@ -114,11 +115,6 @@ class simulator(infere):
             if renderer_cls is None:
                 raise AttributeError("MuJoCo Python package does not provide a compatible Renderer API.")
             self.renderer = renderer_cls(self.m, height=480, width=640)
-            self.init_vel_geom(
-                "Goal Vel: x: {:.2f}, y: {:.2f}, yaw: {:.2f},force_z:{:.2f}".format(
-                    self.cmd[0], self.cmd[1], self.cmd[2], 0.0
-                )
-            )
             self.prev_qpos = self.d.qpos
             first_flag = False
             log = {
@@ -244,8 +240,9 @@ class simulator(infere):
         )
         img = self.renderer.render()
         self.video_recorder(img)
+        self._draw_viewer_overlays()
         self.viewer.sync()
-        self.update_vel_geom()
+        self.set_camera()
 
     def _obs_motion_joint_pos_command(self):
         """Returns the current reference motion joint positions."""
@@ -425,11 +422,7 @@ class simulator(infere):
         ...
 
     def init_vel_geom(self, input):
-        """Creates an on-screen MuJoCo label for command and force feedback.
-
-        Args:
-            input: Initial label text.
-        """
+        """Creates one on-screen MuJoCo label geom at the current overlay tail."""
         geom = self.viewer.user_scn.geoms[self.viewer.user_scn.ngeom]
         mujoco.mjv_initGeom(
             geom,
@@ -442,11 +435,28 @@ class simulator(infere):
         geom.label = str(input)
         self.viewer.user_scn.ngeom += 1
 
+    def _draw_viewer_overlays(self):
+        """Draws all per-frame viewer overlays in a stable order."""
+        self.viewer.user_scn.ngeom = 0
+        if (
+            getattr(self.motion, "is_realtime", False)
+            and cfg.realtime_draw_xsens_frames
+            and hasattr(self.motion, "get_latest_xsens_human_frame")
+        ):
+            draw_link_frames(
+                mujoco_module=mujoco,
+                viewer=self.viewer,
+                human_frame=self.motion.get_latest_xsens_human_frame(),
+                axis_length=cfg.realtime_xsens_frame_axis_length,
+                shaft_width=cfg.realtime_xsens_frame_shaft_width,
+                show_labels=cfg.realtime_draw_xsens_labels,
+                clear_existing=False,
+            )
+        self.update_vel_geom()
+
     def update_vel_geom(self):
-        """Refreshes the runtime status label shown above the robot."""
-        geom = self.viewer.user_scn.geoms[self.viewer.user_scn.ngeom - 1]
-        geom.pos = self.d.qpos[:3] + np.array([0.0, 0.0, 1.0])
-        geom.label = (
+        """Appends the runtime status label after all other user overlays."""
+        label = (
             "rb h{:.2f} \r\nGoal Vel: x: {:.2f}, y: {:.2f}, yaw: {:.2f},force_z: {:.2f}"
         ).format(
             0.0,
@@ -455,6 +465,7 @@ class simulator(infere):
             self.cmd[2],
             self.fz,
         )
+        self.init_vel_geom(label)
 
 
 if __name__ == "__main__":

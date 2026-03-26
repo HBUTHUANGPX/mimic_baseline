@@ -85,15 +85,13 @@
             ]
         },
         {
-            "name": "single fsq play",
+            "name": "deploy_g1_mujoco",
             "type": "debugpy",
             "request": "launch",
-            "program": "/home/hpx/HPX_LOCO_2/mimic_baseline/scripts/rsl_rl/play.py",
+            "program": "awesome_deploy/awesome_deploy/scripts/deploy_g1_mujoco.py",
             "console": "integratedTerminal",
             "args": [
-                "--task", "Tracking-Flat-Q1-v1",
-                "--num_envs", "4",
-                "--domain_randomization"
+                "--robot_name","q1"
             ]
         },
 

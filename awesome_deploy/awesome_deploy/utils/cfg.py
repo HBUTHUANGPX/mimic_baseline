@@ -11,6 +11,8 @@ current_path = AWESOME_DIR
 DEFAULT_REALTIME_URI = "tcp://127.0.0.1:5555"
 DEFAULT_REALTIME_TOPIC = "xsens.link_states.v1"
 DEFAULT_REALTIME_BUFFER_SIZE = 16
+DEFAULT_XSENS_FRAME_AXIS_LENGTH = 0.08
+DEFAULT_XSENS_FRAME_SHAFT_WIDTH = 0.006
 
 
 class BaseRobotCfg:
@@ -46,6 +48,10 @@ class BaseRobotCfg:
         self.motion_source_buffer_size = 1
         self.gmr_robot = "Q1"
         self.gmr_human_height = 1.66
+        self.realtime_draw_xsens_frames = False
+        self.realtime_draw_xsens_labels = False
+        self.realtime_xsens_frame_axis_length = DEFAULT_XSENS_FRAME_AXIS_LENGTH
+        self.realtime_xsens_frame_shaft_width = DEFAULT_XSENS_FRAME_SHAFT_WIDTH
         self._apply_motion_source_env_overrides()
         # Action scaling is applied after the neural policy output is produced
         # and before the target joint position is sent to the PD controller.
@@ -90,6 +96,26 @@ class BaseRobotCfg:
             os.getenv(
                 "AWESOME_DEPLOY_GMR_HUMAN_HEIGHT",
                 str(self.gmr_human_height),
+            )
+        )
+        self.realtime_draw_xsens_frames = os.getenv(
+            "AWESOME_DEPLOY_REALTIME_DRAW_XSENS_FRAMES",
+            "1" if self.motion_source == "realtime" else ("1" if self.realtime_draw_xsens_frames else "0"),
+        ) == "1"
+        self.realtime_draw_xsens_labels = os.getenv(
+            "AWESOME_DEPLOY_REALTIME_DRAW_XSENS_LABELS",
+            "1" if self.realtime_draw_xsens_labels else "0",
+        ) == "1"
+        self.realtime_xsens_frame_axis_length = float(
+            os.getenv(
+                "AWESOME_DEPLOY_REALTIME_XSENS_FRAME_AXIS_LENGTH",
+                str(self.realtime_xsens_frame_axis_length),
+            )
+        )
+        self.realtime_xsens_frame_shaft_width = float(
+            os.getenv(
+                "AWESOME_DEPLOY_REALTIME_XSENS_FRAME_SHAFT_WIDTH",
+                str(self.realtime_xsens_frame_shaft_width),
             )
         )
         if self.motion_source == "realtime":

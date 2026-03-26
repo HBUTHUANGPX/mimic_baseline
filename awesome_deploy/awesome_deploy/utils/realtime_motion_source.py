@@ -93,6 +93,13 @@ class RealtimeMotionSource:
             frame = self._snapshot_latest_frame()
         self._append_frame(frame)
 
+    def get_latest_xsens_human_frame(self):
+        """Returns the latest parsed Xsens human-frame dict when available."""
+        getter = getattr(self._frame_provider, "get_latest_human_frame", None)
+        if getter is None:
+            return None
+        return getter()
+
     def _bootstrap_initial_frame(self, timeout_sec: float) -> RealtimeMotionFrame:
         deadline = time.monotonic() + max(timeout_sec, 0.0)
         while True:
@@ -330,12 +337,14 @@ class XsensRealtimeFrameProvider:
         ]
         self._sample_dt = float(sample_dt)
         self._prev_joint_pos: np.ndarray | None = None
+        self._latest_human_frame = None
 
     def __call__(self) -> RealtimeMotionFrame | None:
         message = self._subscriber.poll_latest()
         if message is None:
             return None
         human_frame = build_xsens_online_frame(message)
+        self._latest_human_frame = human_frame
         qpos = np.asarray(self._retargeter.retarget(human_frame), dtype=np.float64)
         self._data.qpos[: qpos.shape[0]] = qpos
         self._mujoco.mj_forward(self._model, self._data)
@@ -372,6 +381,9 @@ class XsensRealtimeFrameProvider:
             body_lin_vel_w=body_lin_vel_w,
             body_ang_vel_w=body_ang_vel_w,
         )
+
+    def get_latest_human_frame(self):
+        return self._latest_human_frame
 
 
 def build_realtime_motion_source(cfg, body_names: list[str]) -> RealtimeMotionSource:
