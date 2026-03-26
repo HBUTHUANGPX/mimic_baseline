@@ -78,13 +78,14 @@ motion_group:
     file_name: [
       # "artifacts/Q1/xsens_bvh/251021/251021_01_slowly_walk_120Hz.npz",
       # "artifacts/Q1/xsens_bvh/251021/251021_03_saw_120Hz.npz",
-      "artifacts/Q1/100STYLE/Aeroplane/Aeroplane_FR.npz",
+      # "artifacts/Q1/100STYLE/Aeroplane/Aeroplane_FR.npz",
       # "artifacts/Q1/xsens_bvh/251021/251021_04_boxing_120Hz.npz",
       # "artifacts/Q1/xsens_bvh/251021/251021_05_xingyiquan_120Hz.npz"
       ]
     folder_name: [
       # "artifacts/Q1/xsens_bvh",
       # "artifacts/Q1/100STYLE",
+      "artifacts/Q1/100STYLE/aa_set_1",
     ]
     # file_name: []
     # folder_name: []

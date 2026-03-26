@@ -19,11 +19,14 @@ temporal buffers in later iterations.
 """
 
 import os
+import time
 from collections.abc import Sequence
 from dataclasses import MISSING
 from typing import TYPE_CHECKING
 import math
 from abc import ABC, abstractmethod
+from functools import wraps
+import inspect
 
 import numpy as np
 import torch
@@ -650,6 +653,32 @@ class MotionCommand(CommandTerm):
         self._update_motion_data()
         self._update_state_data()
 
+    def _profiling_enabled(self) -> bool:
+        """Return whether timing instrumentation should record metrics."""
+        return bool(getattr(self.cfg, "profile_properties", False))
+
+    def _timing_stamp(self) -> float:
+        """Return a synchronized high-resolution timestamp."""
+        if self.device == "cuda" or (
+            isinstance(self.device, torch.device) and self.device.type == "cuda"
+        ):
+            torch.cuda.synchronize()
+        return time.perf_counter()
+
+    def _record_timing_metric(self, metric_name: str, elapsed_s: float) -> None:
+        """Store a scalar timing metric in milliseconds for all environments."""
+        if not self._profiling_enabled():
+            return
+        if metric_name not in self.metrics:
+            self.metrics[metric_name] = torch.zeros(
+                self.num_envs, dtype=torch.float32, device=self.device
+            )
+        self.metrics[metric_name][:] = elapsed_s * 1000.0
+
+    def _timing_metric_name(self, prefix: str, name: str) -> str:
+        """Build a normalized metric name for profiling data."""
+        return f"time_{prefix}_{name}_ms"
+
     def load_motion(self, motion_file: dict[str, list[str] | str]) -> None:
         """Load motion trajectories and initialize sampling state.
 
@@ -1151,17 +1180,38 @@ class MotionCommand(CommandTerm):
         """
         if len(env_ids) == 0:
             return
+        t0 = self._timing_stamp()
         self.adaptive_sampler.on_resample_start(env_ids, update_failure_statistics)
+        t1 = self._timing_stamp()
+        self._record_timing_metric("time_step_resample_on_start_ms", t1 - t0)
+
         sampling_probabilities = self.adaptive_sampler.build_sampling_probabilities()
+        t2 = self._timing_stamp()
+        self._record_timing_metric("time_step_resample_build_probs_ms", t2 - t1)
+
         sampled_bins = torch.multinomial(
             sampling_probabilities, len(env_ids), replacement=True
         )
+        t3 = self._timing_stamp()
+        self._record_timing_metric("time_step_resample_multinomial_ms", t3 - t2)
+
         self.time_steps[env_ids] = self._sample_time_steps_from_bins(sampled_bins)
+        t4 = self._timing_stamp()
+        self._record_timing_metric("time_step_resample_sample_steps_ms", t4 - t3)
+
         self._update_env_motion_ids(env_ids)
+        t5 = self._timing_stamp()
+        self._record_timing_metric("time_step_resample_update_motion_ids_ms", t5 - t4)
+
         self.adaptive_sampler.on_resample_complete(
             env_ids, sampled_bins, update_failure_statistics
         )
+        t6 = self._timing_stamp()
+        self._record_timing_metric("time_step_resample_on_complete_ms", t6 - t5)
+
         self._update_sampling_metrics(sampling_probabilities)
+        t7 = self._timing_stamp()
+        self._record_timing_metric("time_step_resample_update_metrics_ms", t7 - t6)
 
     def _update_metrics(self) -> None:
         """Update runtime metrics.
@@ -1271,10 +1321,21 @@ class MotionCommand(CommandTerm):
 
     def _update_command(self) -> None:
         """Advance the active frame and resample environments when needed."""
+        t0 = self._timing_stamp()
         if self.cfg.sampling_mode == "assigned_sequential":
             self._advance_assigned_motion_tracks()
+            t1 = self._timing_stamp()
+            self._record_timing_metric("time_step_update_command_advance_ms", t1 - t0)
             self._update_motion_data()
+            t2 = self._timing_stamp()
+            self._record_timing_metric(
+                "time_step_update_command_motion_cache_ms", t2 - t1
+            )
             self._update_state_data()
+            t3 = self._timing_stamp()
+            self._record_timing_metric(
+                "time_step_update_command_state_cache_ms", t3 - t2
+            )
             return
 
         # Keep a snapshot of the frame that produced the current transition so
@@ -1282,12 +1343,24 @@ class MotionCommand(CommandTerm):
         self._previous_time_steps = self.time_steps.clone()
         self.time_steps += 1
         env_ids = self._get_env_ids_to_resample()
+        t1 = self._timing_stamp()
+        self._record_timing_metric("time_step_update_command_find_resample_ms", t1 - t0)
         self._post_update_command()
+        t2 = self._timing_stamp()
+        self._record_timing_metric("time_step_update_command_post_update_ms", t2 - t1)
         self._resample_command(env_ids)
+        t3 = self._timing_stamp()
+        self._record_timing_metric("time_step_update_command_resample_ms", t3 - t2)
         # Always refresh the caches so the frame actually advances every step.
         self._update_motion_data()
+        t4 = self._timing_stamp()
+        self._record_timing_metric("time_step_update_command_motion_cache_ms", t4 - t3)
         self._update_state_data()
+        t5 = self._timing_stamp()
+        self._record_timing_metric("time_step_update_command_state_cache_ms", t5 - t4)
         self.adaptive_sampler.on_step_end()
+        t6 = self._timing_stamp()
+        self._record_timing_metric("time_step_update_command_sampler_end_ms", t6 - t5)
 
     def _update_motion_data(self) -> None:
         """Update motion tensors for the active temporal window.
@@ -1295,6 +1368,7 @@ class MotionCommand(CommandTerm):
         The temporal window is the primary cache. The legacy single-frame
         caches are sliced from the center frame of this window.
         """
+        t0 = self._timing_stamp()
         self._window_time_steps = (
             self.time_steps[:, None] + self.motion.window_offsets[None, :]
         )
@@ -1310,6 +1384,8 @@ class MotionCommand(CommandTerm):
         self._motion_body_ang_vel_w_window = self.motion.body_ang_vel_w[
             self._window_time_steps
         ]
+        t1 = self._timing_stamp()
+        self._record_timing_metric("time_step_motion_window_gather_ms", t1 - t0)
 
         self._motion_body_pos_w_timestep = self._motion_body_pos_w_window[
             :, self.center_frame_index
@@ -1328,6 +1404,8 @@ class MotionCommand(CommandTerm):
         self._motion_id = self.motion._motion_id[self.time_steps]
         self._motion_group = self.motion._motion_group[self.time_steps]
         self._command = torch.cat([self._joint_pos, self._joint_vel], dim=1)
+        t2 = self._timing_stamp()
+        self._record_timing_metric("time_step_motion_center_cache_ms", t2 - t1)
 
         env_origins = self._env.scene.env_origins
         self._body_pos_w_window = (
@@ -1337,12 +1415,16 @@ class MotionCommand(CommandTerm):
         self._body_quat_w = self._motion_body_quat_w_timestep
         self._body_lin_vel_w = self._motion_body_lin_vel_w_timestep
         self._body_ang_vel_w = self._motion_body_ang_vel_w_timestep
+        t3 = self._timing_stamp()
+        self._record_timing_metric("time_step_motion_body_cache_ms", t3 - t2)
         self._ref_lin_vel_w = self._motion_body_lin_vel_w_timestep[
             :, self.motion_ref_body_index
         ]
         self._ref_ang_vel_w = self._motion_body_ang_vel_w_timestep[
             :, self.motion_ref_body_index
         ]
+        t4 = self._timing_stamp()
+        self._record_timing_metric("time_step_motion_ref_cache_ms", t4 - t3)
 
     def _get_env_ids_to_resample(self) -> torch.Tensor:
         """Find environments whose center frame is no longer window-valid.
@@ -1370,11 +1452,14 @@ class MotionCommand(CommandTerm):
         All window-relative targets are expressed relative to the current robot
         reference-body pose at the center frame.
         """
+        t0 = self._timing_stamp()
         ref_pos_w = (
             self._motion_body_pos_w_timestep[:, self.motion_ref_body_index]
             + self._env.scene.env_origins
         )
         ref_quat_w = self._motion_body_quat_w_timestep[:, self.motion_ref_body_index]
+        t1 = self._timing_stamp()
+        self._record_timing_metric("time_step_state_current_targets_ms", t1 - t0)
 
         robot_body_pos_w = self.robot.data.body_pos_w.clone()
         robot_body_quat_w = self.robot.data.body_quat_w.clone()
@@ -1382,6 +1467,8 @@ class MotionCommand(CommandTerm):
         robot_body_ang_vel_w = self.robot.data.body_ang_vel_w.clone()
         robot_joint_pos = self.robot.data.joint_pos.clone()
         robot_joint_vel = self.robot.data.joint_vel.clone()
+        t2 = self._timing_stamp()
+        self._record_timing_metric("time_step_state_robot_state_clone_ms", t2 - t1)
 
         robot_ref_pos_w = robot_body_pos_w[:, self.robot_ref_body_index]
         robot_ref_quat_w = robot_body_quat_w[:, self.robot_ref_body_index]
@@ -1405,6 +1492,8 @@ class MotionCommand(CommandTerm):
         self._robot_joint_pos = robot_joint_pos
         self._robot_joint_vel = robot_joint_vel
         self._robot_ref_ori_w_mat = matrix_from_quat(robot_ref_quat_w)
+        t3 = self._timing_stamp()
+        self._record_timing_metric("time_step_state_cache_write_ms", t3 - t2)
 
         num_bodies = len(self.cfg.body_names)
         ref_pos_repeat = ref_pos_w[:, None, :].expand(-1, num_bodies, -1)
@@ -1428,6 +1517,8 @@ class MotionCommand(CommandTerm):
             + delta_pos_w
             + quat_apply(delta_ori_w, self.body_pos_w - ref_pos_repeat)
         )
+        t4 = self._timing_stamp()
+        self._record_timing_metric("time_step_state_relative_body_ms", t4 - t3)
 
         # Express the robot's current tracked bodies in the robot reference
         # frame itself.
@@ -1492,11 +1583,15 @@ class MotionCommand(CommandTerm):
         )
         self._motion_ref_pos_b = motion_ref_pos_b
         self._motion_ref_ori_b_mat = matrix_from_quat(motion_ref_ori_b)
+        t5 = self._timing_stamp()
+        self._record_timing_metric("time_step_state_motion_ref_ms", t5 - t4)
         self._update_window_state_data(
             robot_ref_pos_w,
             robot_ref_quat_w,
             robot_joint_pos,
         )
+        t6 = self._timing_stamp()
+        self._record_timing_metric("time_step_state_window_ms", t6 - t5)
 
     def _update_window_state_data(
         self,
@@ -1511,6 +1606,7 @@ class MotionCommand(CommandTerm):
             robot_ref_quat_w: Current robot reference-body orientations.
             robot_joint_pos: Current robot joint positions.
         """
+        t0 = self._timing_stamp()
         num_bodies = len(self.cfg.body_names)
         window_size = self.window_size
 
@@ -1557,6 +1653,8 @@ class MotionCommand(CommandTerm):
         )
         self._motion_ref_pos_b_window = motion_ref_pos_b_window
         self._motion_ref_ori_b_mat_window = matrix_from_quat(motion_ref_ori_b_window)
+        t1 = self._timing_stamp()
+        self._record_timing_metric("time_step_window_motion_ref_ms", t1 - t0)
 
         robot_ref_pos_w_body = robot_ref_pos_w[:, None, None, :].expand(
             -1, window_size, num_bodies, -1
@@ -1601,11 +1699,15 @@ class MotionCommand(CommandTerm):
         # `robot_body_*_window` naming scheme.
         self._motion_body_pos_b_window = self._robot_body_pos_b_window
         self._motion_body_ori_b_mat_window = self._robot_body_ori_b_mat_window
+        t2 = self._timing_stamp()
+        self._record_timing_metric("time_step_window_body_state_ms", t2 - t1)
 
         robot_joint_pos_window = robot_joint_pos[:, None, :].expand(-1, window_size, -1)
         self._joint_pos_delta_window = (
             self._motion_joint_pos_window - robot_joint_pos_window
         )
+        t3 = self._timing_stamp()
+        self._record_timing_metric("time_step_window_joint_delta_ms", t3 - t2)
 
     def _post_update_command(self) -> None:
         """Hook for subclasses.
@@ -1763,3 +1865,59 @@ class MotionCommandCfg(CommandTermCfg):
         prim_path="/Visuals/Command/pose"
     )
     body_visualizer_cfg.markers["frame"].scale = (0.1, 0.1, 0.1)
+
+
+def _install_motion_command_timing_wrappers(command_cls: type[MotionCommand]) -> None:
+    """Automatically wrap MotionCommand properties and functions for timing."""
+    excluded_functions = {
+        "__init__",
+        "_profiling_enabled",
+        "_timing_stamp",
+        "_record_timing_metric",
+        "_timing_metric_name",
+    }
+
+    for name, attr in list(command_cls.__dict__.items()):
+        if isinstance(attr, property):
+            getter = attr.fget
+            if getter is None:
+                continue
+
+            @wraps(getter)
+            def profiled_getter(self, _getter=getter, _name=name):
+                if not self._profiling_enabled():
+                    return _getter(self)
+                start = self._timing_stamp()
+                result = _getter(self)
+                end = self._timing_stamp()
+                self._record_timing_metric(
+                    self._timing_metric_name("property", _name), end - start
+                )
+                return result
+
+            setattr(
+                command_cls,
+                name,
+                property(profiled_getter, attr.fset, attr.fdel, attr.__doc__),
+            )
+            continue
+
+        if not inspect.isfunction(attr) or name in excluded_functions:
+            continue
+
+        @wraps(attr)
+        def profiled_method(self, *args, _func=attr, _name=name, **kwargs):
+            if not self._profiling_enabled():
+                return _func(self, *args, **kwargs)
+            start = self._timing_stamp()
+            result = _func(self, *args, **kwargs)
+            end = self._timing_stamp()
+            self._record_timing_metric(
+                self._timing_metric_name("func", _name), end - start
+            )
+            return result
+
+        setattr(command_cls, name, profiled_method)
+
+
+_install_motion_command_timing_wrappers(MotionCommand)
