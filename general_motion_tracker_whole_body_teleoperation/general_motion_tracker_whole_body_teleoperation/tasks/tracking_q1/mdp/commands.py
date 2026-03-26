@@ -698,8 +698,15 @@ class MotionCommand(CommandTerm):
 
     def _initialize_observation_caches(self) -> None:
         """Allocate all per-step caches used by observations and rewards."""
+        self._motion_id = None
+        self._motion_group = None
+        self._command = None
+        self._joint_pos = None
+        self._joint_vel = None
         self._ref_pos_w = None
         self._ref_quat_w = None
+        self._ref_lin_vel_w = None
+        self._ref_ang_vel_w = None
         self._robot_ref_pos_w = None
         self._robot_ref_quat_w = None
         self._robot_ref_lin_vel_w = None
@@ -929,27 +936,27 @@ class MotionCommand(CommandTerm):
     @property
     def motion_id(self) -> torch.Tensor:
         """Return the current motion id for each environment."""
-        return self.motion._motion_id[self.time_steps]
+        return self._motion_id
 
     @property
     def motion_group(self) -> torch.Tensor:
         """Return the current motion group id for each environment."""
-        return self.motion._motion_group[self.time_steps]
+        return self._motion_group
 
     @property
     def command(self) -> torch.Tensor:
         """Return the legacy command tensor `[joint_pos, joint_vel]`."""
-        return torch.cat([self.joint_pos, self.joint_vel], dim=1)
+        return self._command
 
     @property
     def joint_pos(self) -> torch.Tensor:
         """Return motion joint positions at the current center frame."""
-        return self._motion_joint_pos_window[:, self.center_frame_index]
+        return self._joint_pos
 
     @property
     def joint_vel(self) -> torch.Tensor:
         """Return motion joint velocities at the current center frame."""
-        return self._motion_joint_vel_window[:, self.center_frame_index]
+        return self._joint_vel
 
     @property
     def body_pos_w(self) -> torch.Tensor:
@@ -984,16 +991,12 @@ class MotionCommand(CommandTerm):
     @property
     def ref_lin_vel_w(self) -> torch.Tensor:
         """Return the target reference-body linear velocity."""
-        return self._motion_body_lin_vel_w_window[
-            :, self.center_frame_index, self.motion_ref_body_index
-        ]
+        return self._ref_lin_vel_w
 
     @property
     def ref_ang_vel_w(self) -> torch.Tensor:
         """Return the target reference-body angular velocity."""
-        return self._motion_body_ang_vel_w_window[
-            :, self.center_frame_index, self.motion_ref_body_index
-        ]
+        return self._ref_ang_vel_w
 
     @property
     def joint_pos_window(self) -> torch.Tensor:
@@ -1320,6 +1323,11 @@ class MotionCommand(CommandTerm):
         self._motion_body_ang_vel_w_timestep = self._motion_body_ang_vel_w_window[
             :, self.center_frame_index
         ]
+        self._joint_pos = self._motion_joint_pos_window[:, self.center_frame_index]
+        self._joint_vel = self._motion_joint_vel_window[:, self.center_frame_index]
+        self._motion_id = self.motion._motion_id[self.time_steps]
+        self._motion_group = self.motion._motion_group[self.time_steps]
+        self._command = torch.cat([self._joint_pos, self._joint_vel], dim=1)
 
         env_origins = self._env.scene.env_origins
         self._body_pos_w_window = (
@@ -1329,6 +1337,12 @@ class MotionCommand(CommandTerm):
         self._body_quat_w = self._motion_body_quat_w_timestep
         self._body_lin_vel_w = self._motion_body_lin_vel_w_timestep
         self._body_ang_vel_w = self._motion_body_ang_vel_w_timestep
+        self._ref_lin_vel_w = self._motion_body_lin_vel_w_timestep[
+            :, self.motion_ref_body_index
+        ]
+        self._ref_ang_vel_w = self._motion_body_ang_vel_w_timestep[
+            :, self.motion_ref_body_index
+        ]
 
     def _get_env_ids_to_resample(self) -> torch.Tensor:
         """Find environments whose center frame is no longer window-valid.
