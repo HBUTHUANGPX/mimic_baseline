@@ -851,7 +851,7 @@ class MotionCommand(CommandTerm):
         )
         self.bin_valid_center_indices = torch.full(
             (self.bin_count, max_valid_centers_per_bin),
-            -1,
+            self.motion.time_step_total,
             dtype=torch.long,
             device=self.device,
         )
@@ -1139,31 +1139,26 @@ class MotionCommand(CommandTerm):
         candidate_time_steps = torch.clamp(
             candidate_time_steps, 0, self.motion.time_step_total - 1
         )
-        sampled_time_steps = torch.empty_like(candidate_time_steps)
+        valid_counts = self.valid_center_count_per_bin[sampled_bins]
+        valid_centers = self.bin_valid_center_indices[sampled_bins]
+        right_indices = torch.searchsorted(
+            valid_centers, candidate_time_steps.unsqueeze(-1)
+        ).squeeze(-1)
+        right_indices = torch.clamp(right_indices, max=valid_counts - 1)
+        left_indices = torch.clamp(right_indices - 1, min=0)
 
-        for bin_id in torch.unique(sampled_bins).tolist():
-            env_mask = sampled_bins == bin_id
-            valid_count = int(self.valid_center_count_per_bin[bin_id].item())
-            valid_centers = self.bin_valid_center_indices[bin_id, :valid_count]
-            if valid_count == 1:
-                sampled_time_steps[env_mask] = valid_centers[0]
-                continue
+        gather_index_shape = (-1, 1)
+        left_centers = torch.gather(
+            valid_centers, 1, left_indices.view(*gather_index_shape)
+        ).squeeze(-1)
+        right_centers = torch.gather(
+            valid_centers, 1, right_indices.view(*gather_index_shape)
+        ).squeeze(-1)
 
-            bin_candidates = candidate_time_steps[env_mask]
-            right_indices = torch.bucketize(bin_candidates, valid_centers)
-            right_indices = torch.clamp(right_indices, max=valid_count - 1)
-            left_indices = torch.clamp(right_indices - 1, min=0)
-            left_centers = valid_centers[left_indices]
-            right_centers = valid_centers[right_indices]
-
-            choose_right = torch.abs(right_centers - bin_candidates) < torch.abs(
-                bin_candidates - left_centers
-            )
-            sampled_time_steps[env_mask] = torch.where(
-                choose_right, right_centers, left_centers
-            )
-
-        return sampled_time_steps
+        choose_right = torch.abs(right_centers - candidate_time_steps) < torch.abs(
+            candidate_time_steps - left_centers
+        )
+        return torch.where(choose_right, right_centers, left_centers)
 
     def _resample_time_steps(
         self,
