@@ -604,6 +604,10 @@ class RewardsCfg:
             "body_names": ["L_ankle_roll_link", "R_ankle_roll_link"],
         },
     )
+    termination = RewTerm(
+        func=mdp.is_terminated,
+        weight=-200,
+    )
 
 
 @configclass
