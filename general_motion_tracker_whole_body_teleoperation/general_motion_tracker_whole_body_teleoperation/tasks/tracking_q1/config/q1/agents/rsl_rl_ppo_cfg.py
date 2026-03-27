@@ -61,7 +61,22 @@ class Q1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         use_clipped_value_loss=True,
         clip_param=0.2,
     )
-
+@configclass  # 特权信息的训练
+class Q1FlatPPOPureRunnerCfg(Q1FlatPPORunnerCfg):
+    obs_groups = (
+        {
+            "policy": [
+                "command",
+                "proprioception",
+                "last_action",
+            ],  # 映射到环境提供的 'policy' 观测组，用于演员网络
+            "critic": [
+                "command",
+                "proprioception",
+                "last_action",
+            ],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
+        },
+    ) 
 @configclass
 class Q1FlatPPOSingleFSQRunnerCfg(Q1FlatPPORunnerCfg):
     ...

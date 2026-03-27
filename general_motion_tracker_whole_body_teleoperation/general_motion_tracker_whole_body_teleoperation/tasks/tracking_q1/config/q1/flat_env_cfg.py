@@ -44,7 +44,13 @@ class Q1FlatEnvCfg(TrackingEnvCfg):
             "R_wrist_pitch_link",
             "head_pitch_link",
         ]
-
+@configclass
+class Q1FlatPureEnvCfg(Q1FlatEnvCfg):
+    def __post_init__(self):
+        super().__post_init__()
+        self.commands.motion.future_frames = 0
+        self.observations.proprioception_with_noise_wo_privilege.history_length = 8
+        self.observations.proprioception.history_length = 8
 @configclass
 class Q1FlatTeacherEnvCfg(TeacherTrackingEnvCfg):
     def __post_init__(self):
