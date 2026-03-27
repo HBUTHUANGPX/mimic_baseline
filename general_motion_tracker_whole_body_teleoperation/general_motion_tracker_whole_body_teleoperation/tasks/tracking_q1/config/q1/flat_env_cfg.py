@@ -51,6 +51,22 @@ class Q1FlatPureEnvCfg(Q1FlatEnvCfg):
         self.commands.motion.future_frames = 0
         self.observations.proprioception_with_noise_wo_privilege.history_length = 8
         self.observations.proprioception.history_length = 8
+        self.events.add_joint_default_pos = None
+        self.events.base_com = None
+        self.events.pelvis_com = None
+        self.events.knee_link_com = None
+        self.events.robot_scale_mass = None
+        self.events.robot_joint_stiffness_and_damping = None
+        self.events.push_robot = None
+
+@configclass
+class Q1FlatDistillEnvCfg(Q1FlatEnvCfg):
+    def __post_init__(self):
+        super().__post_init__()
+        self.commands.motion.future_frames = 10
+        self.observations.proprioception_with_noise_wo_privilege.history_length = 8
+        self.observations.proprioception.history_length = 8
+        
 @configclass
 class Q1FlatTeacherEnvCfg(TeacherTrackingEnvCfg):
     def __post_init__(self):

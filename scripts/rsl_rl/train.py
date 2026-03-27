@@ -141,7 +141,7 @@ import time
 import torch
 from datetime import datetime
 import glob
-from rsl_rl.runners import DistillationRunner, OnPolicyRunner, OnPolicyRunnerFSQ
+from rsl_rl.runners import DistillationRunner, OnPolicyRunner, OnPolicyRunnerFSQ, OnPolicyDisstillationRunnerFSQ
 from typing import List
 from isaaclab.envs import (
     DirectMARLEnv,
@@ -265,7 +265,7 @@ def main(
             )   
         else:
             resume_path = get_checkpoint_path(
-                "/home/hpx/HPX_LOCO_2/mimic_baseline/logs/rsl_rl/pure_q1_flat", agent_cfg.load_run, agent_cfg.load_checkpoint
+                "/home/hpx/HPX_LOCO_2/mimic_baseline/logs/rsl_rl/q1_flat", agent_cfg.load_run, agent_cfg.load_checkpoint
             )
     # wrap for video recording
     if args_cli.video:
@@ -283,7 +283,7 @@ def main(
 
     # wrap around environment for rsl-rl
     env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
-
+    runner: OnPolicyRunner | DistillationRunner | OnPolicyRunnerFSQ | OnPolicyDisstillationRunnerFSQ = None
     # create runner from rsl-rl
     if agent_cfg.class_name == "OnPolicyRunner":
         runner = OnPolicyRunner(
@@ -298,6 +298,10 @@ def main(
         runner = OnPolicyRunnerFSQ(
             env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device
         )
+    elif agent_cfg.class_name == "OnPolicyDisstillationRunnerFSQ":
+        runner = OnPolicyDisstillationRunnerFSQ(
+            env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device
+        )
     else:
         raise ValueError(f"Unsupported runner class: {agent_cfg.class_name}")
     # write git state to logs
@@ -306,7 +310,7 @@ def main(
     if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
         print(f"[INFO]: Loading model checkpoint from: {resume_path}")
         # load previously trained model
-        runner.load(resume_path)
+        runner.load(resume_path, map_location=agent_cfg.device)
 
     # dump the configuration into log-directory
     dump_yaml(os.path.join(log_dir, "params", "env.yaml"), env_cfg)

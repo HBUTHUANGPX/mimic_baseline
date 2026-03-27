@@ -85,6 +85,22 @@
             ]
         },
         {
+            "name": "single fsq distill train",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/home/hpx/HPX_LOCO_2/mimic_baseline/scripts/rsl_rl/train.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--task", "Tracking-Flat-Q1-v3",
+                "--headless",
+                // "--logger", "wandb",
+                "--log_project_name", "bydmmc",
+                "--run_name",  "test",
+                "--resume",
+                "--load_run", "2026-03-27_16-06-25_xsens_all_fsq_s"
+            ]
+        },
+        {
             "name": "deploy_g1_mujoco",
             "type": "debugpy",
             "request": "launch",
