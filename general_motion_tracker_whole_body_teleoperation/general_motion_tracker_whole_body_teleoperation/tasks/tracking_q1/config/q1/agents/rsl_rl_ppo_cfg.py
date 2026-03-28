@@ -81,7 +81,9 @@ class Q1FlatPPOPureRunnerCfg(Q1FlatPPORunnerCfg):
 @configclass
 class RslRlPpoActorCriticDistillCfg(RslRlPpoActorCriticCfg):
         teacher_hidden_dims: tuple[int] | list[int] = [256, 256, 256],
+        student_hidden_dims: tuple[int] | list[int] = [256, 256, 256],
         teacher_obs_normalization: bool = False, 
+        student_obs_normalization: bool = False, 
 @configclass # 无特权信息的single FSQ蒸馏训练
 class Q1FlatPPODistillSingleFSQRunnerCfg(Q1FlatPPORunnerCfg):
     obs_groups = (
@@ -112,10 +114,10 @@ class Q1FlatPPODistillSingleFSQRunnerCfg(Q1FlatPPORunnerCfg):
     
     policy = RslRlPpoActorCriticDistillCfg(
         init_noise_std=0.8,
-        actor_obs_normalization=True,
+        student_obs_normalization=True,
         critic_obs_normalization=True,
         teacher_obs_normalization = True,
-        actor_hidden_dims=[512, 256, 128],
+        student_hidden_dims=[512, 256, 128],
         critic_hidden_dims=[512, 256, 128],
         teacher_hidden_dims = [512, 256, 128],
         activation="elu",
