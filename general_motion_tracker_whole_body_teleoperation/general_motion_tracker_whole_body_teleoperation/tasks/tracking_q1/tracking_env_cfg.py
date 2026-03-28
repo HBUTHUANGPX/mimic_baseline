@@ -374,10 +374,6 @@ class ObservationsCfg:
         target_joint_pos = ObsTerm(
             func=mdp.robot_joint_pos_window, params={"command_name": "motion"},
         )
-        motion_ref_pos_b = ObsTerm(
-            func=mdp.motion_ref_pos_b_window,
-            params={"command_name": "motion"},
-        )
         motion_ref_ori_b = ObsTerm(
             func=mdp.motion_ref_ori_b_window,
             params={"command_name": "motion"},
