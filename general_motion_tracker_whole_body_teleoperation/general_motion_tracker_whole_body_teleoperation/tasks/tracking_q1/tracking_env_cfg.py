@@ -623,14 +623,35 @@ class TerminationsCfg:
             "threshold": 0.8,
         },
     )
-    ee_body_pos = DoneTerm(
+    ee_body_pos_knee = DoneTerm(
+        func=mdp.bad_motion_body_pos_z_only,
+        params={
+            "command_name": "motion",
+            "threshold": 0.15,
+            "body_names": [
+                "L_knee_link",
+                "R_knee_link",
+            ],
+        },
+    )
+    ee_body_pos_ankle = DoneTerm(
+        func=mdp.bad_motion_body_pos_z_only,
+        params={
+            "command_name": "motion",
+            "threshold": 0.20,
+            "body_names": [
+                "L_ankle_roll_link",
+                "R_ankle_roll_link",
+            ],
+        },
+    )
+
+    ee_body_pos_wrist = DoneTerm(
         func=mdp.bad_motion_body_pos_z_only,
         params={
             "command_name": "motion",
             "threshold": 0.25,
             "body_names": [
-                "L_ankle_roll_link",
-                "R_ankle_roll_link",
                 "L_wrist_pitch_link",
                 "R_wrist_pitch_link",
             ],

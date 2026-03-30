@@ -51,6 +51,8 @@ class Q1FlatPureEnvCfg(Q1FlatEnvCfg):
         self.commands.motion.future_frames = 0
         self.observations.proprioception_with_noise_wo_privilege.history_length = 8
         self.observations.proprioception.history_length = 8
+        
+        self.events.physics_material = None
         self.events.add_joint_default_pos = None
         self.events.base_com = None
         self.events.pelvis_com = None
@@ -58,6 +60,16 @@ class Q1FlatPureEnvCfg(Q1FlatEnvCfg):
         self.events.robot_scale_mass = None
         self.events.robot_joint_stiffness_and_damping = None
         self.events.push_robot = None
+
+        self.commands.motion.velocity_range = {
+            "x": (-0.0, 0.0),
+            "y": (-0.0, 0.0),
+            "z": (-0.0, 0.0),
+            "roll": (-0.0, 0.0),
+            "pitch": (-0.0, 0.0),
+            "yaw": (-0.0, 0.0),
+        }
+        self.commands.motion.joint_position_range = (-0., 0.)
 
 @configclass
 class Q1FlatDistillEnvCfg(Q1FlatEnvCfg):
