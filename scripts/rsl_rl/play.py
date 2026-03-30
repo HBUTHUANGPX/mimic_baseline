@@ -101,7 +101,7 @@ import torch
 import glob
 from typing import List
 
-from rsl_rl.runners import DistillationRunner, OnPolicyRunner, OnPolicyRunnerFSQ
+from rsl_rl.runners import DistillationRunner, OnPolicyRunner, OnPolicyRunnerFSQ, OnPolicyDisstillationRunnerFSQ
 
 from isaaclab.envs import (
     DirectMARLEnv,
@@ -223,20 +223,28 @@ def main(
     print(f"[INFO]: Loading model checkpoint from: {resume_path}")
     # load previously trained model
     if agent_cfg.class_name == "OnPolicyRunner":
-        runner = OnPolicyRunner(
+        _runner = OnPolicyRunner(
             env, agent_cfg.to_dict(), log_dir=None, device=agent_cfg.device
         )
     elif agent_cfg.class_name == "OnPolicyRunnerFSQ":
-        runner = OnPolicyRunnerFSQ(
+        _runner = OnPolicyRunnerFSQ(
             env, agent_cfg.to_dict(), log_dir=None, device=agent_cfg.device
         )
+    elif agent_cfg.class_name == "OnPolicyDisstillationRunnerFSQ":
+        _runner = OnPolicyDisstillationRunnerFSQ(
+            env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device
+        )
     elif agent_cfg.class_name == "DistillationRunner":
-        runner = DistillationRunner(
+        _runner = DistillationRunner(
             env, agent_cfg.to_dict(), log_dir=None, device=agent_cfg.device
         )
     else:
         raise ValueError(f"Unsupported runner class: {agent_cfg.class_name}")
-    runner.load(resume_path, map_location=agent_cfg.device)
+    runner: OnPolicyRunner | OnPolicyRunnerFSQ | OnPolicyDisstillationRunnerFSQ | DistillationRunner = _runner
+    if agent_cfg.class_name == "OnPolicyDisstillationRunnerFSQ":
+        runner.load(resume_path, map_location=agent_cfg.device,is_eval = True)
+    else:
+        runner.load(resume_path, map_location=agent_cfg.device)
 
     # obtain the trained policy for inference
     policy = runner.get_inference_policy(device=env.unwrapped.device)
@@ -261,7 +269,7 @@ def main(
     # export policy to onnx/jit
     export_model_dir = os.path.join(os.path.dirname(resume_path), "exported")
 
-    if runner.alg.policy.__class__.__name__ == 'ActorCriticSingleFSQ':
+    if runner.alg.policy.__class__.__name__ == 'ActorCriticSingleFSQ' or runner.alg.policy.__class__.__name__ == 'ActorCriticSingleFSQDistillation':
         _policy = runner.alg.policy
         _policy.export_policy_as_onnx(
             env,
