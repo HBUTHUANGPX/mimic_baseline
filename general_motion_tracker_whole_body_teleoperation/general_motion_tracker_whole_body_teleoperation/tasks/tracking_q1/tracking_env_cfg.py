@@ -529,7 +529,7 @@ class RewardsCfg:
 
     motion_global_root_pos = RewTerm(
         func=mdp.motion_global_ref_position_error_exp,
-        weight=0.5,
+        weight=2.5,
         params={"command_name": "motion", "std": 0.3},
     )
     motion_global_root_ori = RewTerm(
@@ -627,7 +627,7 @@ class TerminationsCfg:
         func=mdp.bad_motion_body_pos_z_only,
         params={
             "command_name": "motion",
-            "threshold": 0.15,
+            "threshold": 0.28,
             "body_names": [
                 "L_knee_link",
                 "R_knee_link",
@@ -638,7 +638,7 @@ class TerminationsCfg:
         func=mdp.bad_motion_body_pos_z_only,
         params={
             "command_name": "motion",
-            "threshold": 0.20,
+            "threshold": 0.28,
             "body_names": [
                 "L_ankle_roll_link",
                 "R_ankle_roll_link",
@@ -677,8 +677,8 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
 
     # Scene settings
     # scene: MySceneCfg = MySceneCfg(num_envs=64, env_spacing=2.5)
-    scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
-    # scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
+    # scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
+    scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
