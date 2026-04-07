@@ -21,13 +21,20 @@ from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 
-import general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp as mdp
+import general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp as mdp
 
 ##
 # Scene definition
 ##
-
-VELOCITY_RANGE = {
+VELOCITY_RANGE_ZERO = {
+    "x": (-0.0, 0.0),
+    "y": (-0.0, 0.0),
+    "z": (-0.0, 0.0),
+    "roll": (-0.0, 0.0),
+    "pitch": (-0.0, 0.0),
+    "yaw": (-0.0, 0.0),
+}
+VELOCITY_RANGE_MID = {
     "x": (-1.2, 1.2),
     "y": (-0.5, 0.5),
     "z": (-0.2, 0.2),
@@ -35,7 +42,40 @@ VELOCITY_RANGE = {
     "pitch": (-0.52, 0.52),
     "yaw": (-0.78, 0.78),
 }
+VELOCITY_RANGE_HIGH = {
+    "x": (-2.4, 2.4),
+    "y": (-1.2, 1.2),
+    "z": (-0.5, 0.5),
+    "roll": (-1.52, 01.52),
+    "pitch": (-1.52, 1.52),
+    "yaw": (-1.78, 1.78),
+}
 
+
+POSE_RANGE_ZERO = {
+    "x": (-0.0, 0.0),
+    "y": (-0.0, 0.0),
+    "z": (-0.0, 0.0),
+    "roll": (-0., 0.),
+    "pitch": (-0., 0.),
+    "yaw": (-0., 0.),
+}
+POSE_RANGE_NORMAL = {
+    "x": (-0.1, 0.1),
+    "y": (-0.1, 0.1),
+    "z": (-0.0, 0.2),
+    "roll": (-0.1, 0.1),
+    "pitch": (-0.1, 0.1),
+    "yaw": (-0.2, 0.2),
+}
+POSE_RANGE_HIGH = {
+    "x": (-0.2, 0.2),
+    "y": (-0.2, 0.2),
+    "z": (-0.0, 0.3),
+    "roll": (-0.2, 0.2),
+    "pitch": (-0.2, 0.2),
+    "yaw": (-0.3, 0.3),
+}
 
 @configclass
 class MySceneCfg(InteractiveSceneCfg):
@@ -81,6 +121,9 @@ class MySceneCfg(InteractiveSceneCfg):
 # MDP settings
 ##
 
+JOINTS_POSITION_RANGE_NORMAL = (-0.1, 0.1)
+JOINTS_POSITION_RANGE_HIGH = (-0.2, 0.2)
+JOINTS_POSITION_RANGE_ZERO = (-0.0, 0.0)
 
 @configclass
 class CommandsCfg:
@@ -90,25 +133,9 @@ class CommandsCfg:
         asset_name="robot",
         resampling_time_range=(1.0e9, 1.0e9),
         debug_vis=True,
-        pose_range={
-            # "x": (-0.0, 0.0),
-            # "y": (-0.0, 0.0),
-            # "z": (0.05, 0.1),
-            # "roll": (-0., 0.),
-            # "pitch": (-0., 0.),
-            # "yaw": (-0., 0.),
-            "x": (-0.1, 0.1),
-            "y": (-0.1, 0.1),
-            "z": (0.05, 0.2),
-            "roll": (-0.1, 0.1),
-            "pitch": (-0.1, 0.1),
-            "yaw": (-0.2, 0.2),
-        },
-        velocity_range=VELOCITY_RANGE,
-        # joint_position_range=(-0., 0.),
-        # joint_velocity_range=(-0., 0.),
-        joint_position_range=(-0.2, 0.2),
-        # joint_velocity_range=(-8.0, 8.0),
+        pose_range=POSE_RANGE_NORMAL,
+        velocity_range=VELOCITY_RANGE_MID,
+        joint_position_range=JOINTS_POSITION_RANGE_NORMAL,
     )
 
 
@@ -152,30 +179,6 @@ class ObservationsCfg:
             self.concatenate_terms = True
 
     @configclass
-    class TeacherCfg(ObsGroup):
-        """Observations for policy group."""
-
-        # observation terms (order preserved)
-        command = ObsTerm(
-            func=mdp.generated_commands, params={"command_name": "motion"}
-        )
-        motion_ref_ori_b = ObsTerm(
-            func=mdp.motion_ref_ori_b,
-            params={"command_name": "motion"},
-        )
-        body_pos = ObsTerm(func=mdp.robot_body_pos_b, params={"command_name": "motion"})
-        body_ori = ObsTerm(func=mdp.robot_body_ori_b, params={"command_name": "motion"})
-        base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
-        base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
-        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
-        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
-        actions = ObsTerm(func=mdp.last_action)
-
-        def __post_init__(self):
-            self.enable_corruption = True
-            self.concatenate_terms = True
-
-    @configclass
     class PrivilegedCfg(ObsGroup):
         command = ObsTerm(
             func=mdp.generated_commands, params={"command_name": "motion"}
@@ -195,7 +198,7 @@ class ObservationsCfg:
         actions = ObsTerm(func=mdp.last_action)
 
     @configclass
-    class ProprioceptionWithNoiseCfg(ObsGroup):  # 带噪声的特权本体感知观测组
+    class ProprioceptionWithNoiseCfg(ObsGroup):  # 有噪 特权 本体
         """Observations for proprioception group with noise."""
 
         base_lin_vel = ObsTerm(
@@ -215,7 +218,7 @@ class ObservationsCfg:
             self.enable_corruption = True
 
     @configclass
-    class ProprioceptionWithNoiseWOPrivilegeCfg(ObsGroup):  # 带噪声的本体感知观测组
+    class ProprioceptionWithNoiseWOPrivilegeCfg(ObsGroup):  # 有噪 无特权 本体
         """Observations for proprioception group with noise."""
 
         base_ang_vel = ObsTerm(
@@ -228,10 +231,10 @@ class ObservationsCfg:
 
         def __post_init__(self):
             self.enable_corruption = True
-            self.history_length = 24
+            # self.history_length = 8
 
     @configclass
-    class ProprioceptionCfg(ObsGroup):  # 不带噪声的特权本体感知观测组
+    class ProprioceptionCfg(ObsGroup):  # 无噪 特权 本体
         """Observations for proprioception group without noise."""
 
         base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
@@ -241,9 +244,10 @@ class ObservationsCfg:
 
         def __post_init__(self):
             self.enable_corruption = True
+            # self.history_length = 8
 
     @configclass
-    class ProprioceptionWOPrivilegeCfg(ObsGroup):  # 不带噪声的本体感知观测组
+    class ProprioceptionWOPrivilegeCfg(ObsGroup):  # 无噪 无特权 本体
         """Observations for proprioception group without noise."""
 
         base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
@@ -252,14 +256,19 @@ class ObservationsCfg:
 
         def __post_init__(self):
             self.enable_corruption = True
-            self.history_length = 24
+            # self.history_length = 8
 
     @configclass
-    class CommandWithNoiseCfg(ObsGroup):  # 带噪声含有特权信息的指令观测组
+    class CommandWithNoiseCfg(ObsGroup):  # 有噪 特权 cmd
         """Observations for command group with noise."""
 
         joint_pos_delta = ObsTerm(
             func=mdp.joint_pos_delta,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.02, n_max=0.02),
+        )
+        target_joint_pos = ObsTerm(
+            func=mdp.robot_joint_pos,
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.02, n_max=0.02),
         )
@@ -288,11 +297,16 @@ class ObservationsCfg:
             self.enable_corruption = True
 
     @configclass
-    class CommandWithNoiseWOPrivilegeCfg(ObsGroup):  # 带噪声不含特权信息的指令观测组
+    class CommandWithNoiseWOPrivilegeCfg(ObsGroup):  # 有噪 无特权 cmd
         """Observations for command group with noise."""
 
         joint_pos_delta = ObsTerm(
             func=mdp.joint_pos_delta,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.02, n_max=0.02),
+        )
+        target_joint_pos = ObsTerm(
+            func=mdp.robot_joint_pos,
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.02, n_max=0.02),
         )
@@ -306,11 +320,14 @@ class ObservationsCfg:
             self.enable_corruption = True
 
     @configclass
-    class CommandCfg(ObsGroup):  # 无噪声含有特权信息的指令观测组
+    class CommandCfg(ObsGroup):  # 无噪 特权 cmd
         """Observations for command group with noise."""
 
         joint_pos_delta = ObsTerm(
             func=mdp.joint_pos_delta, params={"command_name": "motion"}
+        )
+        target_joint_pos = ObsTerm(
+            func=mdp.robot_joint_pos, params={"command_name": "motion"},
         )
         motion_ref_pos_b = ObsTerm(
             func=mdp.motion_ref_pos_b,
@@ -333,25 +350,73 @@ class ObservationsCfg:
             self.enable_corruption = True
 
     @configclass
-    class CommandWOPrivilegeCfg(ObsGroup):  # 无噪声不含特权信息的指令观测组
+    class CommandWOPrivilegeCfg(ObsGroup):  # 无噪 无特权 cmd
         """Observations for command group with noise."""
 
         joint_pos_delta = ObsTerm(
             func=mdp.joint_pos_delta, params={"command_name": "motion"}
         )
+
+        target_joint_pos = ObsTerm(
+            func=mdp.robot_joint_pos, params={"command_name": "motion"}
+        )
         motion_ref_ori_b = ObsTerm(
             func=mdp.motion_ref_ori_b,
             params={"command_name": "motion"},
         )
-        # robot_ref_vx_vy_w = ObsTerm(
-        #     func=mdp.robot_ref_vx_vy_w,
-        #     params={"command_name": "motion"},
-        # )
 
-        # robot_ref_wz_w = ObsTerm(
-        #     func=mdp.robot_ref_wz_w,
-        #     params={"command_name": "motion"},
-        # )
+        def __post_init__(self):
+            self.enable_corruption = True
+
+    @configclass
+    class CommandWindowWithNoiseWOPrivilegeCfg(ObsGroup):  # 有噪 无特权 cmd
+        """Observations for command group with noise."""
+
+        joint_pos_delta = ObsTerm(
+            func=mdp.joint_pos_delta_window,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.02, n_max=0.02),
+        )
+        target_joint_pos = ObsTerm(
+            func=mdp.robot_joint_pos_window,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.02, n_max=0.02),
+        )
+        motion_ref_ori_b = ObsTerm(
+            func=mdp.motion_ref_ori_b_window,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.05, n_max=0.05),
+        )
+
+        def __post_init__(self):
+            self.enable_corruption = True
+
+    @configclass
+    class CommandWindowCfg(ObsGroup):  # 无噪 特权 cmd
+        """Observations for command group with noise."""
+
+        joint_pos_delta = ObsTerm(
+            func=mdp.joint_pos_delta_window, params={"command_name": "motion"}
+        )
+        target_joint_pos = ObsTerm(
+            func=mdp.robot_joint_pos_window, params={"command_name": "motion"},
+        )
+        motion_ref_pos_b = ObsTerm(
+            func=mdp.motion_ref_pos_b_window,
+            params={"command_name": "motion"},
+        )
+        motion_ref_ori_b = ObsTerm(
+            func=mdp.motion_ref_ori_b_window,
+            params={"command_name": "motion"},
+        )
+        body_pos = ObsTerm(
+            func=mdp.robot_body_pos_b_window,
+            params={"command_name": "motion"},
+        )
+        body_ori = ObsTerm(
+            func=mdp.robot_body_ori_b_window,
+            params={"command_name": "motion"},
+        )
 
         def __post_init__(self):
             self.enable_corruption = True
@@ -374,30 +439,25 @@ class ObservationsCfg:
 
         motion_group = ObsTerm(func=mdp.motion_group, params={"command_name": "motion"})
 
-    # # observation groups
-    # policy: PolicyCfg = PolicyCfg()
-    # critic: PrivilegedCfg = PrivilegedCfg()
-    # teacher: TeacherCfg = TeacherCfg()
+    # observation groups
+    policy: PolicyCfg = PolicyCfg()
+    critic: PrivilegedCfg = PrivilegedCfg()
 
-    # proprioception_with_noise: ProprioceptionWithNoiseCfg = ProprioceptionWithNoiseCfg()
-    # proprioception_with_noise_wo_privilege: ProprioceptionWithNoiseWOPrivilegeCfg = (
-    #     ProprioceptionWithNoiseWOPrivilegeCfg()
-    # )
-    # command_with_noise: CommandWithNoiseCfg = CommandWithNoiseCfg()
-    # command_with_noise_wo_privilege: CommandWithNoiseWOPrivilegeCfg = (
-    #     CommandWithNoiseWOPrivilegeCfg()
-    # )
 
-    proprioception: ProprioceptionCfg = ProprioceptionCfg()
-    proprioception_wo_privilege: ProprioceptionWOPrivilegeCfg = (
-        ProprioceptionWOPrivilegeCfg()
-    )
-    proprioception_with_noise_wo_privilege: ProprioceptionWithNoiseWOPrivilegeCfg = (
-        ProprioceptionWithNoiseWOPrivilegeCfg()
-    )
-    command: CommandCfg = CommandCfg()
-    command_wo_privilege: CommandWOPrivilegeCfg = CommandWOPrivilegeCfg()
+    
+    # Use the window-backed command observations. When history_frames and
+    # future_frames are both zero, these terms reduce exactly to the original
+    # single-frame observations and can be used to validate correctness before
+    # enabling larger temporal windows.
+    command_with_noise_wo_privilege : CommandWindowWithNoiseWOPrivilegeCfg = CommandWindowWithNoiseWOPrivilegeCfg()  # 有噪 无特权 cmd
+    # command_with_noise_wo_privilege : CommandWithNoiseWOPrivilegeCfg = CommandWithNoiseWOPrivilegeCfg()  # 有噪 无特权 cmd
+    proprioception_with_noise_wo_privilege : ProprioceptionWithNoiseWOPrivilegeCfg = ProprioceptionWithNoiseWOPrivilegeCfg()  # 有噪 无特权 本体
+
+    command: CommandWindowCfg = CommandWindowCfg()  # 无噪 特权 cmd
+    # command: CommandCfg = CommandCfg()  # 无噪 特权 cmd
+    proprioception: ProprioceptionCfg = ProprioceptionCfg() # 无噪 特权 本体
     last_action: LastActionCfg = LastActionCfg()
+
     motion_id: MotionIdCfg = MotionIdCfg()
     motion_group: MotionGroupCfg = MotionGroupCfg()
 
@@ -424,7 +484,7 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=[".*"]),
-            "pos_distribution_params": (-0.02, 0.02),
+            "pos_distribution_params": (-0.01, 0.01),
             "operation": "add",
         },
     )
@@ -460,7 +520,7 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names=".*"),
-            "mass_distribution_params": (0.9, 1.1),
+            "mass_distribution_params": (0.92, 1.08),
             "operation": "scale",
         },
     )
@@ -469,8 +529,8 @@ class EventCfg:
         mode="startup",  # startup 和 reset 的训练结构没什么区别，反而 reset 会增加训练时间
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
-            "stiffness_distribution_params": (1 / 3.0, 3.0),
-            "damping_distribution_params": (1 / 3.0, 3.0),
+            "stiffness_distribution_params": (1 / 2.0, 2.0),
+            "damping_distribution_params": (1 / 2.0, 2.0),
             "operation": "scale",
             "distribution": "uniform",
         },
@@ -480,7 +540,7 @@ class EventCfg:
         func=mdp.push_by_setting_velocity,
         mode="interval",
         interval_range_s=(1.0, 3.0),
-        params={"velocity_range": VELOCITY_RANGE},
+        params={"velocity_range": VELOCITY_RANGE_MID},
     )
 
     # reset robot
@@ -532,7 +592,7 @@ class RewardsCfg:
         weight=1.0,
         params={"command_name": "motion", "std": 3.14},
     )
-    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-1e-1)
+    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.1)
     joint_limit = RewTerm(
         func=mdp.joint_pos_limits,
         weight=-10.0,
@@ -610,48 +670,3 @@ class CurriculumCfg:
 
     pass
 
-
-##
-# Environment configuration
-##
-
-
-@configclass
-class TrackingEnvCfg(ManagerBasedRLEnvCfg):
-    """Configuration for the locomotion velocity-tracking environment."""
-
-    # Scene settings
-    # scene: MySceneCfg = MySceneCfg(num_envs=128, env_spacing=2.5)
-    scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
-    # scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
-    # Basic settings
-    observations: ObservationsCfg = ObservationsCfg()
-    actions: ActionsCfg = ActionsCfg()
-    commands: CommandsCfg = CommandsCfg()
-    # MDP settings
-    rewards: RewardsCfg = RewardsCfg()
-    terminations: TerminationsCfg = TerminationsCfg()
-    events: EventCfg = EventCfg()
-    curriculum: CurriculumCfg = CurriculumCfg()
-
-    def __post_init__(self):
-        """Post initialization."""
-        # general settings
-        # self.decimation = 4
-        # self.sim.dt = 0.005
-
-        # self.decimation = 10
-        # self.sim.dt = 0.002
-
-        self.decimation = 1
-        self.sim.dt = 0.02
-
-        self.episode_length_s = 10.0
-        # simulation settings
-        self.sim.render_interval = self.decimation
-        self.sim.physics_material = self.scene.terrain.physics_material
-        self.sim.physx.gpu_max_rigid_patch_count = 10 * 2**15
-        # viewer settings
-        self.viewer.eye = (3, 3, 1.5)
-        self.viewer.origin_type = "asset_root"
-        self.viewer.asset_name = "robot"

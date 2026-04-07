@@ -1,15 +1,15 @@
 from isaaclab.utils import configclass
 
-from general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.tracking_env_cfg import (
+from general_motion_tracker_whole_body_teleoperation.tasks.tracking.tracking_env_cfg import (
     TrackingEnvCfg,
 )
-from general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.teacher_wo_d_tracking_env_cfg import (
+from general_motion_tracker_whole_body_teleoperation.tasks.tracking.teacher_wo_d_tracking_env_cfg import (
     TrackingEnvCfg as TeacherTrackingEnvCfg,
 )
-from general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.pure_tracking_env_cfg import (
+from general_motion_tracker_whole_body_teleoperation.tasks.tracking.pure_tracking_env_cfg import (
     TrackingEnvCfg as PureTrackingEnvCfg,
 )
-from general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.distill_tracking_env_cfg import (
+from general_motion_tracker_whole_body_teleoperation.tasks.tracking.distill_tracking_env_cfg import (
     TrackingEnvCfg as DissTrackingEnvCfg,
 )
 

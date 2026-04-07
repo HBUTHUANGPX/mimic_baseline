@@ -50,7 +50,7 @@ from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 ##
 if args_cli.robot == "Q1":
     from general_motion_tracker_whole_body_teleoperation.robots.q1 import Q1_CYLINDER_CFG as ROBOT_CFG
-    from general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp import MotionLoader
+    from general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp import MotionLoader
 elif args_cli.robot == "g1":
     from general_motion_tracker_whole_body_teleoperation.robots.g1 import G1_CYLINDER_CFG as ROBOT_CFG
     from general_motion_tracker_whole_body_teleoperation.tasks.tracking_g1.mdp import MotionLoader

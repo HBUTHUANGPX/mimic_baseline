@@ -10,7 +10,7 @@ time order `[t - n, ..., t, ..., t + m]`.
 import torch
 from typing import TYPE_CHECKING
 
-from general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp.commands import (
+from general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp.commands import (
     MotionCommand,
 )
 

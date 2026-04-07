@@ -4,7 +4,7 @@ from pathlib import Path
 COMMANDS_PATH = Path(
     "general_motion_tracker_whole_body_teleoperation/"
     "general_motion_tracker_whole_body_teleoperation/"
-    "tasks/tracking_q1/mdp/commands.py"
+    "tasks/tracking/mdp/commands.py"
 )
 
 

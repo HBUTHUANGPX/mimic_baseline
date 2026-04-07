@@ -21,7 +21,7 @@ from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 
-import general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp as mdp
+import general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp as mdp
 
 ##
 # Scene definition

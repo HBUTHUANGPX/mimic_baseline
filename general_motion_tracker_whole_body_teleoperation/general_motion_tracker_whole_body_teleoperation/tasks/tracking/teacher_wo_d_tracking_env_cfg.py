@@ -21,19 +21,19 @@ from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 
-import general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp as mdp
+import general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp as mdp
 
 ##
 # Scene definition
 ##
 
 VELOCITY_RANGE = {
-    "x": (-1.2, 1.2),
-    "y": (-0.5, 0.5),
-    "z": (-0.2, 0.2),
-    "roll": (-0.52, 0.52),
-    "pitch": (-0.52, 0.52),
-    "yaw": (-0.78, 0.78),
+    "x": (0.0, 0.0),
+    "y": (0.0, 0.0),
+    "z": (0.0, 0.0),
+    "roll": (0.0, 0.0),
+    "pitch": (0.0, 0.0),
+    "yaw": (0.0, 0.0),
 }
 
 
@@ -91,23 +91,17 @@ class CommandsCfg:
         resampling_time_range=(1.0e9, 1.0e9),
         debug_vis=True,
         pose_range={
-            # "x": (-0.0, 0.0),
-            # "y": (-0.0, 0.0),
-            # "z": (-0.0, 0.0),
-            # "roll": (-0., 0.),
-            # "pitch": (-0., 0.),
-            # "yaw": (-0., 0.),
-            "x": (-0.1, 0.1),
-            "z": (-0.0, 0.2),
-            "y": (-0.1, 0.1),
-            "roll": (-0.1, 0.1),
-            "pitch": (-0.1, 0.1),
-            "yaw": (-0.2, 0.2),
+            "x": (-0.0, 0.0),
+            "y": (-0.0, 0.0),
+            "z": (0.1, 0.101),
+            "roll": (-0., 0.),
+            "pitch": (-0., 0.),
+            "yaw": (-0., 0.),
         },
         velocity_range=VELOCITY_RANGE,
         # joint_position_range=(-0., 0.),
         # joint_velocity_range=(-0., 0.),
-        joint_position_range=(-0.1, 0.1),
+        joint_position_range=(-0, 0),
         # joint_velocity_range=(-0.1, 0.1),
     )
 
@@ -204,7 +198,7 @@ class ObservationsCfg:
 
         def __post_init__(self):
             self.enable_corruption = True
-            # self.history_length = 8
+            self.history_length = 24
 
     @configclass
     class ProprioceptionCfg(ObsGroup):  # 无噪 特权 本体
@@ -217,7 +211,7 @@ class ObservationsCfg:
 
         def __post_init__(self):
             self.enable_corruption = True
-            # self.history_length = 8
+            # self.history_length = 24
 
     @configclass
     class ProprioceptionWOPrivilegeCfg(ObsGroup):  # 无噪 无特权 本体
@@ -229,7 +223,7 @@ class ObservationsCfg:
 
         def __post_init__(self):
             self.enable_corruption = True
-            self.history_length = 8
+            self.history_length = 24
 
     @configclass
     class CommandWithNoiseCfg(ObsGroup):  # 有噪 特权 cmd
@@ -341,28 +335,6 @@ class ObservationsCfg:
         def __post_init__(self):
             self.enable_corruption = True
 
-    @configclass
-    class CommandWindowWithNoiseWOPrivilegeCfg(ObsGroup):  # 有噪 无特权 cmd
-        """Observations for command group with noise."""
-
-        joint_pos_delta = ObsTerm(
-            func=mdp.joint_pos_delta_window,
-            params={"command_name": "motion"},
-            noise=Unoise(n_min=-0.02, n_max=0.02),
-        )
-        target_joint_pos = ObsTerm(
-            func=mdp.robot_joint_pos_window,
-            params={"command_name": "motion"},
-            noise=Unoise(n_min=-0.02, n_max=0.02),
-        )
-        motion_ref_ori_b = ObsTerm(
-            func=mdp.motion_ref_ori_b_window,
-            params={"command_name": "motion"},
-            noise=Unoise(n_min=-0.05, n_max=0.05),
-        )
-
-        def __post_init__(self):
-            self.enable_corruption = True
 
     @configclass
     class CommandWindowCfg(ObsGroup):  # 无噪 特权 cmd
@@ -372,7 +344,11 @@ class ObservationsCfg:
             func=mdp.joint_pos_delta_window, params={"command_name": "motion"}
         )
         target_joint_pos = ObsTerm(
-            func=mdp.robot_joint_pos_window, params={"command_name": "motion"},
+            func=mdp.joint_pos_delta_window, params={"command_name": "motion"},
+        )
+        motion_ref_pos_b = ObsTerm(
+            func=mdp.motion_ref_pos_b_window,
+            params={"command_name": "motion"},
         )
         motion_ref_ori_b = ObsTerm(
             func=mdp.motion_ref_ori_b_window,
@@ -409,23 +385,10 @@ class ObservationsCfg:
         motion_group = ObsTerm(func=mdp.motion_group, params={"command_name": "motion"})
 
     # observation groups
-    policy: PolicyCfg = PolicyCfg()
-    critic: PrivilegedCfg = PrivilegedCfg()
 
-
-    
-    # Use the window-backed command observations. When history_frames and
-    # future_frames are both zero, these terms reduce exactly to the original
-    # single-frame observations and can be used to validate correctness before
-    # enabling larger temporal windows.
-    command_window_with_noise_wo_privilege : CommandWindowWithNoiseWOPrivilegeCfg = CommandWindowWithNoiseWOPrivilegeCfg()  # 有噪 无特权 cmd
-    command_with_noise_wo_privilege : CommandWithNoiseWOPrivilegeCfg = CommandWithNoiseWOPrivilegeCfg()  # 有噪 无特权 cmd
-    proprioception_with_noise_wo_privilege : ProprioceptionWithNoiseWOPrivilegeCfg = ProprioceptionWithNoiseWOPrivilegeCfg()  # 有噪 无特权 本体
-
-    command_window: CommandWindowCfg = CommandWindowCfg()  # 无噪 特权 cmd
-    command: CommandCfg = CommandCfg()  # 无噪 特权 cmd
     proprioception: ProprioceptionCfg = ProprioceptionCfg() # 无噪 特权 本体
-
+    command: CommandCfg = CommandCfg()  # 无噪 特权 cmd
+    # command: CommandWindowCfg = CommandWindowCfg()  # 无噪 特权 cmd
     last_action: LastActionCfg = LastActionCfg()
 
     motion_id: MotionIdCfg = MotionIdCfg()
@@ -435,84 +398,6 @@ class ObservationsCfg:
 @configclass
 class EventCfg:
     """Configuration for events."""
-
-    # startup
-    physics_material = EventTerm(
-        func=mdp.randomize_rigid_body_material,
-        mode="startup",
-        params={
-            "asset_cfg": SceneEntityCfg("robot", body_names=".*"),
-            "static_friction_range": (0.1, 1.6),
-            "dynamic_friction_range": (0.1, 1.2),
-            "restitution_range": (0.0, 0.5),
-            "num_buckets": 64,
-        },
-    )
-
-    add_joint_default_pos = EventTerm(
-        func=mdp.randomize_joint_default_pos,
-        mode="startup",
-        params={
-            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*"]),
-            "pos_distribution_params": (-0.01, 0.01),
-            "operation": "add",
-        },
-    )
-
-    base_com = EventTerm(
-        func=mdp.randomize_rigid_body_com,
-        mode="startup",
-        params={
-            "asset_cfg": SceneEntityCfg("robot", body_names="torso_link"),
-            "com_range": {"x": (-0.06, 0.06), "y": (-0.025, 0.025), "z": (-0.01, 0.05)},
-        },
-    )
-    pelvis_com = EventTerm(
-        func=mdp.randomize_rigid_body_com,
-        mode="startup",
-        params={
-            "asset_cfg": SceneEntityCfg("robot", body_names="pelvis_link"),
-            "com_range": {"x": (-0.01, 0.01), "y": (-0.02, 0.02), "z": (0.01, 0.01)},
-        },
-    )
-    knee_link_com = EventTerm(
-        func=mdp.randomize_rigid_body_com,
-        mode="startup",
-        params={
-            "asset_cfg": SceneEntityCfg(
-                "robot", body_names=["L_knee_link", "R_knee_link"]
-            ),
-            "com_range": {"x": (-0.01, 0.01), "y": (-0.01, 0.01), "z": (-0.03, 0.03)},
-        },
-    )
-    robot_scale_mass = EventTerm(
-        func=mdp.randomize_rigid_body_mass,
-        mode="startup",
-        params={
-            "asset_cfg": SceneEntityCfg("robot", body_names=".*"),
-            "mass_distribution_params": (0.92, 1.08),
-            "operation": "scale",
-        },
-    )
-    robot_joint_stiffness_and_damping = EventTerm(
-        func=mdp.randomize_actuator_gains,
-        mode="startup",  # startup 和 reset 的训练结构没什么区别，反而 reset 会增加训练时间
-        params={
-            "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
-            "stiffness_distribution_params": (1 / 2.0, 2.0),
-            "damping_distribution_params": (1 / 2.0, 2.0),
-            "operation": "scale",
-            "distribution": "uniform",
-        },
-    )
-    # interval
-    push_robot = EventTerm(
-        func=mdp.push_by_setting_velocity,
-        mode="interval",
-        interval_range_s=(1.0, 3.0),
-        params={"velocity_range": VELOCITY_RANGE},
-    )
-
     # reset robot
     reset_robot = EventTerm(
         func=mdp.reset_robot_state_by_motioncommand,
@@ -529,7 +414,7 @@ class RewardsCfg:
 
     motion_global_root_pos = RewTerm(
         func=mdp.motion_global_ref_position_error_exp,
-        weight=2.5,
+        weight=0.5,
         params={"command_name": "motion", "std": 0.3},
     )
     motion_global_root_ori = RewTerm(
@@ -600,10 +485,6 @@ class RewardsCfg:
             "body_names": ["L_ankle_roll_link", "R_ankle_roll_link"],
         },
     )
-    termination = RewTerm(
-        func=mdp.is_terminated,
-        weight=-200,
-    )
 
 
 @configclass
@@ -613,7 +494,7 @@ class TerminationsCfg:
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
     ref_pos = DoneTerm(
         func=mdp.bad_ref_pos_z_only,
-        params={"command_name": "motion", "threshold": 0.25},
+        params={"command_name": "motion", "threshold": 0.35},
     )
     ref_ori = DoneTerm(
         func=mdp.bad_ref_ori,
@@ -623,35 +504,14 @@ class TerminationsCfg:
             "threshold": 0.8,
         },
     )
-    ee_body_pos_knee = DoneTerm(
+    ee_body_pos = DoneTerm(
         func=mdp.bad_motion_body_pos_z_only,
         params={
             "command_name": "motion",
-            "threshold": 0.28,
-            "body_names": [
-                "L_knee_link",
-                "R_knee_link",
-            ],
-        },
-    )
-    ee_body_pos_ankle = DoneTerm(
-        func=mdp.bad_motion_body_pos_z_only,
-        params={
-            "command_name": "motion",
-            "threshold": 0.28,
+            "threshold": 0.2,
             "body_names": [
                 "L_ankle_roll_link",
                 "R_ankle_roll_link",
-            ],
-        },
-    )
-
-    ee_body_pos_wrist = DoneTerm(
-        func=mdp.bad_motion_body_pos_z_only,
-        params={
-            "command_name": "motion",
-            "threshold": 0.25,
-            "body_names": [
                 "L_wrist_pitch_link",
                 "R_wrist_pitch_link",
             ],
@@ -676,9 +536,9 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the locomotion velocity-tracking environment."""
 
     # Scene settings
-    # scene: MySceneCfg = MySceneCfg(num_envs=64, env_spacing=2.5)
-    # scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
-    scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
+    # scene: MySceneCfg = MySceneCfg(num_envs=128, env_spacing=2.5)
+    scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
+    # scene: MySceneCfg = MySceneCfg(num_envs=4096 * 4, env_spacing=2.5)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
@@ -698,16 +558,15 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
         self.decimation = 1
         self.sim.dt = 0.02
 
-        self.observations.proprioception_with_noise_wo_privilege.history_length = 8
-        self.commands.motion.future_frames = 10
         # self.decimation = 20
         # self.sim.dt = 0.001
+
         self.episode_length_s = 10.0
         # simulation settings
         self.sim.render_interval = self.decimation
         self.sim.physics_material = self.scene.terrain.physics_material
         self.sim.physx.gpu_max_rigid_patch_count = 10 * 2**15
         # viewer settings
-        self.viewer.eye = (3, 3, 1.5)
-        self.viewer.origin_type = "asset_root"
-        self.viewer.asset_name = "robot"
+        # self.viewer.eye = (3, 3, 1.5)
+        # self.viewer.origin_type = "asset_root"
+        # self.viewer.asset_name = "robot"

@@ -13,7 +13,7 @@ from isaaclab.envs import ManagerBasedRLEnv
 from isaaclab_rl.rsl_rl.exporter import _OnnxPolicyExporter, _TorchPolicyExporter
 
 # from whole_body_tracking.tasks.tracking.mdp import MotionCommand
-from general_motion_tracker_whole_body_teleoperation.tasks.tracking_q1.mdp import (
+from general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp import (
     MotionCommand,
 )
 
