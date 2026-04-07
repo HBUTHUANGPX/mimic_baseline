@@ -22,12 +22,20 @@ class G1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
                 "command_with_noise_wo_privilege",
                 "proprioception_with_noise_wo_privilege",
                 "last_action",
+                # "policy"
             ],  # 映射到环境提供的 'policy' 观测组，用于演员网络
             "critic": [
                 "command",
                 "proprioception",
                 "last_action",
+                # "critic"
             ],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
+            "policy_window":[
+                "command_window_with_noise_wo_privilege",
+            ],
+            "critic_window":[
+                "command_window",
+            ]
         },
     )
     experiment_name = "g1_flat"
@@ -53,7 +61,123 @@ class G1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         use_clipped_value_loss=True,
         clip_param=0.2,
     )
+@configclass  # 特权信息的训练
+class G1FlatPPOPureRunnerCfg(G1FlatPPORunnerCfg):
+    obs_groups = (
+        {
+            "policy": [
+                "command",
+                "proprioception",
+                "last_action",
+            ],  # 映射到环境提供的 'policy' 观测组，用于演员网络
+            "critic": [
+                "command",
+                "proprioception",
+                "last_action",
+            ],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
+        },
+    ) 
 
+@configclass
+class RslRlPpoActorCriticDistillCfg(RslRlPpoActorCriticCfg):
+        teacher_hidden_dims: tuple[int] | list[int] = [256, 256, 256],
+        student_hidden_dims: tuple[int] | list[int] = [256, 256, 256],
+        teacher_obs_normalization: bool = False, 
+        student_obs_normalization: bool = False, 
+@configclass # 无特权信息的single FSQ蒸馏训练
+class G1FlatPPODistillSingleFSQRunnerCfg(G1FlatPPORunnerCfg):
+    obs_groups = (
+        {
+            "policy": [
+                "command_with_noise_wo_privilege",
+                "proprioception_with_noise_wo_privilege",
+                "last_action",
+            ],  
+            "critic": [
+                "command",
+                "proprioception",
+                "last_action",
+            ], 
+            "teacher": [
+                "command",
+                "proprioception",
+                "last_action",
+            ],  
+            "policy_window":[
+                "command_window_with_noise_wo_privilege",
+            ],
+            "critic_window":[
+                "command_window",
+            ]
+        },
+    )
+    
+    policy = RslRlPpoActorCriticDistillCfg(
+        init_noise_std=0.8,
+        student_obs_normalization=True,
+        critic_obs_normalization=True,
+        teacher_obs_normalization = True,
+        student_hidden_dims=[512, 256, 128],
+        critic_hidden_dims=[512, 256, 128],
+        teacher_hidden_dims = [512, 256, 128],
+        activation="elu",
+    )
+    def __post_init__(self):
+        super().__post_init__()
+        self.class_name = "OnPolicyDisstillationRunnerFSQ"
+        self.policy.class_name = "ActorCriticSingleFSQDistillation"
+        self.algorithm.class_name = "PPOSingleFSQDistillation"
+
+@configclass # 无特权信息的single FSQ训练
+class G1FlatPPOSingleFSQRunnerCfg(G1FlatPPORunnerCfg):
+    def __post_init__(self):
+        super().__post_init__()
+        self.class_name = "OnPolicyRunnerFSQ"
+        self.policy.class_name = "ActorCriticSingleFSQ"
+        self.algorithm.class_name = "PPOSingleFSQ"
+
+@configclass  # 有特权信息WO DR 的训练
+class G1FlatTeacherPPORunnerCfg(RslRlOnPolicyRunnerCfg):
+    num_steps_per_env = 24
+    max_iterations = 90001
+    save_interval = 500
+    obs_groups = (
+        {
+            "policy": [
+                "command",
+                "proprioception",
+                "last_action",
+                ],  
+            "critic": [
+                "command",
+                "proprioception",
+                "last_action",
+                ], 
+        },
+    )
+    experiment_name = "g1_flat_teacher"
+    policy = RslRlPpoActorCriticCfg(
+        init_noise_std=0.6,
+        actor_obs_normalization=True,
+        critic_obs_normalization=True,
+        actor_hidden_dims=[512, 256, 128],
+        critic_hidden_dims=[512, 256, 128],
+        activation="elu",
+    )
+    algorithm = RslRlPpoAlgorithmCfg(
+        num_learning_epochs=5,
+        num_mini_batches=4,
+        learning_rate=1.0e-3,
+        schedule="adaptive",
+        gamma=0.99,
+        lam=0.95,
+        entropy_coef=0.005,
+        desired_kl=0.01,
+        max_grad_norm=1.0,
+        value_loss_coef=1.0,
+        use_clipped_value_loss=True,
+        clip_param=0.2,
+    )
 
 @configclass  # 有特权信息的训练
 class PureG1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
@@ -311,3 +435,5 @@ class G1FlatFSQCVAEDistillationStudentMultiTeacherCfg(RslRlDistillationRunnerCfg
         use_clipped_value_loss=True,
         clip_param=0.2,
     )
+
+

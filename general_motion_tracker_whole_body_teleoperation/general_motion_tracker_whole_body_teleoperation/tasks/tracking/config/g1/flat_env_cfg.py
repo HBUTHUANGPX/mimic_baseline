@@ -1,0 +1,188 @@
+from isaaclab.utils import configclass
+
+from general_motion_tracker_whole_body_teleoperation.tasks.tracking.tracking_env_cfg import (
+    TrackingEnvCfg,
+)
+from general_motion_tracker_whole_body_teleoperation.tasks.tracking.teacher_wo_d_tracking_env_cfg import (
+    TrackingEnvCfg as TeacherTrackingEnvCfg,
+)
+from general_motion_tracker_whole_body_teleoperation.tasks.tracking.pure_tracking_env_cfg import (
+    TrackingEnvCfg as PureTrackingEnvCfg,
+)
+from general_motion_tracker_whole_body_teleoperation.tasks.tracking.distill_tracking_env_cfg import (
+    TrackingEnvCfg as DissTrackingEnvCfg,
+)
+
+from general_motion_tracker_whole_body_teleoperation.robots.g1 import (
+    G1_ACTION_SCALE,
+    G1_CYLINDER_CFG,
+)
+
+
+@configclass
+class G1FlatEnvCfg(TrackingEnvCfg):
+    def __post_init__(self):
+        super().__post_init__()
+
+        self.scene.robot = G1_CYLINDER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        self.actions.joint_pos.scale = G1_ACTION_SCALE
+        self.commands.motion.reference_body = "torso_link"
+        self.commands.motion.body_names = [
+            "pelvis",
+            "left_hip_yaw_link",
+            "left_knee_link",
+            "left_ankle_roll_link",
+            "right_hip_yaw_link",
+            "right_knee_link",
+            "right_ankle_roll_link",
+            "torso_link",
+            "left_shoulder_yaw_link",
+            "left_elbow_link",
+            "left_wrist_yaw_link",
+            "right_shoulder_yaw_link",
+            "right_elbow_link",
+            "right_wrist_yaw_link",
+        ]
+        self.rewards.foot_contact_velocity.params["body_names"] = [
+            "left_ankle_roll_link",
+            "right_ankle_roll_link",
+        ]
+        self.rewards.undesired_contacts.params["sensor_cfg"].body_names = [
+            r"^(?!left_ankle_roll_link$)(?!right_ankle_roll_link$)(?!left_wrist_yaw_link$)(?!right_wrist_yaw_link$).+$"
+        ]
+        self.events.knee_link_com.params["asset_cfg"].body_names = [
+            "left_knee_link",
+            "right_knee_link",
+        ]
+        self.events.pelvis_com.params["asset_cfg"].body_names = ["pelvis"]
+
+        self.terminations.ee_body_pos_knee.params["body_names"] = [
+            "left_knee_link",
+            "right_knee_link",
+        ]
+        self.terminations.ee_body_pos_ankle.params["body_names"] = [
+            "left_ankle_roll_link",
+            "right_ankle_roll_link",
+        ]
+        self.terminations.ee_body_pos_wrist.params["body_names"] = [
+            "left_wrist_yaw_link",
+            "right_wrist_yaw_link",
+        ]
+
+
+@configclass
+class G1FlatPureEnvCfg(G1FlatEnvCfg):
+    def __post_init__(self):
+        super().__post_init__()
+        self.commands.motion.future_frames = 0
+        self.observations.proprioception_with_noise_wo_privilege.history_length = 0
+        self.observations.proprioception.history_length = 0
+
+        self.events.physics_material = None
+        self.events.add_joint_default_pos = None
+        self.events.base_com = None
+        self.events.pelvis_com = None
+        self.events.knee_link_com = None
+        self.events.robot_scale_mass = None
+        self.events.robot_joint_stiffness_and_damping = None
+        self.events.push_robot = None
+
+        self.commands.motion.velocity_range = {
+            "x": (-0.0, 0.0),
+            "y": (-0.0, 0.0),
+            "z": (-0.0, 0.0),
+            "roll": (-0.0, 0.0),
+            "pitch": (-0.0, 0.0),
+            "yaw": (-0.0, 0.0),
+        }
+        self.commands.motion.joint_position_range = (-0.0, 0.0)
+
+
+@configclass
+class G1FlatDistillEnvCfg(G1FlatEnvCfg):
+    def __post_init__(self):
+        super().__post_init__()
+        self.commands.motion.future_frames = 10
+        self.observations.proprioception_with_noise_wo_privilege.history_length = 8
+        self.observations.proprioception.history_length = 8
+
+
+@configclass
+class G1FlatTeacherEnvCfg(TeacherTrackingEnvCfg):
+    def __post_init__(self):
+        super().__post_init__()
+
+        self.scene.robot = G1_CYLINDER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        self.actions.joint_pos.scale = G1_ACTION_SCALE
+        self.commands.motion.reference_body = "torso_link"
+        self.commands.motion.body_names = [
+            "pelvis_link",
+            "L_hip_yaw_link",
+            "L_knee_link",
+            "L_ankle_roll_link",
+            "R_hip_yaw_link",
+            "R_knee_link",
+            "R_ankle_roll_link",
+            "torso_link",
+            "L_shoulder_roll_link",
+            "L_elbow_link",
+            "L_wrist_pitch_link",
+            "R_shoulder_roll_link",
+            "R_elbow_link",
+            "R_wrist_pitch_link",
+            "head_pitch_link",
+        ]
+
+
+@configclass
+class PureG1FlatEnvCfg(PureTrackingEnvCfg):
+    def __post_init__(self):
+        super().__post_init__()
+
+        self.scene.robot = G1_CYLINDER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        self.actions.joint_pos.scale = G1_ACTION_SCALE
+        self.commands.motion.reference_body = "torso_link"
+        self.commands.motion.body_names = [
+            "pelvis_link",
+            "L_hip_yaw_link",
+            "L_knee_link",
+            "L_ankle_roll_link",
+            "R_hip_yaw_link",
+            "R_knee_link",
+            "R_ankle_roll_link",
+            "torso_link",
+            "L_shoulder_roll_link",
+            "L_elbow_link",
+            "L_wrist_pitch_link",
+            "R_shoulder_roll_link",
+            "R_elbow_link",
+            "R_wrist_pitch_link",
+            "head_pitch_link",
+        ]
+
+
+@configclass
+class DissG1FlatEnvCfg(DissTrackingEnvCfg):
+    def __post_init__(self):
+        super().__post_init__()
+
+        self.scene.robot = G1_CYLINDER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        self.actions.joint_pos.scale = G1_ACTION_SCALE
+        self.commands.motion.reference_body = "torso_link"
+        self.commands.motion.body_names = [
+            "pelvis_link",
+            "L_hip_yaw_link",
+            "L_knee_link",
+            "L_ankle_roll_link",
+            "R_hip_yaw_link",
+            "R_knee_link",
+            "R_ankle_roll_link",
+            "torso_link",
+            "L_shoulder_roll_link",
+            "L_elbow_link",
+            "L_wrist_pitch_link",
+            "R_shoulder_roll_link",
+            "R_elbow_link",
+            "R_wrist_pitch_link",
+            "head_pitch_link",
+        ]
