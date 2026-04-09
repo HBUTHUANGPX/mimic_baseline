@@ -203,3 +203,36 @@ class MotionLoader_robot:
             if valid_start < valid_end:
                 valid_center_mask[valid_start:valid_end] = True
         return valid_center_mask
+
+# Example usage:
+if __name__ == "__main__":
+    try:
+        from scripts.rsl_rl.load_motion_file import collect_npz_paths
+    except ModuleNotFoundError:
+        import importlib.util
+        from pathlib import Path
+
+        repo_root = Path(__file__).resolve().parents[5]
+        module_path = repo_root / "scripts" / "rsl_rl" / "load_motion_file.py"
+        spec = importlib.util.spec_from_file_location("load_motion_file", module_path)
+        if spec is None or spec.loader is None:
+            raise ModuleNotFoundError(f"Unable to load module from {module_path}")
+        load_motion_file = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(load_motion_file)
+        collect_npz_paths = load_motion_file.collect_npz_paths
+
+    motion_file_path = "scripts/rsl_rl/motion_file.yaml"
+    motion_file_group = collect_npz_paths(motion_file_path)
+    for group_name, paths in motion_file_group.items():
+        print(f"\nGroup: {group_name}")
+        print(f"[INFO] Collected {len(paths)} motion files for training.")
+
+    ml_r = MotionLoader_robot(
+        motion_file_group=motion_file_group,
+        body_indexes=[0, 1, 2],
+        history_frames=2,
+        future_frames=2,
+        device="cuda:0",
+    )
+
+    
