@@ -55,15 +55,18 @@ class MotionLoader_robot:
         self.future_frames = future_frames
         self.window_size = history_frames + future_frames + 1
 
-        joint_pos_list: list[torch.Tensor] = []
-        joint_vel_list: list[torch.Tensor] = []
-        body_pos_w_list: list[torch.Tensor] = []
-        body_quat_w_list: list[torch.Tensor] = []
-        body_lin_vel_w_list: list[torch.Tensor] = []
-        body_ang_vel_w_list: list[torch.Tensor] = []
-        motion_id_list: list[torch.Tensor] = []
-        motion_group_list: list[torch.Tensor] = []
+        # === 优化1：收集 NumPy 数组而非直接转 Tensor ===
+        np_joint_pos_list: list[np.ndarray] = []
+        np_joint_vel_list: list[np.ndarray] = []
+        np_body_pos_w_list: list[np.ndarray] = []
+        np_body_quat_w_list: list[np.ndarray] = []
+        np_body_lin_vel_w_list: list[np.ndarray] = []
+        np_body_ang_vel_w_list: list[np.ndarray] = []
 
+        # motion_id_list: list[torch.Tensor] = []
+        # motion_group_list: list[torch.Tensor] = []
+        motion_group_list: list[int] = []      # 仅存标量值，后续批量构造
+        motion_id_list: list[int] = []         # 同上
         motion_group_index = 0
         for group_name, paths in motion_file_group.items():
             normalized_paths = self._normalize_paths(paths)
@@ -82,50 +85,21 @@ class MotionLoader_robot:
                 data = np.load(motion_path)
                 self._validate_fps(data)
 
-                joint_pos_tensor = torch.tensor(
-                    data["joint_pos"], dtype=torch.float32, device=device
-                )
-                num_frames = joint_pos_tensor.shape[0]
+                # 直接收集 NumPy 数组
+                np_joint_pos_list.append(data["joint_pos"].astype(np.float32))
+                np_joint_vel_list.append(data["joint_vel"].astype(np.float32))
+                np_body_pos_w_list.append(data["body_pos_w"].astype(np.float32))
+                np_body_quat_w_list.append(data["body_quat_w"].astype(np.float32))
+                np_body_lin_vel_w_list.append(data["body_lin_vel_w"].astype(np.float32))
+                np_body_ang_vel_w_list.append(data["body_ang_vel_w"].astype(np.float32))
 
-                joint_pos_list.append(joint_pos_tensor)
-                joint_vel_list.append(
-                    torch.tensor(data["joint_vel"], dtype=torch.float32, device=device)
-                )
-                body_pos_w_list.append(
-                    torch.tensor(data["body_pos_w"], dtype=torch.float32, device=device)
-                )
-                body_quat_w_list.append(
-                    torch.tensor(
-                        data["body_quat_w"], dtype=torch.float32, device=device
-                    )
-                )
-                body_lin_vel_w_list.append(
-                    torch.tensor(
-                        data["body_lin_vel_w"], dtype=torch.float32, device=device
-                    )
-                )
-                body_ang_vel_w_list.append(
-                    torch.tensor(
-                        data["body_ang_vel_w"], dtype=torch.float32, device=device
-                    )
-                )
-                motion_group_list.append(
-                    torch.full(
-                        (num_frames, 1),
-                        motion_group_index,
-                        dtype=torch.float32,
-                        device=device,
-                    )
-                )
-                motion_id_list.append(
-                    torch.full(
-                        (num_frames, 1),
-                        self.num_motions + local_motion_id,
-                        dtype=torch.float32,
-                        device=device,
-                    )
-                )
+                num_frames = np_joint_pos_list[-1].shape[0]
                 self.motion_lengths.append(num_frames)
+
+                motion_group_list.extend([motion_group_index] * num_frames)
+                motion_id_list.extend(
+                    [self.num_motions + local_motion_id] * num_frames
+                )
 
             self.extracted_list.extend(extracted_list)
             self.group_names.append(group_name)
@@ -134,23 +108,27 @@ class MotionLoader_robot:
 
         assert self.num_motions > 0, "At least one motion file is required."
 
-        self.joint_pos = torch.cat(joint_pos_list, dim=0)
-        self.joint_vel = torch.cat(joint_vel_list, dim=0)
-        self._body_pos_w = torch.cat(body_pos_w_list, dim=0)
-        self._body_quat_w = torch.cat(body_quat_w_list, dim=0)
-        self._body_lin_vel_w = torch.cat(body_lin_vel_w_list, dim=0)
-        self._body_ang_vel_w = torch.cat(body_ang_vel_w_list, dim=0)
-        self._motion_id = torch.cat(motion_id_list, dim=0)
-        self._motion_group = torch.cat(motion_group_list, dim=0)
-
+        self.joint_pos = self.np_list_to_tensor(np_joint_pos_list,device)
+        self.joint_vel = self.np_list_to_tensor(np_joint_vel_list, device)
+        self._body_pos_w = self.np_list_to_tensor(np_body_pos_w_list, device)
+        self._body_quat_w = self.np_list_to_tensor(np_body_quat_w_list, device)
+        self._body_lin_vel_w = self.np_list_to_tensor(np_body_lin_vel_w_list, device)
+        self._body_ang_vel_w = self.np_list_to_tensor(np_body_ang_vel_w_list, device)
+        
         self.body_pos_w = self._body_pos_w[:, self._body_indexes]
         self.body_quat_w = self._body_quat_w[:, self._body_indexes]
         self.body_lin_vel_w = self._body_lin_vel_w[:, self._body_indexes]
         self.body_ang_vel_w = self._body_ang_vel_w[:, self._body_indexes]
 
+        self._motion_id = torch.tensor(
+            motion_id_list, dtype=torch.long, device=device
+        ).unsqueeze(1)
+        self._motion_group = torch.tensor(
+            motion_group_list, dtype=torch.long, device=device
+        ).unsqueeze(1)
+        
         self.time_step_total = self.joint_pos.shape[0]
         self.motion_indices = self._build_motion_indices(device)
-        self.new_data_flag = self._build_new_data_flag(device)
         self.window_offsets = torch.arange(
             -self.history_frames,
             self.future_frames + 1,
@@ -165,6 +143,10 @@ class MotionLoader_robot:
             self.valid_center_indices.numel() > 0
         ), "No valid center frames found for the configured window size."
 
+    def np_list_to_tensor(self, np_list: list[np.ndarray], device: str) -> torch.Tensor:
+        """Convert a NumPy array to a PyTorch tensor on the appropriate device."""
+        return torch.from_numpy(np.concatenate(np_list, axis=0)).to(device)
+
     def extract_part(self,path: str) -> str | None:
         """Extract an artifact-relative motion path."""
         if path.startswith("artifacts/"):
@@ -172,7 +154,7 @@ class MotionLoader_robot:
             if relative_path.endswith(".npz"):
                 return relative_path
         return None
-    
+
     def _normalize_paths(self, paths: list[str] | str) -> list[str]:
         """Convert a path input to a normalized list."""
         if isinstance(paths, str):
@@ -204,18 +186,6 @@ class MotionLoader_robot:
             start = end
         return motion_indices
 
-    def _build_new_data_flag(self, device: str) -> torch.Tensor:
-        """Mark the first frame of every trajectory except the first one."""
-        new_data_flag = torch.zeros(
-            self.time_step_total, dtype=torch.bool, device=device
-        )
-        cumulative_length = 0
-        for motion_id, length in enumerate(self.motion_lengths):
-            if motion_id > 0:
-                new_data_flag[cumulative_length] = True
-            cumulative_length += length
-        return new_data_flag
-
     def _build_valid_center_mask(self, device: str) -> torch.Tensor:
         """Mark frame indices that can serve as valid window centers.
 
@@ -238,4 +208,3 @@ class MotionLoader_robot:
             if valid_start < valid_end:
                 valid_center_mask[valid_start:valid_end] = True
         return valid_center_mask
-
