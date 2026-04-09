@@ -79,32 +79,31 @@ class MotionCommand(CommandTerm):
             device=self.device,
         )
         self.kernel = self.kernel / self.kernel.sum()
+        self._perpare_metrics()
 
-        self.metrics["error_anchor_pos"] = torch.zeros(
-            self.num_envs, device=self.device
-        )
-        self.metrics["error_anchor_rot"] = torch.zeros(
-            self.num_envs, device=self.device
-        )
-        self.metrics["error_anchor_lin_vel"] = torch.zeros(
-            self.num_envs, device=self.device
-        )
-        self.metrics["error_anchor_ang_vel"] = torch.zeros(
-            self.num_envs, device=self.device
-        )
-        self.metrics["error_body_pos"] = torch.zeros(self.num_envs, device=self.device)
-        self.metrics["error_body_rot"] = torch.zeros(self.num_envs, device=self.device)
-        self.metrics["error_joint_pos"] = torch.zeros(self.num_envs, device=self.device)
-        self.metrics["error_joint_vel"] = torch.zeros(self.num_envs, device=self.device)
-        self.metrics["sampling_entropy"] = torch.zeros(
-            self.num_envs, device=self.device
-        )
-        self.metrics["sampling_top1_prob"] = torch.zeros(
-            self.num_envs, device=self.device
-        )
-        self.metrics["sampling_top1_bin"] = torch.zeros(
-            self.num_envs, device=self.device
-        )
+    def _perpare_metrics(self):
+        self.metrics["error_anchor_pos"] = \
+            torch.zeros(self.num_envs, device=self.device)
+        self.metrics["error_anchor_rot"] = \
+            torch.zeros(self.num_envs, device=self.device)
+        self.metrics["error_anchor_lin_vel"] = \
+            torch.zeros(self.num_envs, device=self.device)
+        self.metrics["error_anchor_ang_vel"] = \
+            torch.zeros(self.num_envs, device=self.device)
+        self.metrics["error_body_pos"] = \
+            torch.zeros(self.num_envs, device=self.device)
+        self.metrics["error_body_rot"] = \
+            torch.zeros(self.num_envs, device=self.device)
+        self.metrics["error_joint_pos"] = \
+            torch.zeros(self.num_envs, device=self.device)
+        self.metrics["error_joint_vel"] = \
+            torch.zeros(self.num_envs, device=self.device)
+        self.metrics["sampling_entropy"] = \
+            torch.zeros(self.num_envs, device=self.device)
+        self.metrics["sampling_top1_prob"] = \
+            torch.zeros(self.num_envs, device=self.device)
+        self.metrics["sampling_top1_bin"] = \
+            torch.zeros(self.num_envs, device=self.device)
 
     @property
     def command(

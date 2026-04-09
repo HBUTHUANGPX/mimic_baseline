@@ -40,18 +40,35 @@ class MotionLoader:
 class MotionLoader_robot:
     def __init__(
         self,
-        motion_file_group: dict[str, list[str] | str],
-        body_indexes: Sequence[int],
-        history_frames: int,
-        future_frames: int,
+        motion_file_group: dict[str, list[str] | str] | str,
+        body_indexes: Sequence[int] | None = None,
+        body_names: Sequence[int] | None = None,
+        history_frames: int = 0,
+        future_frames: int = 0,
         device: str = "cpu",
     ) -> None:
+        if isinstance(motion_file_group, str):
+            motion_file_group = {"default": motion_file_group}
+        
         self.group_names: list[str] = []
         self.extracted_list: list[str] = []
         self.motion_lengths: list[int] = []
         self.num_motions = 0
         self.fps = None
         self._body_indexes = body_indexes
+        self._body_names = body_names
+        # TODO:
+        if body_indexes is None and body_names is None:
+            ...# 不能都为None，否则无法确定要加载哪些身体部位的数据
+        elif body_indexes is not None and body_names is not None:
+            ...# 不能同时指定索引和名称，否则可能会出现冲突或不一致的情况，导致加载错误的数据或引发混淆,
+            ...# 此时抛出warn,建议用户指定一种方式来选择身体部位的数据
+            ...# 此时实际的self._body_indexes由 body_indexes 确定
+        elif body_indexes is not None and body_names is None:
+            ...# 此时实际的self._body_indexes由 body_indexes 确定
+        elif body_indexes is None and body_names is not None:
+            ...# 此时实际的self._body_indexes由 body_names 确定,但需要确定后续的motion文件中含有相应的key
+        
         self.history_frames = history_frames
         self.future_frames = future_frames
         self.window_size = history_frames + future_frames + 1
