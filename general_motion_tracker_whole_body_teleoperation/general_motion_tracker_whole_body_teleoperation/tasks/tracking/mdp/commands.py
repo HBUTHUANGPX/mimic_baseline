@@ -12,12 +12,15 @@ from isaaclab.markers import VisualizationMarkers, VisualizationMarkersCfg
 from isaaclab.markers.config import FRAME_MARKER_CFG
 from isaaclab.utils import configclass
 from isaaclab.utils.math import (
+    matrix_from_quat,
     quat_apply,
+    quat_apply_inverse,
     quat_error_magnitude,
     quat_from_euler_xyz,
     quat_inv,
     quat_mul,
     sample_uniform,
+    subtract_frame_transforms,
     yaw_quat,
 )
 
@@ -80,6 +83,14 @@ class MotionCommand(CommandTerm):
         )
         self.kernel = self.kernel / self.kernel.sum()
         self._perpare_metrics()
+        
+        self._update_motion_cache()
+        self._update_robot_state_cache()
+        self._make_calculate()
+
+    @property
+    def command(self) -> torch.Tensor:
+        return self._command
 
     def _perpare_metrics(self):
         self.metrics["error_anchor_pos"] = \
@@ -104,47 +115,22 @@ class MotionCommand(CommandTerm):
             torch.zeros(self.num_envs, device=self.device)
         self.metrics["sampling_top1_bin"] = \
             torch.zeros(self.num_envs, device=self.device)
-
-    @property
-    def command(
-        self,
-    ) -> torch.Tensor:  # TODO Consider again if this is the best observation
-        return torch.cat([self.joint_pos, self.joint_vel], dim=1)
-
+        self.metrics["error_body_lin_vel"] = \
+            torch.zeros(self.num_envs, device=self.device)
+        self.metrics["error_body_ang_vel"] = \
+            torch.zeros(self.num_envs, device=self.device)
+        
     def _update_metrics(self):
-        self.metrics["error_anchor_pos"] = torch.norm(
-            self.anchor_pos_w - self.robot_anchor_pos_w, dim=-1
-        )
-        self.metrics["error_anchor_rot"] = quat_error_magnitude(
-            self.anchor_quat_w, self.robot_anchor_quat_w
-        )
-        self.metrics["error_anchor_lin_vel"] = torch.norm(
-            self.anchor_lin_vel_w - self.robot_anchor_lin_vel_w, dim=-1
-        )
-        self.metrics["error_anchor_ang_vel"] = torch.norm(
-            self.anchor_ang_vel_w - self.robot_anchor_ang_vel_w, dim=-1
-        )
-
-        self.metrics["error_body_pos"] = torch.norm(
-            self.body_pos_relative_w - self.robot_body_pos_w, dim=-1
-        ).mean(dim=-1)
-        self.metrics["error_body_rot"] = quat_error_magnitude(
-            self.body_quat_relative_w, self.robot_body_quat_w
-        ).mean(dim=-1)
-
-        self.metrics["error_body_lin_vel"] = torch.norm(
-            self.body_lin_vel_w - self.robot_body_lin_vel_w, dim=-1
-        ).mean(dim=-1)
-        self.metrics["error_body_ang_vel"] = torch.norm(
-            self.body_ang_vel_w - self.robot_body_ang_vel_w, dim=-1
-        ).mean(dim=-1)
-
-        self.metrics["error_joint_pos"] = torch.norm(
-            self.joint_pos - self.robot_joint_pos, dim=-1
-        )
-        self.metrics["error_joint_vel"] = torch.norm(
-            self.joint_vel - self.robot_joint_vel, dim=-1
-        )
+        self.metrics["error_anchor_pos"] = self.anchor_pos_error_norm
+        self.metrics["error_anchor_rot"] = self.anchor_rot_error
+        self.metrics["error_anchor_lin_vel"] = self.anchor_lin_vel_error_norm
+        self.metrics["error_anchor_ang_vel"] = self.anchor_ang_vel_error_norm
+        self.metrics["error_body_pos"] = self.body_pos_error_norm.mean(dim=-1)
+        self.metrics["error_body_rot"] = self.body_rot_error.mean(dim=-1)
+        self.metrics["error_body_lin_vel"] = self.body_lin_vel_error_norm.mean(dim=-1)
+        self.metrics["error_body_ang_vel"] = self.body_ang_vel_error_norm.mean(dim=-1)
+        self.metrics["error_joint_pos"] = self.joint_pos_error_norm
+        self.metrics["error_joint_vel"] = self.joint_vel_error_norm
 
     def _adaptive_sampling(self, env_ids: Sequence[int]):
         episode_failed = self._env.termination_manager.terminated[env_ids]
@@ -237,8 +223,96 @@ class MotionCommand(CommandTerm):
         self.robot_anchor_ang_vel_w = self.robot.data.body_ang_vel_w[:, self.robot_anchor_body_index].clone()
 
     def _make_calculate(self):
-        
-        ...
+        num_bodies = len(self.cfg.body_names)
+        anchor_pos_w_repeat = self.anchor_pos_w[:, None, :].expand(-1, num_bodies, -1)
+        anchor_quat_w_repeat = self.anchor_quat_w[:, None, :].expand(
+            -1, num_bodies, -1
+        )
+        robot_anchor_pos_w_repeat = self.robot_anchor_pos_w[:, None, :].expand(
+            -1, num_bodies, -1
+        )
+        robot_anchor_quat_w_repeat = self.robot_anchor_quat_w[:, None, :].expand(
+            -1, num_bodies, -1
+        )
+
+        # Build legacy command tensor once per step.
+        self._command = torch.cat([self.joint_pos, self.joint_vel], dim=1)
+        self.robot_anchor_vel_w = torch.cat(
+            [self.robot_anchor_lin_vel_w, self.robot_anchor_ang_vel_w], dim=-1
+        )
+        self.joint_pos_delta = self.joint_pos - self.robot_joint_pos
+
+        # Global-anchor alignment used by rewards/terminations.
+        delta_pos_w = robot_anchor_pos_w_repeat.clone()
+        delta_pos_w[..., 2] = anchor_pos_w_repeat[..., 2]
+        delta_ori_w = yaw_quat(
+            quat_mul(robot_anchor_quat_w_repeat, quat_inv(anchor_quat_w_repeat))
+        )
+        self.body_quat_relative_w = quat_mul(delta_ori_w, self.body_quat_w)
+        self.body_pos_relative_w = delta_pos_w + quat_apply(
+            delta_ori_w, self.body_pos_w - anchor_pos_w_repeat
+        )
+
+        # Robot anchor orientation in 6D representation.
+        robot_anchor_ori_mat = matrix_from_quat(self.robot_anchor_quat_w)
+        self.robot_anchor_ori_w = robot_anchor_ori_mat[..., :2].reshape(
+            self.num_envs, -1
+        )
+
+        # Robot body pose in robot-anchor frame.
+        robot_body_pos_b, robot_body_ori_b = subtract_frame_transforms(
+            robot_anchor_pos_w_repeat,
+            robot_anchor_quat_w_repeat,
+            self.robot_body_pos_w,
+            self.robot_body_quat_w,
+        )
+        self.robot_body_pos_b = robot_body_pos_b
+        self.robot_body_ori_b = matrix_from_quat(robot_body_ori_b)[..., :2].reshape(
+            self.num_envs, -1
+        )
+
+        # Motion anchor pose in robot-anchor frame.
+        motion_anchor_pos_b, motion_anchor_ori_b = subtract_frame_transforms(
+            self.robot_anchor_pos_w,
+            self.robot_anchor_quat_w,
+            self.anchor_pos_w,
+            self.anchor_quat_w,
+        )
+        self.motion_anchor_pos_b = motion_anchor_pos_b
+        self.motion_anchor_ori_b = matrix_from_quat(motion_anchor_ori_b)[..., :2].reshape(
+            self.num_envs, -1
+        )
+
+        # Shared error tensors used by rewards/terminations/metrics.
+        self.anchor_pos_error = self.anchor_pos_w - self.robot_anchor_pos_w
+        self.anchor_lin_vel_error = self.anchor_lin_vel_w - self.robot_anchor_lin_vel_w
+        self.anchor_ang_vel_error = self.anchor_ang_vel_w - self.robot_anchor_ang_vel_w
+        self.anchor_rot_error = quat_error_magnitude(
+            self.anchor_quat_w, self.robot_anchor_quat_w
+        )
+        self.body_pos_error = self.body_pos_relative_w - self.robot_body_pos_w
+        self.body_rot_error = quat_error_magnitude(
+            self.body_quat_relative_w, self.robot_body_quat_w
+        )
+        self.body_lin_vel_error = self.body_lin_vel_w - self.robot_body_lin_vel_w
+        self.body_ang_vel_error = self.body_ang_vel_w - self.robot_body_ang_vel_w
+        self.joint_pos_error = self.joint_pos - self.robot_joint_pos
+        self.joint_vel_error = self.joint_vel - self.robot_joint_vel
+
+        self.anchor_pos_error_norm = torch.norm(self.anchor_pos_error, dim=-1)
+        self.anchor_lin_vel_error_norm = torch.norm(self.anchor_lin_vel_error, dim=-1)
+        self.anchor_ang_vel_error_norm = torch.norm(self.anchor_ang_vel_error, dim=-1)
+        self.body_pos_error_norm = torch.norm(self.body_pos_error, dim=-1)
+        self.body_lin_vel_error_norm = torch.norm(self.body_lin_vel_error, dim=-1)
+        self.body_ang_vel_error_norm = torch.norm(self.body_ang_vel_error, dim=-1)
+        self.joint_pos_error_norm = torch.norm(self.joint_pos_error, dim=-1)
+        self.joint_vel_error_norm = torch.norm(self.joint_vel_error, dim=-1)
+
+        gravity_w = self.robot.data.GRAVITY_VEC_W
+        self.motion_projected_gravity_b = quat_apply_inverse(self.anchor_quat_w, gravity_w)
+        self.robot_projected_gravity_b = quat_apply_inverse(
+            self.robot_anchor_quat_w, gravity_w
+        )
 
     def _reset_env_by_motion(self, env_ids: Sequence[int]):
         root_pos = self.body_pos_w[:, 0].clone()
@@ -301,30 +375,6 @@ class MotionCommand(CommandTerm):
         self.time_steps += 1
         env_ids = torch.where(self.time_steps >= self.motion.time_step_total)[0]
         self._resample_command(env_ids)
-
-        anchor_pos_w_repeat = self.anchor_pos_w[:, None, :].repeat(
-            1, len(self.cfg.body_names), 1
-        )
-        anchor_quat_w_repeat = self.anchor_quat_w[:, None, :].repeat(
-            1, len(self.cfg.body_names), 1
-        )
-        robot_anchor_pos_w_repeat = self.robot_anchor_pos_w[:, None, :].repeat(
-            1, len(self.cfg.body_names), 1
-        )
-        robot_anchor_quat_w_repeat = self.robot_anchor_quat_w[:, None, :].repeat(
-            1, len(self.cfg.body_names), 1
-        )
-
-        delta_pos_w = robot_anchor_pos_w_repeat
-        delta_pos_w[..., 2] = anchor_pos_w_repeat[..., 2]
-        delta_ori_w = yaw_quat(
-            quat_mul(robot_anchor_quat_w_repeat, quat_inv(anchor_quat_w_repeat))
-        )
-
-        self.body_quat_relative_w = quat_mul(delta_ori_w, self.body_quat_w)
-        self.body_pos_relative_w = delta_pos_w + quat_apply(
-            delta_ori_w, self.body_pos_w - anchor_pos_w_repeat
-        )
 
         self.bin_failed_count = (
             self.cfg.adaptive_alpha * self._current_bin_failed
