@@ -301,7 +301,9 @@ class MotionCommand(CommandTerm):
         if len(env_ids) == 0:
             return
         self._adaptive_sampling(env_ids)
-
+        self._reset_env_by_motion(env_ids)
+        
+    def _reset_env_by_motion(self, env_ids: Sequence[int]):
         root_pos = self.body_pos_w[:, 0].clone()
         root_ori = self.body_quat_w[:, 0].clone()
         root_lin_vel = self.body_lin_vel_w[:, 0].clone()
