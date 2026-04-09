@@ -111,106 +111,6 @@ class MotionCommand(CommandTerm):
     ) -> torch.Tensor:  # TODO Consider again if this is the best observation
         return torch.cat([self.joint_pos, self.joint_vel], dim=1)
 
-    @property
-    def joint_pos(self) -> torch.Tensor:
-        return self.motion.joint_pos[self.time_steps]
-
-    @property
-    def joint_vel(self) -> torch.Tensor:
-        return self.motion.joint_vel[self.time_steps]
-
-    @property
-    def body_pos_w(self) -> torch.Tensor:
-        return (
-            self.motion.body_pos_w[self.time_steps]
-            + self._env.scene.env_origins[:, None, :]
-        )
-
-    @property
-    def body_quat_w(self) -> torch.Tensor:
-        return self.motion.body_quat_w[self.time_steps]
-
-    @property
-    def body_lin_vel_w(self) -> torch.Tensor:
-        return self.motion.body_lin_vel_w[self.time_steps]
-
-    @property
-    def body_ang_vel_w(self) -> torch.Tensor:
-        return self.motion.body_ang_vel_w[self.time_steps]
-
-    @property
-    def anchor_pos_w(self) -> torch.Tensor:
-        return (
-            self.motion.body_pos_w[self.time_steps, self.motion_anchor_body_index]
-            + self._env.scene.env_origins
-        )
-
-    @property
-    def anchor_quat_w(self) -> torch.Tensor:
-        return self.motion.body_quat_w[self.time_steps, self.motion_anchor_body_index]
-
-    @property
-    def anchor_lin_vel_w(self) -> torch.Tensor:
-        return self.motion.body_lin_vel_w[
-            self.time_steps, self.motion_anchor_body_index
-        ]
-
-    @property
-    def anchor_ang_vel_w(self) -> torch.Tensor:
-        return self.motion.body_ang_vel_w[
-            self.time_steps, self.motion_anchor_body_index
-        ]
-
-    @property
-    def robot_joint_pos(self) -> torch.Tensor:
-        return self.robot.data.joint_pos
-
-    @property
-    def robot_joint_vel(self) -> torch.Tensor:
-        return self.robot.data.joint_vel
-
-    @property
-    def robot_body_pos_w(self) -> torch.Tensor:
-        return self.robot.data.body_pos_w[:, self.body_indexes]
-
-    @property
-    def robot_body_quat_w(self) -> torch.Tensor:
-        return self.robot.data.body_quat_w[:, self.body_indexes]
-
-    @property
-    def robot_body_lin_vel_w(self) -> torch.Tensor:
-        return self.robot.data.body_lin_vel_w[:, self.body_indexes]
-
-    @property
-    def robot_body_ang_vel_w(self) -> torch.Tensor:
-        return self.robot.data.body_ang_vel_w[:, self.body_indexes]
-
-    @property
-    def robot_anchor_pos_w(self) -> torch.Tensor:
-        return self.robot.data.body_pos_w[:, self.robot_anchor_body_index]
-
-    @property
-    def robot_anchor_quat_w(self) -> torch.Tensor:
-        return self.robot.data.body_quat_w[:, self.robot_anchor_body_index]
-
-    @property
-    def robot_anchor_lin_vel_w(self) -> torch.Tensor:
-        return self.robot.data.body_lin_vel_w[:, self.robot_anchor_body_index]
-
-    @property
-    def robot_anchor_ang_vel_w(self) -> torch.Tensor:
-        return self.robot.data.body_ang_vel_w[:, self.robot_anchor_body_index]
-
-    @property
-    def motion_id(self) -> torch.Tensor:
-        """Return the current motion id for each environment."""
-        return self.motion._motion_id[self.time_steps]
-
-    @property
-    def motion_group(self) -> torch.Tensor:
-        """Return the current motion group id for each environment."""
-        return self.motion._motion_group[self.time_steps]
-    
     def _update_metrics(self):
         self.metrics["error_anchor_pos"] = torch.norm(
             self.anchor_pos_w - self.robot_anchor_pos_w, dim=-1
@@ -299,15 +199,52 @@ class MotionCommand(CommandTerm):
 
     def _resample_command(self, env_ids: Sequence[int]):
         if len(env_ids) == 0:
+            self._update_motion_cache()
+            self._update_robot_state_cache()
             return
-        self._adaptive_sampling(env_ids)
-        self._reset_env_by_motion(env_ids)
+        self._adaptive_sampling(env_ids) # 对time_stamps进行自适应采样
+        self._update_motion_cache()
+        self._reset_env_by_motion(env_ids) # 根据采样的time_stamps对应的motion数据重置环境状态
+        self._update_robot_state_cache()
+
+    def _update_motion_cache(self):
+        # 在time_stamps更新后，更新缓存的motion数据,因为_resample_command在_update_command中被调用,所以当需要reset的env_ids数量为0时也要触发一次
+        self.body_pos_w = self.motion.body_pos_w[self.time_steps] + self._env.scene.env_origins[:, None, :]
+        self.body_quat_w = self.motion.body_quat_w[self.time_steps]
+        self.body_lin_vel_w = self.motion.body_lin_vel_w[self.time_steps]
+        self.body_ang_vel_w = self.motion.body_ang_vel_w[self.time_steps]
+        self.joint_pos = self.motion.joint_pos[self.time_steps]
+        self.joint_vel = self.motion.joint_vel[self.time_steps]
+        self.anchor_pos_w = self.motion.body_pos_w[self.time_steps, self.motion_anchor_body_index] + self._env.scene.env_origins
+        self.anchor_quat_w = self.motion.body_quat_w[self.time_steps, self.motion_anchor_body_index]
+        self.anchor_lin_vel_w = self.motion.body_lin_vel_w[self.time_steps, self.motion_anchor_body_index]
+        self.anchor_ang_vel_w = self.motion.body_ang_vel_w[self.time_steps, self.motion_anchor_body_index]
+        self.motion_id = self.motion._motion_id[self.time_steps]
+        self.motion_group = self.motion._motion_group[self.time_steps]
+
+    def _update_robot_state_cache(self):
+        self.robot_body_pos_w = self.robot.data.body_pos_w[:, self.body_indexes].clone()
+        self.robot_body_quat_w = self.robot.data.body_quat_w[:, self.body_indexes].clone()
+        self.robot_body_lin_vel_w = self.robot.data.body_lin_vel_w[:, self.body_indexes].clone()
+        self.robot_body_ang_vel_w = self.robot.data.body_ang_vel_w[:, self.body_indexes].clone()
+        self.robot_joint_pos = self.robot.data.joint_pos.clone()
+        self.robot_joint_vel = self.robot.data.joint_vel.clone()
+        self.robot_anchor_pos_w = self.robot.data.body_pos_w[:, self.robot_anchor_body_index].clone()
+        self.robot_anchor_quat_w = self.robot.data.body_quat_w[:, self.robot_anchor_body_index].clone()
+        self.robot_anchor_lin_vel_w = self.robot.data.body_lin_vel_w[:, self.robot_anchor_body_index].clone()
+        self.robot_anchor_ang_vel_w = self.robot.data.body_ang_vel_w[:, self.robot_anchor_body_index].clone()
+
+    def _make_calculate(self):
         
+        ...
+
     def _reset_env_by_motion(self, env_ids: Sequence[int]):
         root_pos = self.body_pos_w[:, 0].clone()
         root_ori = self.body_quat_w[:, 0].clone()
         root_lin_vel = self.body_lin_vel_w[:, 0].clone()
         root_ang_vel = self.body_ang_vel_w[:, 0].clone()
+        joint_pos = self.joint_pos.clone()
+        joint_vel = self.joint_vel.clone()
 
         range_list = [
             self.cfg.pose_range.get(key, (0.0, 0.0))
@@ -332,9 +269,6 @@ class MotionCommand(CommandTerm):
         )
         root_lin_vel[env_ids] += rand_samples[:, :3]
         root_ang_vel[env_ids] += rand_samples[:, 3:]
-
-        joint_pos = self.joint_pos.clone()
-        joint_vel = self.joint_vel.clone()
 
         joint_pos += sample_uniform(
             *self.cfg.joint_position_range, joint_pos.shape, joint_pos.device
