@@ -56,12 +56,7 @@ class MotionLoader_robot:
         self.future_frames = future_frames
         self.window_size = history_frames + future_frames + 1
 
-        np_joint_pos_list: list[np.ndarray] = []
-        np_joint_vel_list: list[np.ndarray] = []
-        np_body_pos_w_list: list[np.ndarray] = []
-        np_body_quat_w_list: list[np.ndarray] = []
-        np_body_lin_vel_w_list: list[np.ndarray] = []
-        np_body_ang_vel_w_list: list[np.ndarray] = []
+        self._prepare_np_list()
 
         motion_group_list: list[int] = []
         motion_id_list: list[int] = []
@@ -82,15 +77,9 @@ class MotionLoader_robot:
                 self._validate_motion_file(motion_path)
                 data = np.load(motion_path)
                 self._validate_fps(data)
+                self._append_motion_data(data)
 
-                np_joint_pos_list.append(data["joint_pos"].astype(np.float32))
-                np_joint_vel_list.append(data["joint_vel"].astype(np.float32))
-                np_body_pos_w_list.append(data["body_pos_w"].astype(np.float32))
-                np_body_quat_w_list.append(data["body_quat_w"].astype(np.float32))
-                np_body_lin_vel_w_list.append(data["body_lin_vel_w"].astype(np.float32))
-                np_body_ang_vel_w_list.append(data["body_ang_vel_w"].astype(np.float32))
-
-                num_frames = np_joint_pos_list[-1].shape[0]
+                num_frames = self.np_joint_pos_list[-1].shape[0]
                 self.motion_lengths.append(num_frames)
 
                 motion_group_list.extend([motion_group_index] * num_frames)
@@ -103,17 +92,7 @@ class MotionLoader_robot:
 
         assert self.num_motions > 0, "At least one motion file is required."
 
-        self.joint_pos = self.np_list_to_tensor(np_joint_pos_list, device)
-        self.joint_vel = self.np_list_to_tensor(np_joint_vel_list, device)
-        self._body_pos_w = self.np_list_to_tensor(np_body_pos_w_list, device)
-        self._body_quat_w = self.np_list_to_tensor(np_body_quat_w_list, device)
-        self._body_lin_vel_w = self.np_list_to_tensor(np_body_lin_vel_w_list, device)
-        self._body_ang_vel_w = self.np_list_to_tensor(np_body_ang_vel_w_list, device)
-
-        self.body_pos_w = self._body_pos_w[:, self._body_indexes]
-        self.body_quat_w = self._body_quat_w[:, self._body_indexes]
-        self.body_lin_vel_w = self._body_lin_vel_w[:, self._body_indexes]
-        self.body_ang_vel_w = self._body_ang_vel_w[:, self._body_indexes]
+        self._motion_data_np_list_to_tensor(device)
 
         self._motion_id = torch.tensor(
             motion_id_list, dtype=torch.long, device=device
@@ -137,6 +116,38 @@ class MotionLoader_robot:
         assert (
             self.valid_center_indices.numel() > 0
         ), "No valid center frames found for the configured window size."
+
+    def _prepare_np_list(self):
+        self.np_joint_pos_list: list[np.ndarray] = []
+        self.np_joint_vel_list: list[np.ndarray] = []
+        self.np_body_pos_w_list: list[np.ndarray] = []
+        self.np_body_quat_w_list: list[np.ndarray] = []
+        self.np_body_lin_vel_w_list: list[np.ndarray] = []
+        self.np_body_ang_vel_w_list: list[np.ndarray] = []
+
+    def _append_motion_data(self, data: np.lib.npyio.NpzFile) -> None:
+        self.np_joint_pos_list.append(data["joint_pos"].astype(np.float32))
+        self.np_joint_vel_list.append(data["joint_vel"].astype(np.float32))
+        self.np_body_pos_w_list.append(data["body_pos_w"].astype(np.float32))
+        self.np_body_quat_w_list.append(data["body_quat_w"].astype(np.float32))
+        self.np_body_lin_vel_w_list.append(data["body_lin_vel_w"].astype(np.float32))
+        self.np_body_ang_vel_w_list.append(data["body_ang_vel_w"].astype(np.float32))
+
+    def _motion_data_np_list_to_tensor(self, device: str) -> None:
+        self.joint_pos = self.np_list_to_tensor(self.np_joint_pos_list, device)
+        self.joint_vel = self.np_list_to_tensor(self.np_joint_vel_list, device)
+        self.body_pos_w = self.np_list_to_tensor(self.np_body_pos_w_list, device)[
+            :, self._body_indexes
+        ]
+        self.body_quat_w = self.np_list_to_tensor(self.np_body_quat_w_list, device)[
+            :, self._body_indexes
+        ]
+        self.body_lin_vel_w = self.np_list_to_tensor(
+            self.np_body_lin_vel_w_list, device
+        )[:, self._body_indexes]
+        self.body_ang_vel_w = self.np_list_to_tensor(
+            self.np_body_ang_vel_w_list, device
+        )[:, self._body_indexes]
 
     def np_list_to_tensor(self, np_list: list[np.ndarray], device: str) -> torch.Tensor:
         """Convert a NumPy array to a PyTorch tensor on the appropriate device."""
@@ -204,6 +215,7 @@ class MotionLoader_robot:
                 valid_center_mask[valid_start:valid_end] = True
         return valid_center_mask
 
+
 # Example usage:
 if __name__ == "__main__":
     try:
@@ -234,5 +246,3 @@ if __name__ == "__main__":
         future_frames=2,
         device="cuda:0",
     )
-
-    
