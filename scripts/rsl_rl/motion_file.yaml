@@ -2,13 +2,13 @@ motion_group:
   # ========================== G1 ======================
   xsens_bvh:
     file_name: [ 
-      # "artifacts/g1/xsens_bvh/251203/dance_01_120Hz.npz", 
+      "artifacts/g1/xsens_bvh/251203/dance_01_120Hz.npz", 
       # "artifacts/g1/xsens_bvh/251203/dance_02_120Hz.npz",
       # "artifacts/g1/xsens_bvh/251203/dance_03_120Hz.npz" ,
       # "artifacts/g1/mimic_kit/g1_cartwheel.npz",
       # "artifacts/unitree_g1/AMASS/CMU/90/90_06_stageii.npz",
       # "artifacts/g1/mimic_kit/g1_spinkick.npz"
-      "soma-retargeter/assets/motions/test-export/dance_basic_chaines_180_R_001__A306.npz"
+      # "soma-retargeter/assets/motions/test-export/dance_basic_chaines_180_R_001__A306.npz"
     ]
     # file_name: [ "artifacts/g1/xsens_bvh/251203/03_fast_forward_walk_120Hz.npz", "artifacts/g1/xsens_bvh/251203/01_slowly_forward_walk_120Hz.npz" ]
     # folder_name: ["artifacts/g1/xsens_bvh"]
@@ -86,7 +86,7 @@ motion_group:
   #     ]
   #   folder_name: [
   #     "artifacts/Q1/xsens_bvh",
-  #     "artifacts/Q1/100STYLE",
+  #     # "artifacts/Q1/100STYLE",
   #     # "artifacts/Q1/100STYLE/aa_set_1",
   #   ]
   #   # file_name: []
