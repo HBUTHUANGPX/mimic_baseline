@@ -56,9 +56,9 @@ POSE_RANGE_ZERO = {
     "x": (-0.0, 0.0),
     "y": (-0.0, 0.0),
     "z": (-0.0, 0.0),
-    "roll": (-0., 0.),
-    "pitch": (-0., 0.),
-    "yaw": (-0., 0.),
+    "roll": (-0.0, 0.0),
+    "pitch": (-0.0, 0.0),
+    "yaw": (-0.0, 0.0),
 }
 POSE_RANGE_NORMAL = {
     "x": (-0.1, 0.1),
@@ -76,6 +76,7 @@ POSE_RANGE_HIGH = {
     "pitch": (-0.2, 0.2),
     "yaw": (-0.3, 0.3),
 }
+
 
 @configclass
 class MySceneCfg(InteractiveSceneCfg):
@@ -124,6 +125,7 @@ class MySceneCfg(InteractiveSceneCfg):
 JOINTS_POSITION_RANGE_NORMAL = (-0.1, 0.1)
 JOINTS_POSITION_RANGE_HIGH = (-0.2, 0.2)
 JOINTS_POSITION_RANGE_ZERO = (-0.0, 0.0)
+
 
 @configclass
 class CommandsCfg:
@@ -327,7 +329,8 @@ class ObservationsCfg:
             func=mdp.joint_pos_delta, params={"command_name": "motion"}
         )
         target_joint_pos = ObsTerm(
-            func=mdp.robot_joint_pos, params={"command_name": "motion"},
+            func=mdp.robot_joint_pos,
+            params={"command_name": "motion"},
         )
         motion_ref_pos_b = ObsTerm(
             func=mdp.motion_ref_pos_b,
@@ -399,7 +402,8 @@ class ObservationsCfg:
             func=mdp.joint_pos_delta_window, params={"command_name": "motion"}
         )
         target_joint_pos = ObsTerm(
-            func=mdp.robot_joint_pos_window, params={"command_name": "motion"},
+            func=mdp.robot_joint_pos_window,
+            params={"command_name": "motion"},
         )
         motion_ref_pos_b = ObsTerm(
             func=mdp.motion_ref_pos_b_window,
@@ -443,19 +447,21 @@ class ObservationsCfg:
     policy: PolicyCfg = PolicyCfg()
     critic: PrivilegedCfg = PrivilegedCfg()
 
-
-    
     # Use the window-backed command observations. When history_frames and
     # future_frames are both zero, these terms reduce exactly to the original
     # single-frame observations and can be used to validate correctness before
     # enabling larger temporal windows.
-    command_with_noise_wo_privilege : CommandWindowWithNoiseWOPrivilegeCfg = CommandWindowWithNoiseWOPrivilegeCfg()  # 有噪 无特权 cmd
+    command_with_noise_wo_privilege: CommandWindowWithNoiseWOPrivilegeCfg = (
+        CommandWindowWithNoiseWOPrivilegeCfg()
+    )  # 有噪 无特权 cmd
     # command_with_noise_wo_privilege : CommandWithNoiseWOPrivilegeCfg = CommandWithNoiseWOPrivilegeCfg()  # 有噪 无特权 cmd
-    proprioception_with_noise_wo_privilege : ProprioceptionWithNoiseWOPrivilegeCfg = ProprioceptionWithNoiseWOPrivilegeCfg()  # 有噪 无特权 本体
+    proprioception_with_noise_wo_privilege: ProprioceptionWithNoiseWOPrivilegeCfg = (
+        ProprioceptionWithNoiseWOPrivilegeCfg()
+    )  # 有噪 无特权 本体
 
     command: CommandWindowCfg = CommandWindowCfg()  # 无噪 特权 cmd
     # command: CommandCfg = CommandCfg()  # 无噪 特权 cmd
-    proprioception: ProprioceptionCfg = ProprioceptionCfg() # 无噪 特权 本体
+    proprioception: ProprioceptionCfg = ProprioceptionCfg()  # 无噪 特权 本体
     last_action: LastActionCfg = LastActionCfg()
 
     motion_id: MotionIdCfg = MotionIdCfg()
@@ -669,4 +675,3 @@ class CurriculumCfg:
     """Curriculum terms for the MDP."""
 
     pass
-

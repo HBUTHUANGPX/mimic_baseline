@@ -375,7 +375,10 @@ class LegacyBinAdaptiveSampling(AdaptiveSamplingModule):
             command.bin_count, dtype=torch.float32, device=command.device
         )
         self.kernel = torch.tensor(
-            [command.cfg.adaptive_lambda**i for i in range(command.cfg.adaptive_kernel_size)],
+            [
+                command.cfg.adaptive_lambda**i
+                for i in range(command.cfg.adaptive_kernel_size)
+            ],
             dtype=torch.float32,
             device=command.device,
         )
@@ -758,12 +761,8 @@ class MotionCommand(CommandTerm):
         )
         self.metrics["error_body_pos"] = torch.zeros(self.num_envs, device=self.device)
         self.metrics["error_body_rot"] = torch.zeros(self.num_envs, device=self.device)
-        self.metrics["error_joint_pos"] = torch.zeros(
-            self.num_envs, device=self.device
-        )
-        self.metrics["error_joint_vel"] = torch.zeros(
-            self.num_envs, device=self.device
-        )
+        self.metrics["error_joint_pos"] = torch.zeros(self.num_envs, device=self.device)
+        self.metrics["error_joint_vel"] = torch.zeros(self.num_envs, device=self.device)
         self.metrics["sampling_entropy"] = torch.zeros(
             self.num_envs, device=self.device
         )
@@ -804,6 +803,7 @@ class MotionCommand(CommandTerm):
             int(1.0 / (self._env.cfg.decimation * self._env.cfg.sim.dt)),
             1,
         )
+
     def _initialize_sampling_metadata(self) -> None:
         """Build sampling metadata for valid center-frame bin sampling."""
         valid_center_indices = self.motion.valid_center_indices
@@ -830,7 +830,9 @@ class MotionCommand(CommandTerm):
             count = int(self.valid_center_count_per_bin[bin_id].item())
             if count == 0:
                 continue
-            bin_valid_centers = valid_center_indices[self.valid_center_bin_ids == bin_id]
+            bin_valid_centers = valid_center_indices[
+                self.valid_center_bin_ids == bin_id
+            ]
             self.bin_valid_center_indices[bin_id, :count] = bin_valid_centers
 
         self.valid_center_lookup = torch.full(
@@ -881,9 +883,7 @@ class MotionCommand(CommandTerm):
             AssertionError: If the number of environments does not match the
                 number of motions while one-to-one assignment is requested.
         """
-        assert (
-            self.num_envs == self.motion.num_motions
-        ), (
+        assert self.num_envs == self.motion.num_motions, (
             "assigned_sequential sampling requires num_envs to equal the number "
             "of loaded motion trajectories."
         )
@@ -897,10 +897,14 @@ class MotionCommand(CommandTerm):
             self.assigned_motion_ends - self.cfg.future_frames - 1
         )
         self.time_steps = self.assigned_motion_starts + self.cfg.history_frames
-        print("_initialize_assigned_motion_tracks: ",self.assigned_motion_starts,self.assigned_motion_ends,self.cfg.history_frames,self.time_steps)
-        assert torch.all(
-            self.time_steps <= self.assigned_last_center_steps
-        ), (
+        print(
+            "_initialize_assigned_motion_tracks: ",
+            self.assigned_motion_starts,
+            self.assigned_motion_ends,
+            self.cfg.history_frames,
+            self.time_steps,
+        )
+        assert torch.all(self.time_steps <= self.assigned_last_center_steps), (
             "assigned_sequential sampling requires every assigned motion to have "
             "at least history_frames + future_frames + 1 frames."
         )
@@ -910,14 +914,21 @@ class MotionCommand(CommandTerm):
         """Advance deterministically assigned motions without resampling."""
         self._previous_time_steps = self.time_steps.clone()
         self.time_steps += 1
-        print("_advance_assigned_motion_tracks: ",self.assigned_motion_starts,self.assigned_motion_ends,self.time_steps)
+        print(
+            "_advance_assigned_motion_tracks: ",
+            self.assigned_motion_starts,
+            self.assigned_motion_ends,
+            self.time_steps,
+        )
         if self.cfg.freeze_assigned_motion_at_end:
             self.time_steps = torch.minimum(
                 self.time_steps, self.assigned_last_center_steps
             )
         else:
             overflow_mask = self.time_steps > self.assigned_last_center_steps
-            self.time_steps[overflow_mask] = self.assigned_motion_starts[overflow_mask] + self.cfg.history_frames
+            self.time_steps[overflow_mask] = (
+                self.assigned_motion_starts[overflow_mask] + self.cfg.history_frames
+            )
 
     def _flatten_window(self, tensor: torch.Tensor | None) -> torch.Tensor:
         """Flatten a temporal-window tensor into `[num_envs, -1]`.
@@ -1035,7 +1046,7 @@ class MotionCommand(CommandTerm):
 
     @property
     def robot_body_ang_vel_w(self) -> torch.Tensor:
-        """Return robot body angular velocities in world coordinates.""" 
+        """Return robot body angular velocities in world coordinates."""
         return self._robot_body_ang_vel_w
 
     @property
@@ -1058,21 +1069,23 @@ class MotionCommand(CommandTerm):
         """Return robot reference-body angular velocity."""
         return self._robot_ref_ang_vel_w
 
-    def _update_sampling_metrics(
-        self, sampling_probabilities: torch.Tensor
-    ) -> None:
+    def _update_sampling_metrics(self, sampling_probabilities: torch.Tensor) -> None:
         """Update metrics derived from the current sampling distribution.
 
         Args:
             sampling_probabilities: Adaptive sampling probabilities over global
                 time bins.
         """
-        entropy = -(sampling_probabilities * (sampling_probabilities + 1e-12).log()).sum()
+        entropy = -(
+            sampling_probabilities * (sampling_probabilities + 1e-12).log()
+        ).sum()
         normalized_entropy = entropy / max(math.log(self.bin_count), 1e-12)
         top1_prob, top1_index = sampling_probabilities.max(dim=0)
         self.metrics["sampling_entropy"][:] = normalized_entropy
         self.metrics["sampling_top1_prob"][:] = top1_prob
-        self.metrics["sampling_top1_bin"][:] = top1_index.float() / max(self.bin_count, 1)
+        self.metrics["sampling_top1_bin"][:] = top1_index.float() / max(
+            self.bin_count, 1
+        )
 
     def _update_env_motion_ids(self, env_ids: Sequence[int]) -> None:
         """Refresh cached motion ids for the specified environments.
@@ -1410,9 +1423,7 @@ class MotionCommand(CommandTerm):
         ref_pos_repeat = ref_pos_w[:, None, :].expand(-1, num_bodies, -1)
         ref_quat_repeat = ref_quat_w[:, None, :].expand(-1, num_bodies, -1)
         robot_ref_pos_repeat = robot_ref_pos_w[:, None, :].expand(-1, num_bodies, -1)
-        robot_ref_quat_repeat = robot_ref_quat_w[:, None, :].expand(
-            -1, num_bodies, -1
-        )
+        robot_ref_quat_repeat = robot_ref_quat_w[:, None, :].expand(-1, num_bodies, -1)
 
         # Align the motion target to the robot reference frame while preserving
         # only the height difference in translation and the yaw difference in rotation.
@@ -1742,7 +1753,7 @@ class MotionCommandCfg(CommandTermCfg):
 
     sampling_mode: str = "adaptive"  # "adaptive" | "assigned_sequential"
     freeze_assigned_motion_at_end: bool = True
-    adaptive_sampler_type: str = "sonic" # "sonic" | "legacy_bin"
+    adaptive_sampler_type: str = "sonic"  # "sonic" | "legacy_bin"
     adaptive_bin_duration_s: float | None = None
     adaptive_kernel_size: int = 1
     adaptive_lambda: float = 0.8

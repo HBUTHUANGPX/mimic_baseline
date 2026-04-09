@@ -30,12 +30,12 @@ class Q1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
                 "last_action",
                 # "critic"
             ],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
-            "policy_window":[
+            "policy_window": [
                 "command_window_with_noise_wo_privilege",
             ],
-            "critic_window":[
+            "critic_window": [
                 "command_window",
-            ]
+            ],
         },
     )
     experiment_name = "q1_flat"
@@ -61,6 +61,8 @@ class Q1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         use_clipped_value_loss=True,
         clip_param=0.2,
     )
+
+
 @configclass  # 特权信息的训练
 class Q1FlatPPOPureRunnerCfg(Q1FlatPPORunnerCfg):
     obs_groups = (
@@ -76,15 +78,18 @@ class Q1FlatPPOPureRunnerCfg(Q1FlatPPORunnerCfg):
                 "last_action",
             ],  # 映射到环境提供的 'critic' 观测组，用于评论家网络
         },
-    ) 
+    )
+
 
 @configclass
 class RslRlPpoActorCriticDistillCfg(RslRlPpoActorCriticCfg):
-        teacher_hidden_dims: tuple[int] | list[int] = [256, 256, 256],
-        student_hidden_dims: tuple[int] | list[int] = [256, 256, 256],
-        teacher_obs_normalization: bool = False, 
-        student_obs_normalization: bool = False, 
-@configclass # 无特权信息的single FSQ蒸馏训练
+    teacher_hidden_dims: tuple[int] | list[int] = ([256, 256, 256],)
+    student_hidden_dims: tuple[int] | list[int] = ([256, 256, 256],)
+    teacher_obs_normalization: bool = (False,)
+    student_obs_normalization: bool = (False,)
+
+
+@configclass  # 无特权信息的single FSQ蒸馏训练
 class Q1FlatPPODistillSingleFSQRunnerCfg(Q1FlatPPORunnerCfg):
     obs_groups = (
         {
@@ -92,49 +97,52 @@ class Q1FlatPPODistillSingleFSQRunnerCfg(Q1FlatPPORunnerCfg):
                 "command_with_noise_wo_privilege",
                 "proprioception_with_noise_wo_privilege",
                 "last_action",
-            ],  
+            ],
             "critic": [
                 "command",
                 "proprioception",
                 "last_action",
-            ], 
+            ],
             "teacher": [
                 "command",
                 "proprioception",
                 "last_action",
-            ],  
-            "policy_window":[
+            ],
+            "policy_window": [
                 "command_window_with_noise_wo_privilege",
             ],
-            "critic_window":[
+            "critic_window": [
                 "command_window",
-            ]
+            ],
         },
     )
-    
+
     policy = RslRlPpoActorCriticDistillCfg(
         init_noise_std=0.8,
         student_obs_normalization=True,
         critic_obs_normalization=True,
-        teacher_obs_normalization = True,
+        teacher_obs_normalization=True,
         student_hidden_dims=[512, 256, 128],
         critic_hidden_dims=[512, 256, 128],
-        teacher_hidden_dims = [512, 256, 128],
+        teacher_hidden_dims=[512, 256, 128],
         activation="elu",
     )
+
     def __post_init__(self):
         super().__post_init__()
         self.class_name = "OnPolicyDisstillationRunnerFSQ"
         self.policy.class_name = "ActorCriticSingleFSQDistillation"
         self.algorithm.class_name = "PPOSingleFSQDistillation"
 
-@configclass # 无特权信息的single FSQ训练
+
+@configclass  # 无特权信息的single FSQ训练
 class Q1FlatPPOSingleFSQRunnerCfg(Q1FlatPPORunnerCfg):
     def __post_init__(self):
         super().__post_init__()
         self.class_name = "OnPolicyRunnerFSQ"
         self.policy.class_name = "ActorCriticSingleFSQ"
         self.algorithm.class_name = "PPOSingleFSQ"
+
 
 @configclass  # 有特权信息WO DR 的训练
 class Q1FlatTeacherPPORunnerCfg(RslRlOnPolicyRunnerCfg):
@@ -147,12 +155,12 @@ class Q1FlatTeacherPPORunnerCfg(RslRlOnPolicyRunnerCfg):
                 "command",
                 "proprioception",
                 "last_action",
-                ],  
+            ],
             "critic": [
                 "command",
                 "proprioception",
                 "last_action",
-                ], 
+            ],
         },
     )
     experiment_name = "q1_flat_teacher"
@@ -178,6 +186,7 @@ class Q1FlatTeacherPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         use_clipped_value_loss=True,
         clip_param=0.2,
     )
+
 
 @configclass  # 有特权信息的训练
 class PureQ1FlatPPORunnerCfg(RslRlOnPolicyRunnerCfg):
@@ -435,5 +444,3 @@ class Q1FlatFSQCVAEDistillationStudentMultiTeacherCfg(RslRlDistillationRunnerCfg
         use_clipped_value_loss=True,
         clip_param=0.2,
     )
-
-

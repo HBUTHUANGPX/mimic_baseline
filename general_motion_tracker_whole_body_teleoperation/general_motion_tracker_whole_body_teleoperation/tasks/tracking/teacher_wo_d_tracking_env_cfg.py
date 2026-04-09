@@ -94,9 +94,9 @@ class CommandsCfg:
             "x": (-0.0, 0.0),
             "y": (-0.0, 0.0),
             "z": (0.1, 0.101),
-            "roll": (-0., 0.),
-            "pitch": (-0., 0.),
-            "yaw": (-0., 0.),
+            "roll": (-0.0, 0.0),
+            "pitch": (-0.0, 0.0),
+            "yaw": (-0.0, 0.0),
         },
         velocity_range=VELOCITY_RANGE,
         # joint_position_range=(-0., 0.),
@@ -294,7 +294,8 @@ class ObservationsCfg:
             func=mdp.joint_pos_delta, params={"command_name": "motion"}
         )
         target_joint_pos = ObsTerm(
-            func=mdp.robot_joint_pos, params={"command_name": "motion"},
+            func=mdp.robot_joint_pos,
+            params={"command_name": "motion"},
         )
         motion_ref_pos_b = ObsTerm(
             func=mdp.motion_ref_pos_b,
@@ -335,7 +336,6 @@ class ObservationsCfg:
         def __post_init__(self):
             self.enable_corruption = True
 
-
     @configclass
     class CommandWindowCfg(ObsGroup):  # 无噪 特权 cmd
         """Observations for command group with noise."""
@@ -344,7 +344,8 @@ class ObservationsCfg:
             func=mdp.joint_pos_delta_window, params={"command_name": "motion"}
         )
         target_joint_pos = ObsTerm(
-            func=mdp.joint_pos_delta_window, params={"command_name": "motion"},
+            func=mdp.joint_pos_delta_window,
+            params={"command_name": "motion"},
         )
         motion_ref_pos_b = ObsTerm(
             func=mdp.motion_ref_pos_b_window,
@@ -386,7 +387,7 @@ class ObservationsCfg:
 
     # observation groups
 
-    proprioception: ProprioceptionCfg = ProprioceptionCfg() # 无噪 特权 本体
+    proprioception: ProprioceptionCfg = ProprioceptionCfg()  # 无噪 特权 本体
     command: CommandCfg = CommandCfg()  # 无噪 特权 cmd
     # command: CommandWindowCfg = CommandWindowCfg()  # 无噪 特权 cmd
     last_action: LastActionCfg = LastActionCfg()
@@ -398,6 +399,7 @@ class ObservationsCfg:
 @configclass
 class EventCfg:
     """Configuration for events."""
+
     # reset robot
     reset_robot = EventTerm(
         func=mdp.reset_robot_state_by_motioncommand,

@@ -245,9 +245,7 @@ def robot_joint_pos_window(env: ManagerBasedEnv, command_name: str) -> torch.Ten
     return command._flatten_window(command.joint_pos_window)
 
 
-def motion_ref_pos_b_window(
-    env: ManagerBasedEnv, command_name: str
-) -> torch.Tensor:
+def motion_ref_pos_b_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     """Return motion reference-body positions for the full temporal window.
 
     Args:
@@ -261,9 +259,7 @@ def motion_ref_pos_b_window(
     return command._flatten_window(command._motion_ref_pos_b_window)
 
 
-def motion_ref_ori_b_window(
-    env: ManagerBasedEnv, command_name: str
-) -> torch.Tensor:
+def motion_ref_ori_b_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     """Return motion reference-body orientations for the full temporal window.
 
     Args:
@@ -277,9 +273,7 @@ def motion_ref_ori_b_window(
     return command._flatten_window(command._motion_ref_ori_b_mat_window[..., :2])
 
 
-def robot_body_pos_b_window(
-    env: ManagerBasedEnv, command_name: str
-) -> torch.Tensor:
+def robot_body_pos_b_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     """Return body positions for the full temporal window.
 
     The command module caches a window-aligned body-position tensor, so the
@@ -297,9 +291,7 @@ def robot_body_pos_b_window(
     return command._flatten_window(command._robot_body_pos_b_window)
 
 
-def robot_body_ori_b_window(
-    env: ManagerBasedEnv, command_name: str
-) -> torch.Tensor:
+def robot_body_ori_b_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     """Return body orientations for the full temporal window.
 
     Args:

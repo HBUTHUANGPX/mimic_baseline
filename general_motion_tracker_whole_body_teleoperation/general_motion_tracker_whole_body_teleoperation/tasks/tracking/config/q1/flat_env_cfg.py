@@ -44,6 +44,8 @@ class Q1FlatEnvCfg(TrackingEnvCfg):
             "R_wrist_pitch_link",
             "head_pitch_link",
         ]
+
+
 @configclass
 class Q1FlatPureEnvCfg(Q1FlatEnvCfg):
     def __post_init__(self):
@@ -51,7 +53,7 @@ class Q1FlatPureEnvCfg(Q1FlatEnvCfg):
         self.commands.motion.future_frames = 0
         self.observations.proprioception_with_noise_wo_privilege.history_length = 8
         self.observations.proprioception.history_length = 8
-        
+
         self.events.physics_material = None
         self.events.add_joint_default_pos = None
         self.events.base_com = None
@@ -69,7 +71,8 @@ class Q1FlatPureEnvCfg(Q1FlatEnvCfg):
             "pitch": (-0.0, 0.0),
             "yaw": (-0.0, 0.0),
         }
-        self.commands.motion.joint_position_range = (-0., 0.)
+        self.commands.motion.joint_position_range = (-0.0, 0.0)
+
 
 @configclass
 class Q1FlatDistillEnvCfg(Q1FlatEnvCfg):
@@ -78,7 +81,8 @@ class Q1FlatDistillEnvCfg(Q1FlatEnvCfg):
         self.commands.motion.future_frames = 10
         self.observations.proprioception_with_noise_wo_privilege.history_length = 8
         self.observations.proprioception.history_length = 8
-        
+
+
 @configclass
 class Q1FlatTeacherEnvCfg(TeacherTrackingEnvCfg):
     def __post_init__(self):

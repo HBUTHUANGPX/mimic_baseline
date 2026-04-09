@@ -70,7 +70,9 @@ def _quat_to_angular_velocity(quat_xyzw: torch.Tensor, dt: float) -> torch.Tenso
     an angular velocity vector in rad/s on the last axis.
     """
     if quat_xyzw.shape[0] <= 1:
-        return torch.zeros((*quat_xyzw.shape[:-1], 3), dtype=quat_xyzw.dtype, device=quat_xyzw.device)
+        return torch.zeros(
+            (*quat_xyzw.shape[:-1], 3), dtype=quat_xyzw.dtype, device=quat_xyzw.device
+        )
 
     quat_xyzw = _normalize_quat_xyzw(quat_xyzw)
     rel = _quat_mul_xyzw(quat_xyzw[1:], _quat_conjugate_xyzw(quat_xyzw[:-1]))
@@ -87,6 +89,7 @@ def _quat_to_angular_velocity(quat_xyzw: torch.Tensor, dt: float) -> torch.Tenso
     angvel = axis * (angle / dt)
     angvel = torch.where(sin_half > 1e-8, angvel, torch.zeros_like(angvel))
     return torch.cat((angvel[:1], angvel), dim=0)
+
 
 class MotionLoader_robot:
     """Load and organize a set of motion trajectories.
@@ -317,6 +320,7 @@ class MotionLoader_robot:
                 valid_center_mask[valid_start:valid_end] = True
         return valid_center_mask
 
+
 class MotionLoader_human_robot:
     """Load human+robot motions and organize them on one shared timeline."""
 
@@ -439,7 +443,12 @@ class MotionLoader_human_robot:
                 human_body_angvel_list.append(human_body_angvel)
 
                 motion_group_list.append(
-                    torch.full((num_frames, 1), motion_group_index, dtype=torch.long, device=device)
+                    torch.full(
+                        (num_frames, 1),
+                        motion_group_index,
+                        dtype=torch.long,
+                        device=device,
+                    )
                 )
                 motion_id_list.append(
                     torch.full(
@@ -478,7 +487,9 @@ class MotionLoader_human_robot:
         # Only the robot body tensors are reduced by body_indexes. Human body
         # tensors stay full-width because their topology is tied to
         # human_joint_names rather than the robot body subset.
-        body_index_tensor = torch.as_tensor(self._body_indexes, dtype=torch.long, device=device)
+        body_index_tensor = torch.as_tensor(
+            self._body_indexes, dtype=torch.long, device=device
+        )
         assert int(body_index_tensor.max().item()) < self._robot_body_pos.shape[1]
         self.robot_body_pos = self._robot_body_pos[:, body_index_tensor]
         self.robot_body_vel = self._robot_body_vel[:, body_index_tensor]
@@ -566,7 +577,9 @@ class MotionLoader_human_robot:
 
     def _build_motion_indices(self, device: str) -> torch.Tensor:
         """Store each motion segment as a global [start, end) range."""
-        motion_indices = torch.zeros(self.num_motions, 2, dtype=torch.long, device=device)
+        motion_indices = torch.zeros(
+            self.num_motions, 2, dtype=torch.long, device=device
+        )
         start = 0
         for motion_id, length in enumerate(self.motion_lengths):
             end = start + length
@@ -577,7 +590,9 @@ class MotionLoader_human_robot:
 
     def _build_new_data_flag(self, device: str) -> torch.Tensor:
         """Mark the first frame of every motion after concatenation."""
-        new_data_flag = torch.zeros(self.time_step_total, dtype=torch.bool, device=device)
+        new_data_flag = torch.zeros(
+            self.time_step_total, dtype=torch.bool, device=device
+        )
         cumulative_length = 0
         for motion_id, length in enumerate(self.motion_lengths):
             if motion_id > 0:
@@ -587,7 +602,9 @@ class MotionLoader_human_robot:
 
     def _build_valid_center_mask(self, device: str) -> torch.Tensor:
         """Centers are valid only when the full history/future window stays inside one motion."""
-        valid_center_mask = torch.zeros(self.time_step_total, dtype=torch.bool, device=device)
+        valid_center_mask = torch.zeros(
+            self.time_step_total, dtype=torch.bool, device=device
+        )
         for motion_id in range(self.num_motions):
             start, end = self.motion_indices[motion_id]
             valid_start = start + self.history_frames

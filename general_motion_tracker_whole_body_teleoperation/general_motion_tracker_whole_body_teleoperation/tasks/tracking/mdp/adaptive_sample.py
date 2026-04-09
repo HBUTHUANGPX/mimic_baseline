@@ -1,10 +1,11 @@
-
 import numpy as np
 import torch
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+
 # from general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp.commands import MotionCommand
 from isaaclab.managers import CommandTerm, CommandTermCfg
+
 
 class AdaptiveSamplingModule(ABC):
     """Abstract interface for pluggable adaptive sampling strategies.
@@ -70,7 +71,10 @@ class LegacyBinAdaptiveSampling(AdaptiveSamplingModule):
             command.bin_count, dtype=torch.float32, device=command.device
         )
         self.kernel = torch.tensor(
-            [command.cfg.adaptive_lambda**i for i in range(command.cfg.adaptive_kernel_size)],
+            [
+                command.cfg.adaptive_lambda**i
+                for i in range(command.cfg.adaptive_kernel_size)
+            ],
             dtype=torch.float32,
             device=command.device,
         )
