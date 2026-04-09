@@ -3,6 +3,7 @@ import torch
 import os
 import numpy as np
 
+
 class MotionLoader:
     def __init__(
         self, motion_file: str, body_indexes: Sequence[int], device: str = "cpu"
@@ -32,7 +33,7 @@ class MotionLoader:
         self.time_step_total = self.joint_pos.shape[0]
         self.body_pos_w = self._body_pos_w[:, self._body_indexes]
         self.body_quat_w = self._body_quat_w[:, self._body_indexes]
-        self.body_lin_vel_w = self._body_lin_vel_w[:, self._body_indexes]   
+        self.body_lin_vel_w = self._body_lin_vel_w[:, self._body_indexes]
         self.body_ang_vel_w = self._body_ang_vel_w[:, self._body_indexes]
 
 
@@ -55,7 +56,6 @@ class MotionLoader_robot:
         self.future_frames = future_frames
         self.window_size = history_frames + future_frames + 1
 
-        # === 优化1：收集 NumPy 数组而非直接转 Tensor ===
         np_joint_pos_list: list[np.ndarray] = []
         np_joint_vel_list: list[np.ndarray] = []
         np_body_pos_w_list: list[np.ndarray] = []
@@ -63,10 +63,8 @@ class MotionLoader_robot:
         np_body_lin_vel_w_list: list[np.ndarray] = []
         np_body_ang_vel_w_list: list[np.ndarray] = []
 
-        # motion_id_list: list[torch.Tensor] = []
-        # motion_group_list: list[torch.Tensor] = []
-        motion_group_list: list[int] = []      # 仅存标量值，后续批量构造
-        motion_id_list: list[int] = []         # 同上
+        motion_group_list: list[int] = []
+        motion_id_list: list[int] = []
         motion_group_index = 0
         for group_name, paths in motion_file_group.items():
             normalized_paths = self._normalize_paths(paths)
@@ -85,7 +83,6 @@ class MotionLoader_robot:
                 data = np.load(motion_path)
                 self._validate_fps(data)
 
-                # 直接收集 NumPy 数组
                 np_joint_pos_list.append(data["joint_pos"].astype(np.float32))
                 np_joint_vel_list.append(data["joint_vel"].astype(np.float32))
                 np_body_pos_w_list.append(data["body_pos_w"].astype(np.float32))
@@ -97,9 +94,7 @@ class MotionLoader_robot:
                 self.motion_lengths.append(num_frames)
 
                 motion_group_list.extend([motion_group_index] * num_frames)
-                motion_id_list.extend(
-                    [self.num_motions + local_motion_id] * num_frames
-                )
+                motion_id_list.extend([self.num_motions + local_motion_id] * num_frames)
 
             self.extracted_list.extend(extracted_list)
             self.group_names.append(group_name)
@@ -108,13 +103,13 @@ class MotionLoader_robot:
 
         assert self.num_motions > 0, "At least one motion file is required."
 
-        self.joint_pos = self.np_list_to_tensor(np_joint_pos_list,device)
+        self.joint_pos = self.np_list_to_tensor(np_joint_pos_list, device)
         self.joint_vel = self.np_list_to_tensor(np_joint_vel_list, device)
         self._body_pos_w = self.np_list_to_tensor(np_body_pos_w_list, device)
         self._body_quat_w = self.np_list_to_tensor(np_body_quat_w_list, device)
         self._body_lin_vel_w = self.np_list_to_tensor(np_body_lin_vel_w_list, device)
         self._body_ang_vel_w = self.np_list_to_tensor(np_body_ang_vel_w_list, device)
-        
+
         self.body_pos_w = self._body_pos_w[:, self._body_indexes]
         self.body_quat_w = self._body_quat_w[:, self._body_indexes]
         self.body_lin_vel_w = self._body_lin_vel_w[:, self._body_indexes]
@@ -126,7 +121,7 @@ class MotionLoader_robot:
         self._motion_group = torch.tensor(
             motion_group_list, dtype=torch.long, device=device
         ).unsqueeze(1)
-        
+
         self.time_step_total = self.joint_pos.shape[0]
         self.motion_indices = self._build_motion_indices(device)
         self.window_offsets = torch.arange(
@@ -147,7 +142,7 @@ class MotionLoader_robot:
         """Convert a NumPy array to a PyTorch tensor on the appropriate device."""
         return torch.from_numpy(np.concatenate(np_list, axis=0)).to(device)
 
-    def extract_part(self,path: str) -> str | None:
+    def extract_part(self, path: str) -> str | None:
         """Extract an artifact-relative motion path."""
         if path.startswith("artifacts/"):
             relative_path = path[len("artifacts/") :]
