@@ -24,7 +24,7 @@ from isaaclab.utils.math import (
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 from general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp.motion_loader import (
-    MotionLoader,
+    MotionLoader_robot as MotionLoader,
 )
 
 
@@ -201,6 +201,16 @@ class MotionCommand(CommandTerm):
     def robot_anchor_ang_vel_w(self) -> torch.Tensor:
         return self.robot.data.body_ang_vel_w[:, self.robot_anchor_body_index]
 
+    @property
+    def motion_id(self) -> torch.Tensor:
+        """Return the current motion id for each environment."""
+        return self.motion._motion_id[self.time_steps]
+
+    @property
+    def motion_group(self) -> torch.Tensor:
+        """Return the current motion group id for each environment."""
+        return self.motion._motion_group[self.time_steps]
+    
     def _update_metrics(self):
         self.metrics["error_anchor_pos"] = torch.norm(
             self.anchor_pos_w - self.robot_anchor_pos_w, dim=-1
@@ -456,7 +466,7 @@ class MotionCommandCfg(CommandTermCfg):
 
     asset_name: str = MISSING
 
-    motion_file: str = MISSING
+    motion_file:  dict[str, list[str] | str] | str = MISSING
     anchor_body_name: str = MISSING
     body_names: list[str] = MISSING
 

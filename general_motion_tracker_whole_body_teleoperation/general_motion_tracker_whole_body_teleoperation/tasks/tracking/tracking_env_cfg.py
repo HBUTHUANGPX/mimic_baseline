@@ -133,8 +133,8 @@ class ObservationsCfg:
         command = ObsTerm(
             func=mdp.generated_commands, params={"command_name": "motion"}
         )
-        motion_ref_ori_b = ObsTerm(
-            func=mdp.motion_ref_ori_b,
+        motion_anchor_ori_b = ObsTerm(
+            func=mdp.motion_anchor_ori_b,
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.05, n_max=0.05),
         )
@@ -156,11 +156,11 @@ class ObservationsCfg:
         command = ObsTerm(
             func=mdp.generated_commands, params={"command_name": "motion"}
         )
-        motion_ref_pos_b = ObsTerm(
-            func=mdp.motion_ref_pos_b, params={"command_name": "motion"}
+        motion_anchor_pos_b = ObsTerm(
+            func=mdp.motion_anchor_pos_b, params={"command_name": "motion"}
         )
-        motion_ref_ori_b = ObsTerm(
-            func=mdp.motion_ref_ori_b, params={"command_name": "motion"}
+        motion_anchor_ori_b = ObsTerm(
+            func=mdp.motion_anchor_ori_b, params={"command_name": "motion"}
         )
         body_pos = ObsTerm(func=mdp.robot_body_pos_b, params={"command_name": "motion"})
         body_ori = ObsTerm(func=mdp.robot_body_ori_b, params={"command_name": "motion"})
@@ -245,13 +245,13 @@ class ObservationsCfg:
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.02, n_max=0.02),
         )
-        motion_ref_pos_b = ObsTerm(
-            func=mdp.motion_ref_pos_b,
+        motion_anchor_pos_b = ObsTerm(
+            func=mdp.motion_anchor_pos_b,
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.02, n_max=0.02),
         )
-        motion_ref_ori_b = ObsTerm(
-            func=mdp.motion_ref_ori_b,
+        motion_anchor_ori_b = ObsTerm(
+            func=mdp.motion_anchor_ori_b,
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.05, n_max=0.05),
         )
@@ -283,8 +283,8 @@ class ObservationsCfg:
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.02, n_max=0.02),
         )
-        motion_ref_ori_b = ObsTerm(
-            func=mdp.motion_ref_ori_b,
+        motion_anchor_ori_b = ObsTerm(
+            func=mdp.motion_anchor_ori_b,
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.05, n_max=0.05),
         )
@@ -303,12 +303,12 @@ class ObservationsCfg:
             func=mdp.robot_joint_pos,
             params={"command_name": "motion"},
         )
-        motion_ref_pos_b = ObsTerm(
-            func=mdp.motion_ref_pos_b,
+        motion_anchor_pos_b = ObsTerm(
+            func=mdp.motion_anchor_pos_b,
             params={"command_name": "motion"},
         )
-        motion_ref_ori_b = ObsTerm(
-            func=mdp.motion_ref_ori_b,
+        motion_anchor_ori_b = ObsTerm(
+            func=mdp.motion_anchor_ori_b,
             params={"command_name": "motion"},
         )
         body_pos = ObsTerm(
@@ -334,8 +334,8 @@ class ObservationsCfg:
         target_joint_pos = ObsTerm(
             func=mdp.robot_joint_pos, params={"command_name": "motion"}
         )
-        motion_ref_ori_b = ObsTerm(
-            func=mdp.motion_ref_ori_b,
+        motion_anchor_ori_b = ObsTerm(
+            func=mdp.motion_anchor_ori_b,
             params={"command_name": "motion"},
         )
 
@@ -356,8 +356,8 @@ class ObservationsCfg:
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.02, n_max=0.02),
         )
-        motion_ref_ori_b = ObsTerm(
-            func=mdp.motion_ref_ori_b_window,
+        motion_anchor_ori_b = ObsTerm(
+            func=mdp.motion_anchor_ori_b_window,
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.05, n_max=0.05),
         )
@@ -376,8 +376,8 @@ class ObservationsCfg:
             func=mdp.robot_joint_pos_window,
             params={"command_name": "motion"},
         )
-        motion_ref_ori_b = ObsTerm(
-            func=mdp.motion_ref_ori_b_window,
+        motion_anchor_ori_b = ObsTerm(
+            func=mdp.motion_anchor_ori_b_window,
             params={"command_name": "motion"},
         )
         body_pos = ObsTerm(
@@ -519,27 +519,18 @@ class EventCfg:
         params={"velocity_range": VELOCITY_RANGE},
     )
 
-    # reset robot
-    reset_robot = EventTerm(
-        func=mdp.reset_robot_state_by_motioncommand,
-        mode="reset",
-        params={
-            "command_name": "motion",
-        },
-    )
-
 
 @configclass
 class RewardsCfg:
     """Reward terms for the MDP."""
 
-    motion_global_root_pos = RewTerm(
-        func=mdp.motion_global_ref_position_error_exp,
+    motion_global_anchor_pos = RewTerm(
+        func=mdp.motion_global_anchor_position_error_exp,
         weight=2.5,
         params={"command_name": "motion", "std": 0.3},
     )
-    motion_global_root_ori = RewTerm(
-        func=mdp.motion_global_ref_orientation_error_exp,
+    motion_global_anchor_ori = RewTerm(
+        func=mdp.motion_global_anchor_orientation_error_exp,
         weight=0.5,
         params={"command_name": "motion", "std": 0.4},
     )
@@ -618,11 +609,11 @@ class TerminationsCfg:
 
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
     ref_pos = DoneTerm(
-        func=mdp.bad_ref_pos_z_only,
+        func=mdp.bad_anchor_pos_z_only,
         params={"command_name": "motion", "threshold": 0.25},
     )
     ref_ori = DoneTerm(
-        func=mdp.bad_ref_ori,
+        func=mdp.bad_anchor_ori,
         params={
             "asset_cfg": SceneEntityCfg("robot"),
             "command_name": "motion",

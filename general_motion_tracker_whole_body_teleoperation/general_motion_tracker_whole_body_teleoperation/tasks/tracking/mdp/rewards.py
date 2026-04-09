@@ -7,7 +7,7 @@ from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors import ContactSensor
 from isaaclab.utils.math import quat_error_magnitude
 
-from whole_body_tracking.tasks.tracking.mdp.commands import MotionCommand
+from general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp.commands import MotionCommand
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
@@ -80,3 +80,31 @@ def feet_contact_time(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg, thresh
     last_contact_time = contact_sensor.data.last_contact_time[:, sensor_cfg.body_ids]
     reward = torch.sum((last_contact_time < threshold) * first_air, dim=-1)
     return reward
+
+def foot_contact_velocity(
+    env: ManagerBasedRLEnv,
+    threshold: float,
+    sensor_cfg: SceneEntityCfg,
+    command_name: str,
+    clip: float,
+    body_names: list[str] | None = None,
+) -> torch.Tensor:
+    # 用于检测足端与地面接触时的速度，希望与地面接触时，速度尽可能为0
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    body_indexes = _get_body_indexes(command, body_names)
+
+    net_contact_forces = contact_sensor.data.net_forces_w_history
+    is_contact = (
+        torch.max(
+            torch.norm(net_contact_forces[:, :, sensor_cfg.body_ids], dim=-1), dim=1
+        )[0]
+        > threshold
+    )
+    foot_vel = torch.square(command.robot_body_lin_vel_w[:, body_indexes]).sum(
+        -1
+    )  # tag
+    clipped_vel = torch.clip(foot_vel, min=0, max=clip)
+    r = ((torch.exp(clipped_vel) - 1.0)) * is_contact
+
+    return r.sum(1)
