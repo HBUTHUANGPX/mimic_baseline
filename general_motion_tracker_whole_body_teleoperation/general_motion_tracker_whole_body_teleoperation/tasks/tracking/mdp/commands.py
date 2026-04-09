@@ -201,11 +201,13 @@ class MotionCommand(CommandTerm):
         if len(env_ids) == 0:
             self._update_motion_cache()
             self._update_robot_state_cache()
+            self._make_calculate()
             return
         self._adaptive_sampling(env_ids) # 对time_stamps进行自适应采样
         self._update_motion_cache()
         self._reset_env_by_motion(env_ids) # 根据采样的time_stamps对应的motion数据重置环境状态
         self._update_robot_state_cache()
+        self._make_calculate()
 
     def _update_motion_cache(self):
         # 在time_stamps更新后，更新缓存的motion数据,因为_resample_command在_update_command中被调用,所以当需要reset的env_ids数量为0时也要触发一次
