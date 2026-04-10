@@ -136,8 +136,6 @@ class MotionCommand(CommandTerm):
         self.metrics["error_body_ang_vel"] = torch.zeros(
             self.num_envs, device=self.device
         )
-        for metric_name in self._timing_metric_names():
-            self.metrics[metric_name] = torch.zeros(self.num_envs, device=self.device)
 
     def _update_metrics(self):
         self.metrics["error_anchor_pos"] = self.anchor_pos_error_norm
@@ -195,7 +193,6 @@ class MotionCommand(CommandTerm):
         ).long()
 
         # Metrics
-        _t_step = self._time_now()
         H = -(sampling_probabilities * (sampling_probabilities + 1e-12).log()).sum()
         H_norm = H / math.log(self.bin_count)
         pmax, imax = sampling_probabilities.max(dim=0)
