@@ -404,6 +404,11 @@ class MotionCommand(CommandTerm):
         )
 
     def _update_command(self):
+        # TODO: 这地方太糟糕了,time_steps的增加和环境重置不应该放在此处.
+        # 具体需要分析IsaacLab/source/isaaclab/isaaclab/envs/manager_based_rl_env.py中的step函数中的流程
+        self.time_steps += 1
+        env_ids = torch.where(self.time_steps >= self.motion.time_step_total)[0]
+        self._resample_command(env_ids)
         self._update_motion_cache()
         self._update_robot_state_cache()
         self._make_calculate()
@@ -413,7 +418,6 @@ class MotionCommand(CommandTerm):
             + (1 - self.cfg.adaptive_alpha) * self.bin_failed_count
         )
         self._current_bin_failed.zero_()
-        self.time_steps += 1
         # self.reached_motion_end = self.time_steps > self.motion.time_step_total
 
     def _set_debug_vis_impl(self, debug_vis: bool):
