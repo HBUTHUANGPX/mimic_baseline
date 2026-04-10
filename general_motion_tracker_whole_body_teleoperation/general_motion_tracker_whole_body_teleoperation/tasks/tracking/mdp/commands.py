@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import time
 import torch
 from collections.abc import Sequence
 from dataclasses import MISSING
@@ -87,6 +88,16 @@ class MotionCommand(CommandTerm):
         self._update_motion_cache()
         self._update_robot_state_cache()
         self._make_calculate()
+        range_list = [
+            self.cfg.velocity_range.get(key, (0.0, 0.0))
+            for key in ["x", "y", "z", "roll", "pitch", "yaw"]
+        ]
+        self.velocity_ranges = torch.tensor(range_list, device=self.device)
+        range_list = [
+            self.cfg.pose_range.get(key, (0.0, 0.0))
+            for key in ["x", "y", "z", "roll", "pitch", "yaw"]
+        ]
+        self.pose_ranges = torch.tensor(range_list, device=self.device)
 
     @property
     def command(self) -> torch.Tensor:
@@ -119,8 +130,63 @@ class MotionCommand(CommandTerm):
             torch.zeros(self.num_envs, device=self.device)
         self.metrics["error_body_ang_vel"] = \
             torch.zeros(self.num_envs, device=self.device)
+        for metric_name in self._timing_metric_names():
+            self.metrics[metric_name] = torch.zeros(self.num_envs, device=self.device)
+
+    def _timing_metric_names(self) -> tuple[str, ...]:
+        return (
+            "time_s_update_command_total",
+            "time_s_update_command_update_motion_cache",
+            "time_s_update_command_update_robot_cache",
+            "time_s_update_command_make_calculate",
+            "time_s_resample_command_total",
+            "time_s_resample_command_adaptive_sampling",
+            "time_s_resample_command_update_motion_cache",
+            "time_s_resample_command_reset_env",
+            "time_s_update_motion_cache_total",
+            "time_s_update_robot_cache_total",
+            "time_s_make_calculate_total",
+            "time_s_make_calculate_build_command",
+            "time_s_make_calculate_relative_alignment",
+            "time_s_make_calculate_anchor_ori6d",
+            "time_s_make_calculate_robot_body_in_anchor",
+            "time_s_make_calculate_motion_anchor_in_robot",
+            "time_s_make_calculate_errors",
+            "time_s_make_calculate_error_norms",
+            "time_s_make_calculate_gravity_projection",
+            "time_s_adaptive_sampling_total",
+            "time_s_adaptive_sampling_failure_stats",
+            "time_s_adaptive_sampling_build_distribution",
+            "time_s_adaptive_sampling_sample_bins",
+            "time_s_adaptive_sampling_update_metrics",
+            "time_s_reset_env_total",
+            "time_s_reset_env_pose_noise",
+            "time_s_reset_env_velocity_noise",
+            "time_s_reset_env_joint_noise_and_clip",
+            "time_s_reset_env_write_joint_state",
+            "time_s_reset_env_write_root_state",
+            "time_s_update_metrics_total",
+        )
+
+    def _time_now(self) -> float:
+        if (
+            self.cfg.enable_timing_metrics
+            and self.cfg.timing_sync_cuda
+            and torch.cuda.is_available()
+            and str(self.device).startswith("cuda")
+        ):
+            torch.cuda.synchronize(device=self.device)
+        return time.perf_counter()
+
+    def _record_timing_metric(self, metric_name: str, elapsed_s: float) -> None:
+        if not self.cfg.enable_timing_metrics:
+            return
+        elapsed_ms = elapsed_s
+        alpha = self.cfg.timing_ema_alpha
+        self.metrics[metric_name].add_(elapsed_ms)
         
     def _update_metrics(self):
+        _t_start = self._time_now()
         self.metrics["error_anchor_pos"] = self.anchor_pos_error_norm
         self.metrics["error_anchor_rot"] = self.anchor_rot_error
         self.metrics["error_anchor_lin_vel"] = self.anchor_lin_vel_error_norm
@@ -131,8 +197,11 @@ class MotionCommand(CommandTerm):
         self.metrics["error_body_ang_vel"] = self.body_ang_vel_error_norm.mean(dim=-1)
         self.metrics["error_joint_pos"] = self.joint_pos_error_norm
         self.metrics["error_joint_vel"] = self.joint_vel_error_norm
+        self._record_timing_metric("time_s_update_metrics_total", self._time_now() - _t_start)
 
     def _adaptive_sampling(self, env_ids: Sequence[int]):
+        _t_total = self._time_now()
+        _t_step = self._time_now()
         episode_failed = self._env.termination_manager.terminated[env_ids]
         if torch.any(episode_failed):
             current_bin_index = torch.clamp(
@@ -145,8 +214,12 @@ class MotionCommand(CommandTerm):
             self._current_bin_failed[:] = torch.bincount(
                 fail_bins, minlength=self.bin_count
             )
+        self._record_timing_metric(
+            "time_s_adaptive_sampling_failure_stats", self._time_now() - _t_step
+        )
 
         # Sample
+        _t_step = self._time_now()
         sampling_probabilities = (
             self.bin_failed_count
             + self.cfg.adaptive_uniform_ratio / float(self.bin_count)
@@ -161,7 +234,11 @@ class MotionCommand(CommandTerm):
         ).view(-1)
 
         sampling_probabilities = sampling_probabilities / sampling_probabilities.sum()
+        self._record_timing_metric(
+            "time_s_adaptive_sampling_build_distribution", self._time_now() - _t_step
+        )
 
+        _t_step = self._time_now()
         sampled_bins = torch.multinomial(
             sampling_probabilities, len(env_ids), replacement=True
         )
@@ -174,29 +251,54 @@ class MotionCommand(CommandTerm):
             / self.bin_count
             * (self.motion.time_step_total - 1)
         ).long()
+        self._record_timing_metric(
+            "time_s_adaptive_sampling_sample_bins", self._time_now() - _t_step
+        )
 
         # Metrics
+        _t_step = self._time_now()
         H = -(sampling_probabilities * (sampling_probabilities + 1e-12).log()).sum()
         H_norm = H / math.log(self.bin_count)
         pmax, imax = sampling_probabilities.max(dim=0)
         self.metrics["sampling_entropy"][:] = H_norm
         self.metrics["sampling_top1_prob"][:] = pmax
         self.metrics["sampling_top1_bin"][:] = imax.float() / self.bin_count
+        self._record_timing_metric(
+            "time_s_adaptive_sampling_update_metrics", self._time_now() - _t_step
+        )
+        self._record_timing_metric("time_s_adaptive_sampling_total", self._time_now() - _t_total)
 
     def _resample_command(self, env_ids: Sequence[int]):
+        _t_total = self._time_now()
         if len(env_ids) == 0:
-            self._update_motion_cache()
-            self._update_robot_state_cache()
-            self._make_calculate()
             return
+        _t_step = self._time_now()
         self._adaptive_sampling(env_ids) # 对time_stamps进行自适应采样
+        self._record_timing_metric(
+            "time_s_resample_command_adaptive_sampling", self._time_now() - _t_step
+        )
+        _t_step = self._time_now()
         self._update_motion_cache()
+        self._record_timing_metric(
+            "time_s_resample_command_update_motion_cache",
+            self._time_now() - _t_step,
+        )
+        _t_step = self._time_now()
         self._reset_env_by_motion(env_ids) # 根据采样的time_stamps对应的motion数据重置环境状态
-        self._update_robot_state_cache()
-        self._make_calculate()
+        self._record_timing_metric(
+            "time_s_resample_command_reset_env", self._time_now() - _t_step
+        )
+        self._record_timing_metric(
+            "time_s_resample_command_total", self._time_now() - _t_total
+        )
+
+    def _motion_command_reset(self, env_ids: Sequence[int]):
+        ...
 
     def _update_motion_cache(self):
+        _t_start = self._time_now()
         # 在time_stamps更新后，更新缓存的motion数据,因为_resample_command在_update_command中被调用,所以当需要reset的env_ids数量为0时也要触发一次
+        assert self.time_steps.max() < self.motion.time_step_total, f"time_steps: {self.time_steps}, motion time_step_total: {self.motion.time_step_total}"
         self.body_pos_w = self.motion.body_pos_w[self.time_steps] + self._env.scene.env_origins[:, None, :]
         self.body_quat_w = self.motion.body_quat_w[self.time_steps]
         self.body_lin_vel_w = self.motion.body_lin_vel_w[self.time_steps]
@@ -209,8 +311,10 @@ class MotionCommand(CommandTerm):
         self.anchor_ang_vel_w = self.motion.body_ang_vel_w[self.time_steps, self.motion_anchor_body_index]
         self.motion_id = self.motion._motion_id[self.time_steps]
         self.motion_group = self.motion._motion_group[self.time_steps]
+        self._record_timing_metric("time_s_update_motion_cache_total", self._time_now() - _t_start)
 
     def _update_robot_state_cache(self):
+        _t_start = self._time_now()
         self.robot_body_pos_w = self.robot.data.body_pos_w[:, self.body_indexes].clone()
         self.robot_body_quat_w = self.robot.data.body_quat_w[:, self.body_indexes].clone()
         self.robot_body_lin_vel_w = self.robot.data.body_lin_vel_w[:, self.body_indexes].clone()
@@ -221,8 +325,10 @@ class MotionCommand(CommandTerm):
         self.robot_anchor_quat_w = self.robot.data.body_quat_w[:, self.robot_anchor_body_index].clone()
         self.robot_anchor_lin_vel_w = self.robot.data.body_lin_vel_w[:, self.robot_anchor_body_index].clone()
         self.robot_anchor_ang_vel_w = self.robot.data.body_ang_vel_w[:, self.robot_anchor_body_index].clone()
+        self._record_timing_metric("time_s_update_robot_cache_total", self._time_now() - _t_start)
 
     def _make_calculate(self):
+        _t_total = self._time_now()
         num_bodies = len(self.cfg.body_names)
         anchor_pos_w_repeat = self.anchor_pos_w[:, None, :].expand(-1, num_bodies, -1)
         anchor_quat_w_repeat = self.anchor_quat_w[:, None, :].expand(
@@ -235,14 +341,17 @@ class MotionCommand(CommandTerm):
             -1, num_bodies, -1
         )
 
+        _t_step = self._time_now()
         # Build legacy command tensor once per step.
         self._command = torch.cat([self.joint_pos, self.joint_vel], dim=1)
         self.robot_anchor_vel_w = torch.cat(
             [self.robot_anchor_lin_vel_w, self.robot_anchor_ang_vel_w], dim=-1
         )
         self.joint_pos_delta = self.joint_pos - self.robot_joint_pos
+        self._record_timing_metric("time_s_make_calculate_build_command", self._time_now() - _t_step)
 
         # Global-anchor alignment used by rewards/terminations.
+        _t_step = self._time_now()
         delta_pos_w = robot_anchor_pos_w_repeat.clone()
         delta_pos_w[..., 2] = anchor_pos_w_repeat[..., 2]
         delta_ori_w = yaw_quat(
@@ -252,14 +361,20 @@ class MotionCommand(CommandTerm):
         self.body_pos_relative_w = delta_pos_w + quat_apply(
             delta_ori_w, self.body_pos_w - anchor_pos_w_repeat
         )
+        self._record_timing_metric(
+            "time_s_make_calculate_relative_alignment", self._time_now() - _t_step
+        )
 
         # Robot anchor orientation in 6D representation.
+        _t_step = self._time_now()
         robot_anchor_ori_mat = matrix_from_quat(self.robot_anchor_quat_w)
         self.robot_anchor_ori_w = robot_anchor_ori_mat[..., :2].reshape(
             self.num_envs, -1
         )
+        self._record_timing_metric("time_s_make_calculate_anchor_ori6d", self._time_now() - _t_step)
 
         # Robot body pose in robot-anchor frame.
+        _t_step = self._time_now()
         robot_body_pos_b, robot_body_ori_b = subtract_frame_transforms(
             robot_anchor_pos_w_repeat,
             robot_anchor_quat_w_repeat,
@@ -270,8 +385,12 @@ class MotionCommand(CommandTerm):
         self.robot_body_ori_b = matrix_from_quat(robot_body_ori_b)[..., :2].reshape(
             self.num_envs, -1
         )
+        self._record_timing_metric(
+            "time_s_make_calculate_robot_body_in_anchor", self._time_now() - _t_step
+        )
 
         # Motion anchor pose in robot-anchor frame.
+        _t_step = self._time_now()
         motion_anchor_pos_b, motion_anchor_ori_b = subtract_frame_transforms(
             self.robot_anchor_pos_w,
             self.robot_anchor_quat_w,
@@ -282,8 +401,12 @@ class MotionCommand(CommandTerm):
         self.motion_anchor_ori_b = matrix_from_quat(motion_anchor_ori_b)[..., :2].reshape(
             self.num_envs, -1
         )
+        self._record_timing_metric(
+            "time_s_make_calculate_motion_anchor_in_robot", self._time_now() - _t_step
+        )
 
         # Shared error tensors used by rewards/terminations/metrics.
+        _t_step = self._time_now()
         self.anchor_pos_error = self.anchor_pos_w - self.robot_anchor_pos_w
         self.anchor_lin_vel_error = self.anchor_lin_vel_w - self.robot_anchor_lin_vel_w
         self.anchor_ang_vel_error = self.anchor_ang_vel_w - self.robot_anchor_ang_vel_w
@@ -298,7 +421,9 @@ class MotionCommand(CommandTerm):
         self.body_ang_vel_error = self.body_ang_vel_w - self.robot_body_ang_vel_w
         self.joint_pos_error = self.joint_pos - self.robot_joint_pos
         self.joint_vel_error = self.joint_vel - self.robot_joint_vel
+        self._record_timing_metric("time_s_make_calculate_errors", self._time_now() - _t_step)
 
+        _t_step = self._time_now()
         self.anchor_pos_error_norm = torch.norm(self.anchor_pos_error, dim=-1)
         self.anchor_lin_vel_error_norm = torch.norm(self.anchor_lin_vel_error, dim=-1)
         self.anchor_ang_vel_error_norm = torch.norm(self.anchor_ang_vel_error, dim=-1)
@@ -307,45 +432,50 @@ class MotionCommand(CommandTerm):
         self.body_ang_vel_error_norm = torch.norm(self.body_ang_vel_error, dim=-1)
         self.joint_pos_error_norm = torch.norm(self.joint_pos_error, dim=-1)
         self.joint_vel_error_norm = torch.norm(self.joint_vel_error, dim=-1)
+        self._record_timing_metric(
+            "time_s_make_calculate_error_norms", self._time_now() - _t_step
+        )
 
+        _t_step = self._time_now()
         gravity_w = self.robot.data.GRAVITY_VEC_W
         self.motion_projected_gravity_b = quat_apply_inverse(self.anchor_quat_w, gravity_w)
         self.robot_projected_gravity_b = quat_apply_inverse(
             self.robot_anchor_quat_w, gravity_w
         )
+        self._record_timing_metric(
+            "time_s_make_calculate_gravity_projection", self._time_now() - _t_step
+        )
+        self._record_timing_metric("time_s_make_calculate_total", self._time_now() - _t_total)
 
     def _reset_env_by_motion(self, env_ids: Sequence[int]):
-        root_pos = self.body_pos_w[:, 0].clone()
-        root_ori = self.body_quat_w[:, 0].clone()
-        root_lin_vel = self.body_lin_vel_w[:, 0].clone()
-        root_ang_vel = self.body_ang_vel_w[:, 0].clone()
-        joint_pos = self.joint_pos.clone()
-        joint_vel = self.joint_vel.clone()
+        _t_total = self._time_now()
+        root_pos = self.body_pos_w[:, 0]
+        root_ori = self.body_quat_w[:, 0]
+        root_lin_vel = self.body_lin_vel_w[:, 0]
+        root_ang_vel = self.body_ang_vel_w[:, 0]
+        joint_pos = self.joint_pos
+        joint_vel = self.joint_vel
 
-        range_list = [
-            self.cfg.pose_range.get(key, (0.0, 0.0))
-            for key in ["x", "y", "z", "roll", "pitch", "yaw"]
-        ]
-        ranges = torch.tensor(range_list, device=self.device)
+        _t_step = self._time_now()
         rand_samples = sample_uniform(
-            ranges[:, 0], ranges[:, 1], (len(env_ids), 6), device=self.device
+            self.pose_ranges[:, 0], self.pose_ranges[:, 1], (len(env_ids), 6), device=self.device
         )
         root_pos[env_ids] += rand_samples[:, 0:3]
         orientations_delta = quat_from_euler_xyz(
             rand_samples[:, 3], rand_samples[:, 4], rand_samples[:, 5]
         )
         root_ori[env_ids] = quat_mul(orientations_delta, root_ori[env_ids])
-        range_list = [
-            self.cfg.velocity_range.get(key, (0.0, 0.0))
-            for key in ["x", "y", "z", "roll", "pitch", "yaw"]
-        ]
-        ranges = torch.tensor(range_list, device=self.device)
+        self._record_timing_metric("time_s_reset_env_pose_noise", self._time_now() - _t_step)
+
+        _t_step = self._time_now()
         rand_samples = sample_uniform(
-            ranges[:, 0], ranges[:, 1], (len(env_ids), 6), device=self.device
+            self.velocity_ranges[:, 0], self.velocity_ranges[:, 1], (len(env_ids), 6), device=self.device
         )
         root_lin_vel[env_ids] += rand_samples[:, :3]
         root_ang_vel[env_ids] += rand_samples[:, 3:]
+        self._record_timing_metric("time_s_reset_env_velocity_noise", self._time_now() - _t_step)
 
+        _t_step = self._time_now()
         joint_pos += sample_uniform(
             *self.cfg.joint_position_range, joint_pos.shape, joint_pos.device
         )
@@ -355,9 +485,17 @@ class MotionCommand(CommandTerm):
             soft_joint_pos_limits[:, :, 0],
             soft_joint_pos_limits[:, :, 1],
         )
+        self._record_timing_metric(
+            "time_s_reset_env_joint_noise_and_clip", self._time_now() - _t_step
+        )
+        _t_step = self._time_now()
         self.robot.write_joint_state_to_sim(
             joint_pos[env_ids], joint_vel[env_ids], env_ids=env_ids
         )
+        self._record_timing_metric(
+            "time_s_reset_env_write_joint_state", self._time_now() - _t_step
+        )
+        _t_step = self._time_now()
         self.robot.write_root_state_to_sim(
             torch.cat(
                 [
@@ -370,17 +508,44 @@ class MotionCommand(CommandTerm):
             ),
             env_ids=env_ids,
         )
+        self._record_timing_metric(
+            "time_s_reset_env_write_root_state", self._time_now() - _t_step
+        )
+        self._record_timing_metric("time_s_reset_env_total", self._time_now() - _t_total)
 
     def _update_command(self):
-        self.time_steps += 1
-        env_ids = torch.where(self.time_steps >= self.motion.time_step_total)[0]
-        self._resample_command(env_ids)
-
+        _t_start = self._time_now()
+        # env_ids = torch.where(self.time_steps >= self.motion.time_step_total)[0]
+        # self._resample_command(env_ids)
+        
+        _t_step = self._time_now()
+        self._update_motion_cache()
+        self._record_timing_metric(
+            "time_s_update_command_update_motion_cache",
+            self._time_now() - _t_step,
+        )
+        _t_step = self._time_now()
+        self._update_robot_state_cache()
+        self._record_timing_metric(
+            "time_s_update_command_update_robot_cache",
+            self._time_now() - _t_step,
+        )
+        _t_step = self._time_now()
+        self._make_calculate()
+        self._record_timing_metric(
+            "time_s_update_command_make_calculate",
+            self._time_now() - _t_step,
+        )
+        
         self.bin_failed_count = (
             self.cfg.adaptive_alpha * self._current_bin_failed
             + (1 - self.cfg.adaptive_alpha) * self.bin_failed_count
         )
         self._current_bin_failed.zero_()
+        self._record_timing_metric("time_s_update_command_total", self._time_now() - _t_start)
+
+        self.time_steps += 1
+        # self.reached_motion_end = self.time_steps > self.motion.time_step_total
 
     def _set_debug_vis_impl(self, debug_vis: bool):
         if debug_vis:
@@ -467,6 +632,9 @@ class MotionCommandCfg(CommandTermCfg):
     adaptive_lambda: float = 0.8
     adaptive_uniform_ratio: float = 0.1
     adaptive_alpha: float = 0.001
+    enable_timing_metrics: bool = True
+    timing_sync_cuda: bool = False
+    timing_ema_alpha: float = 0.1
 
     anchor_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(
         prim_path="/Visuals/Command/pose"

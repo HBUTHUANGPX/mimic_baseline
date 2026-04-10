@@ -13,6 +13,7 @@ motion_group:
     # file_name: [ "artifacts/g1/xsens_bvh/251203/03_fast_forward_walk_120Hz.npz", "artifacts/g1/xsens_bvh/251203/01_slowly_forward_walk_120Hz.npz" ]
     # folder_name: ["artifacts/g1/xsens_bvh"]
     folder_name: [
+      # "soma-retargeter/assets/motions/test-export"
     ]
     wo_file_name: []
     wo_folder_name: []

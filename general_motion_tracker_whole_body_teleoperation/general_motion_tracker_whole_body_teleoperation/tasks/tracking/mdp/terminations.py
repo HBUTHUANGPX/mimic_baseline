@@ -50,3 +50,8 @@ def bad_motion_body_pos_z_only(
     body_indexes = _get_body_indexes(command, body_names)
     error = torch.abs(command.body_pos_error[:, body_indexes, -1])
     return torch.any(error > threshold, dim=-1)
+
+def reached_motion_end(env: ManagerBasedRLEnv, command_name: str) -> torch.Tensor:
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    # return command.reached_motion_end
+    return command.time_steps >= command.motion.time_step_total

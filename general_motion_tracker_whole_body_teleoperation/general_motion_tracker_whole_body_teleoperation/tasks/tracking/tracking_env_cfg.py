@@ -655,6 +655,10 @@ class TerminationsCfg:
         },
     )
 
+    reach_motion_clip_end = DoneTerm(
+        func=mdp.reached_motion_end, params={"command_name": "motion"}
+    )
+
 
 @configclass
 class CurriculumCfg:

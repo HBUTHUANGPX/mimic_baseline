@@ -172,10 +172,10 @@ class MotionLoader_robot:
 
     def extract_part(self, path: str) -> str | None:
         """Extract an artifact-relative motion path."""
-        if path.startswith("artifacts/"):
-            relative_path = path[len("artifacts/") :]
-            if relative_path.endswith(".npz"):
-                return relative_path
+        # if path.startswith("artifacts/"):
+        #     relative_path = path[len("artifacts/") :]
+        if path.endswith(".npz"):
+            return path
         return None
 
     def _normalize_paths(self, paths: list[str] | str) -> list[str]:
