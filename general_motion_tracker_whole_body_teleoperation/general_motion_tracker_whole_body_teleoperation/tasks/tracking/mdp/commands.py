@@ -300,6 +300,7 @@ class MotionCommand(CommandTerm):
         self.robot_anchor_ori_w = robot_anchor_ori_mat[..., :2].reshape(
             self.num_envs, -1
         )
+        # self.robot_anchor_ori_w = self.robot_anchor_quat_w
         # Robot body pose in robot-anchor frame.
         robot_body_pos_b, robot_body_ori_b = subtract_frame_transforms(
             robot_anchor_pos_w_repeat,
@@ -308,6 +309,7 @@ class MotionCommand(CommandTerm):
             self.robot_body_quat_w,
         )
         self.robot_body_pos_b = robot_body_pos_b
+        # self.robot_body_ori_b = robot_body_ori_b.reshape(self.num_envs, -1)
         self.robot_body_ori_b = matrix_from_quat(robot_body_ori_b)[..., :2].reshape(
             self.num_envs, -1
         )
@@ -322,6 +324,7 @@ class MotionCommand(CommandTerm):
         self.motion_anchor_ori_b = matrix_from_quat(motion_anchor_ori_b)[
             ..., :2
         ].reshape(self.num_envs, -1)
+        # self.motion_anchor_ori_b = motion_anchor_ori_b
         # Shared error tensors used by rewards/terminations/metrics.
         self.anchor_pos_error = self.anchor_pos_w - self.robot_anchor_pos_w
         self.anchor_lin_vel_error = self.anchor_lin_vel_w - self.robot_anchor_lin_vel_w
