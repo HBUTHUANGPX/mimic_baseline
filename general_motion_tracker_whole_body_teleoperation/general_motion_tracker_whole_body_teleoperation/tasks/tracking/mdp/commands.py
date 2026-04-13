@@ -85,6 +85,7 @@ class MotionCommand(CommandTerm):
         self.kernel = self.kernel / self.kernel.sum()
         self._perpare_metrics()
 
+        self.body_pos_start_w = self.motion.body_pos_w[0:1,...]
         self._update_motion_cache()
         self._update_robot_state_cache()
         self._make_calculate()
@@ -204,6 +205,7 @@ class MotionCommand(CommandTerm):
         if len(env_ids) == 0:
             return
         self._adaptive_sampling(env_ids)  # 对time_stamps进行自适应采样
+        self.body_pos_start_w = self.motion.body_pos_w[self.time_steps]*torch.tensor([1,1,0], device=self.device)[None,...]
         self._update_motion_cache()
         self._reset_env_by_motion(
             env_ids
@@ -216,8 +218,10 @@ class MotionCommand(CommandTerm):
         assert (
             self.time_steps.max() < self.motion.time_step_total
         ), f"time_steps: {self.time_steps}, motion time_step_total: {self.motion.time_step_total}"
+
         self.body_pos_w = (
             self.motion.body_pos_w[self.time_steps]
+            - self.body_pos_start_w 
             + self._env.scene.env_origins[:, None, :]
         )
         self.body_quat_w = self.motion.body_quat_w[self.time_steps]
@@ -227,6 +231,7 @@ class MotionCommand(CommandTerm):
         self.joint_vel = self.motion.joint_vel[self.time_steps]
         self.anchor_pos_w = (
             self.motion.body_pos_w[self.time_steps, self.motion_anchor_body_index]
+            - self.body_pos_start_w[:, self.motion_anchor_body_index]
             + self._env.scene.env_origins
         )
         self.anchor_quat_w = self.motion.body_quat_w[
