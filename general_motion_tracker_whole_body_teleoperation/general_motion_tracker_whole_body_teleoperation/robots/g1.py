@@ -155,7 +155,7 @@ G1_CYLINDER_CFG = ArticulationCfg(
     spawn=sim_utils.UrdfFileCfg(
         fix_base=False,
         replace_cylinders_with_capsules=True,
-        asset_path=ASSET_DIR + "/unitree_g1/g1_29dof_mode_15.urdf",
+        asset_path=ASSET_DIR + "/unitree_g1/g1_29dof_mode_15_custom_co.urdf",
         activate_contact_sensors=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=False,
@@ -176,9 +176,13 @@ G1_CYLINDER_CFG = ArticulationCfg(
                 stiffness=0, damping=0
             )
         ),
+        collision_props=sim_utils.CollisionPropertiesCfg(
+            contact_offset=0.1,
+            rest_offset=-0.001,
+        ),# TODO:检查这个是否对碰撞检测有好的影响
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(0.0, 0.0, 0.793),
+        pos=(0.0, 0.0, 80.793),
         joint_pos={
             ".*_hip_pitch_joint": 0.0,
             ".*_knee_joint": 0.0,

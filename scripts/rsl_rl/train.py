@@ -221,7 +221,8 @@ def main(
         print(f"\nGroup: {group_name}")
         print(f"[INFO] Collected {len(paths)} motion files for training.")
     # print(motion_file)
-    env_cfg.commands.motion.motion_file = motion_file_group
+    if hasattr(env_cfg, "commands") and hasattr(env_cfg.commands, "motion") and hasattr(env_cfg.commands.motion, "motion_file"):
+        env_cfg.commands.motion.motion_file = motion_file_group
     # specify directory for logging experiments
     log_root_path = os.path.join("logs", "rsl_rl", agent_cfg.experiment_name)
     log_root_path = os.path.abspath(log_root_path)

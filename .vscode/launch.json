@@ -129,6 +129,18 @@
             ]
         },
         {
+            "name": "g1 terrain play",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/home/hpx/HPX_LOCO_2/mimic_baseline/scripts/rsl_rl/play.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--task", "Tracking-Terrain-G1-Play-v0",
+                "--domain_randomization", 
+                "--num_envs", "128"
+            ]
+        },
+        {
             "name": "deploy_g1_mujoco",
             "type": "debugpy",
             "request": "launch",
