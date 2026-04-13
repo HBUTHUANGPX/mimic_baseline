@@ -85,7 +85,8 @@ class MotionCommand(CommandTerm):
         self.kernel = self.kernel / self.kernel.sum()
         self._perpare_metrics()
 
-        self.body_pos_start_w = self.motion.body_pos_w[0:1,...]
+        self.body_pos_start_w = self.motion.body_pos_w[self.time_steps]*torch.tensor([1,1,0], device=self.device)[None,...]
+
         self._update_motion_cache()
         self._update_robot_state_cache()
         self._make_calculate()
@@ -205,7 +206,7 @@ class MotionCommand(CommandTerm):
         if len(env_ids) == 0:
             return
         self._adaptive_sampling(env_ids)  # 对time_stamps进行自适应采样
-        self.body_pos_start_w = self.motion.body_pos_w[self.time_steps]*torch.tensor([1,1,0], device=self.device)[None,...]
+        self.body_pos_start_w[env_ids] = (self.motion.body_pos_w[self.time_steps]*torch.tensor([1,1,0], device=self.device)[None,...])[env_ids]
         self._update_motion_cache()
         self._reset_env_by_motion(
             env_ids

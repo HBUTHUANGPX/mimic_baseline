@@ -51,7 +51,7 @@ ROUGH_TERRAINS_CFG = TerrainGeneratorCfg(
     use_cache=False,
     sub_terrains={
         "pyramid_stairs": terrain_gen.MeshPyramidStairsTerrainCfg(
-            proportion=0.2,
+            proportion=0.,
             step_height_range=(0.05, 0.23),
             step_width=0.3,
             platform_width=3.0,
@@ -59,7 +59,7 @@ ROUGH_TERRAINS_CFG = TerrainGeneratorCfg(
             holes=False,
         ),
         "pyramid_stairs_inv": terrain_gen.MeshInvertedPyramidStairsTerrainCfg(
-            proportion=0.2,
+            proportion=0.,
             step_height_range=(0.05, 0.23),
             step_width=0.3,
             platform_width=3.0,
@@ -155,7 +155,7 @@ class CommandsCfg:
             # "pitch": (-0., 0.),
             # "yaw": (-0., 0.),
             "x": (-0.1, 0.1),
-            "z": (-0.0, 0.0),
+            "z": (0.05, 0.1),
             "y": (-0.1, 0.1),
             "roll": (-0.1, 0.1),
             "pitch": (-0.1, 0.1),
