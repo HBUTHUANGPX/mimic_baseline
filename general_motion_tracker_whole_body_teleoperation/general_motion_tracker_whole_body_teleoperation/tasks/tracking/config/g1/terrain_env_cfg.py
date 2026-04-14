@@ -59,7 +59,7 @@ class G1TerrainEnvCfg(TrackingEnvCfg):
             "left_wrist_yaw_link",
             "right_wrist_yaw_link",
         ]
-        self.commands.motion.bad_steps_threshold = 8*int(1/self.sim.dt)
+        self.commands.motion.bad_steps_threshold = 1*int(1/self.sim.dt)
 
 @configclass
 class G1TerrainEnvCfg_PLAY(G1TerrainEnvCfg):

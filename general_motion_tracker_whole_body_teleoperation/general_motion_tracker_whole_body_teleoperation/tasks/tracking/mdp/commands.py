@@ -488,12 +488,13 @@ class MotionCommand(CommandTerm):
                 "bad_tracking_terminate"
             ).float()
         )
-        value = (self._time_out - self._bad_tracking_terminate) * env_ids.shape[0]/self.num_envs
-        self.scale_difficulty += value
-        self.scale_difficulty = self.scale_difficulty.clip(0)
-        self._pose_ranges = self.pose_ranges * self.scale_difficulty
-        self._velocity_ranges = self.velocity_ranges * self.scale_difficulty
-        self.bad_steps_threshold =  self.cfg.bad_steps_threshold*self.scale_difficulty
+        value = (self._time_out) * env_ids.shape[0]/self.num_envs *25
+        # self.scale_difficulty += value
+        # self.scale_difficulty = self.scale_difficulty.clip(0,0.5)
+
+        self._pose_ranges = self.pose_ranges * 1#(0.5+self.scale_difficulty)
+        self._velocity_ranges = self.velocity_ranges * 1#(0.5+self.scale_difficulty)
+        self.bad_steps_threshold =  self.cfg.bad_steps_threshold
         
     def _set_debug_vis_impl(self, debug_vis: bool):
         if debug_vis:
