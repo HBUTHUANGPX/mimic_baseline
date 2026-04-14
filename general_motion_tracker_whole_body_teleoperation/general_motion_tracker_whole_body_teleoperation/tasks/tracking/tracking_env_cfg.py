@@ -157,8 +157,8 @@ class CommandsCfg:
             "x": (-0.1, 0.1),
             "z": (0.05, 0.1),
             "y": (-0.1, 0.1),
-            "roll": (-0.1, 0.1),
-            "pitch": (-0.1, 0.1),
+            "roll": (-1.4, 1.4),
+            "pitch": (-1.4, 1.4),
             "yaw": (-0.2, 0.2),
         },
         velocity_range=VELOCITY_RANGE,
@@ -665,51 +665,9 @@ class TerminationsCfg:
     """Termination terms for the MDP."""
 
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
-    ref_pos = DoneTerm(
-        func=mdp.bad_anchor_pos_z_only,
-        params={"command_name": "motion", "threshold": 0.25},
-    )
-    ref_ori = DoneTerm(
-        func=mdp.bad_anchor_ori,
-        params={
-            "asset_cfg": SceneEntityCfg("robot"),
-            "command_name": "motion",
-            "threshold": 0.8,
-        },
-    )
-    ee_body_pos_knee = DoneTerm(
-        func=mdp.bad_motion_body_pos_z_only,
-        params={
-            "command_name": "motion",
-            "threshold": 0.28,
-            "body_names": [
-                "L_knee_link",
-                "R_knee_link",
-            ],
-        },
-    )
-    ee_body_pos_ankle = DoneTerm(
-        func=mdp.bad_motion_body_pos_z_only,
-        params={
-            "command_name": "motion",
-            "threshold": 0.28,
-            "body_names": [
-                "L_ankle_roll_link",
-                "R_ankle_roll_link",
-            ],
-        },
-    )
-
-    ee_body_pos_wrist = DoneTerm(
-        func=mdp.bad_motion_body_pos_z_only,
-        params={
-            "command_name": "motion",
-            "threshold": 0.25,
-            "body_names": [
-                "L_wrist_pitch_link",
-                "R_wrist_pitch_link",
-            ],
-        },
+    bad_tracking_terminate = DoneTerm(
+        func=mdp.bad_tracking_terminated,
+        params={"command_name": "motion"},
     )
 
     # reach_motion_clip_end = DoneTerm(
@@ -760,7 +718,7 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
         self.commands.motion.future_frames = 10
         # self.decimation = 20
         # self.sim.dt = 0.001
-        self.episode_length_s = 10.0
+        self.episode_length_s = 20.0
         # simulation settings
         self.sim.render_interval = self.decimation
         self.sim.physics_material = self.scene.terrain.physics_material

@@ -7,60 +7,18 @@ from general_motion_tracker_whole_body_teleoperation.robots.g1 import (
     G1_ACTION_SCALE,
     G1_CYLINDER_CFG,
 )
-
+from general_motion_tracker_whole_body_teleoperation.tasks.tracking.config.g1.terrain_env_cfg import (
+    G1TerrainEnvCfg,
+)
 @configclass
-class G1FlatEnvCfg(TrackingEnvCfg):
+class G1FlatEnvCfg(G1TerrainEnvCfg):
     def __post_init__(self):
         super().__post_init__()
 
-        self.scene.robot = G1_CYLINDER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
         self.scene.terrain.terrain_type = "plane"
         self.scene.terrain.terrain_generator = None
         self.scene.terrain.max_init_terrain_level = None
-        self.actions.joint_pos.scale = G1_ACTION_SCALE
-        self.commands.motion.anchor_body_name = "torso_link"
-        self.commands.motion.body_names = [
-            "pelvis",
-            "left_hip_yaw_link",
-            "left_knee_link",
-            "left_ankle_roll_link",
-            "right_hip_yaw_link",
-            "right_knee_link",
-            "right_ankle_roll_link",
-            "torso_link",
-            "left_shoulder_yaw_link",
-            "left_elbow_link",
-            "left_wrist_yaw_link",
-            "right_shoulder_yaw_link",
-            "right_elbow_link",
-            "right_wrist_yaw_link",
-        ]
-        self.rewards.foot_contact_velocity.params["body_names"] = [
-            "left_ankle_roll_link",
-            "right_ankle_roll_link",
-        ]
-        self.rewards.undesired_contacts.params["sensor_cfg"].body_names = [
-            r"^(?!left_ankle_roll_link$)(?!right_ankle_roll_link$)(?!left_wrist_yaw_link$)(?!right_wrist_yaw_link$).+$"
-        ]
-        self.events.knee_link_com.params["asset_cfg"].body_names = [
-            "left_knee_link",
-            "right_knee_link",
-        ]
-        self.events.pelvis_com.params["asset_cfg"].body_names = ["pelvis"]
-
-        self.terminations.ee_body_pos_knee.params["body_names"] = [
-            "left_knee_link",
-            "right_knee_link",
-        ]
-        self.terminations.ee_body_pos_ankle.params["body_names"] = [
-            "left_ankle_roll_link",
-            "right_ankle_roll_link",
-        ]
-        self.terminations.ee_body_pos_wrist.params["body_names"] = [
-            "left_wrist_yaw_link",
-            "right_wrist_yaw_link",
-        ]
-
+        
 
 @configclass
 class G1FlatPureEnvCfg(G1FlatEnvCfg):

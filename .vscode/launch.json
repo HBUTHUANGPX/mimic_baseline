@@ -122,10 +122,9 @@
             "console": "integratedTerminal",
             "args": [
                 "--task", "Tracking-Flat-G1-v0",
-                "--headless",
-                // "--logger", "wandb",
-                "--log_project_name", "bydmmc",
+                // "--headless",
                 "--run_name",  "test",
+                "--num_envs", "128"
             ]
         },
         {

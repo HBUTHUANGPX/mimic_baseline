@@ -47,22 +47,19 @@ class G1TerrainEnvCfg(TrackingEnvCfg):
         ]
         self.events.pelvis_com.params["asset_cfg"].body_names = ["pelvis"]
 
-        self.terminations.ref_pos = None
-        self.terminations.ee_body_pos_knee = None
-        self.terminations.ee_body_pos_ankle = None
-        self.terminations.ee_body_pos_wrist = None
-        # self.terminations.ee_body_pos_knee.params["body_names"] = [
-        #     "left_knee_link",
-        #     "right_knee_link",
-        # ]
-        # self.terminations.ee_body_pos_ankle.params["body_names"] = [
-        #     "left_ankle_roll_link",
-        #     "right_ankle_roll_link",
-        # ]
-        # self.terminations.ee_body_pos_wrist.params["body_names"] = [
-        #     "left_wrist_yaw_link",
-        #     "right_wrist_yaw_link",
-        # ]
+        self.commands.motion.ee_body_pos_knee_body_names = [
+            "left_knee_link",
+            "right_knee_link",
+        ]
+        self.commands.motion.ee_body_pos_ankle_body_names = [
+            "left_ankle_roll_link",
+            "right_ankle_roll_link",
+        ]
+        self.commands.motion.ee_body_pos_wrist_body_names = [
+            "left_wrist_yaw_link",
+            "right_wrist_yaw_link",
+        ]
+        self.commands.motion.bad_steps_threshold = 2*int(1/self.sim.dt)
 
 @configclass
 class G1TerrainEnvCfg_PLAY(G1TerrainEnvCfg):

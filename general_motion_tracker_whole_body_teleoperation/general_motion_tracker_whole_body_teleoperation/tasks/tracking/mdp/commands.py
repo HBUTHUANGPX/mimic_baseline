@@ -64,6 +64,7 @@ class MotionCommand(CommandTerm):
             self.num_envs, len(cfg.body_names), 4, device=self.device
         )
         self.body_quat_relative_w[:, :, 0] = 1.0
+        self.consecutive_bad_steps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
 
         self.bin_count = (
             int(
@@ -90,6 +91,7 @@ class MotionCommand(CommandTerm):
         self._update_motion_cache()
         self._update_robot_state_cache()
         self._make_calculate()
+        self._update_termination_cache()
         range_list = [
             self.cfg.velocity_range.get(key, (0.0, 0.0))
             for key in ["x", "y", "z", "roll", "pitch", "yaw"]
@@ -207,6 +209,7 @@ class MotionCommand(CommandTerm):
             return
         self._adaptive_sampling(env_ids)  # 对time_stamps进行自适应采样
         self.body_pos_start_w[env_ids] = (self.motion.body_pos_w[self.time_steps]*torch.tensor([1,1,0], device=self.device)[None,...])[env_ids]
+        self.consecutive_bad_steps[env_ids] = 0  # 重置坏跟踪连续计数器
         self._update_motion_cache()
         self._reset_env_by_motion(
             env_ids
@@ -222,7 +225,7 @@ class MotionCommand(CommandTerm):
 
         self.body_pos_w = (
             self.motion.body_pos_w[self.time_steps]
-            - self.body_pos_start_w 
+            - self.body_pos_start_w [:, self.motion_anchor_body_index:self.motion_anchor_body_index+1,:]
             + self._env.scene.env_origins[:, None, :]
         )
         self.body_quat_w = self.motion.body_quat_w[self.time_steps]
@@ -272,6 +275,41 @@ class MotionCommand(CommandTerm):
         self.robot_anchor_ang_vel_w = self.robot.data.body_ang_vel_w[
             :, self.robot_anchor_body_index
         ].clone()
+
+    def _update_termination_cache(self):
+        self.bad_ref_pos = self.bad_anchor_pos_z_only(0.25)
+        self.bad_ref_ori = self.bad_anchor_ori(0.8)
+        self.ee_body_pos_knee = self.bad_motion_body_pos_z_only(
+            0.28, self.cfg.ee_body_pos_knee_body_names
+        )
+        self.ee_body_pos_ankle = self.bad_motion_body_pos_z_only(
+            0.28, self.cfg.ee_body_pos_ankle_body_names
+        )
+        self.ee_body_pos_wrist = self.bad_motion_body_pos_z_only(
+            0.25, self.cfg.ee_body_pos_wrist_body_names
+        )
+
+        self.bad_tracking_indicator = (
+            self.bad_ref_pos
+            | self.bad_ref_ori
+            | self.ee_body_pos_knee
+            | self.ee_body_pos_ankle
+            | self.ee_body_pos_wrist
+        )
+
+        self.consecutive_bad_steps = torch.where(
+            self.bad_tracking_indicator,
+            self.consecutive_bad_steps + 1,
+            torch.zeros_like(self.consecutive_bad_steps)
+        )
+        # 恢复状态指示器 I_is_recovering(k)
+        self.is_recovering = self._is_recovering(0.1)
+        # 最终坏跟踪终止指示器 I_bad_tracking_terminate(k)
+        self.bad_tracking_terminate = torch.where(
+            self.is_recovering,
+            self.consecutive_bad_steps >= self.cfg.bad_steps_threshold,  # tau_bad
+            self.bad_tracking_indicator
+        )
 
     def _make_calculate(self):
         num_bodies = len(self.cfg.body_names)
@@ -421,6 +459,7 @@ class MotionCommand(CommandTerm):
         self._update_motion_cache()
         self._update_robot_state_cache()
         self._make_calculate()
+        self._update_termination_cache()
 
         self.bin_failed_count = (
             self.cfg.adaptive_alpha * self._current_bin_failed
@@ -492,6 +531,49 @@ class MotionCommand(CommandTerm):
                 self.body_pos_relative_w[:, i], self.body_quat_relative_w[:, i]
             )
 
+    def _is_recovering(
+        self, threshold: float
+    ) -> torch.Tensor:
+        return (
+            self.motion_projected_gravity_b[:, 2]
+            - self.robot_projected_gravity_b[:, 2]
+        ).abs() > threshold 
+    
+    def bad_anchor_pos(self, threshold: float) -> torch.Tensor:
+        return self.anchor_pos_error_norm > threshold
+
+    def bad_anchor_pos_z_only(self, threshold: float) -> torch.Tensor:
+        return torch.abs(self.anchor_pos_error[:, -1]) > threshold
+
+    def bad_anchor_ori(
+        self, threshold: float
+    ) -> torch.Tensor:
+        return (
+            self.motion_projected_gravity_b[:, 2]
+            - self.robot_projected_gravity_b[:, 2]
+        ).abs() > threshold  
+
+    def bad_motion_body_pos(
+        self, threshold: float, body_names: list[str] | None = None
+    ) -> torch.Tensor:
+        body_indexes = self._get_body_indexes(body_names)
+        error = self.body_pos_error_norm[:, body_indexes]
+        return torch.any(error > threshold, dim=-1)
+
+    def bad_motion_body_pos_z_only(
+        self, threshold: float, body_names: list[str] | None = None
+    ) -> torch.Tensor:
+        body_indexes = self._get_body_indexes(body_names)
+        error = torch.abs(self.body_pos_error[:, body_indexes, -1])
+        return torch.any(error > threshold, dim=-1)     
+
+    def _get_body_indexes(self, body_names: list[str] | None) -> list[int]:
+        return [
+            i
+            for i, name in enumerate(self.cfg.body_names)
+            if (body_names is None) or (name in body_names)
+        ]
+
 
 @configclass
 class MotionCommandCfg(CommandTermCfg):
@@ -504,6 +586,11 @@ class MotionCommandCfg(CommandTermCfg):
     motion_file: dict[str, list[str] | str] | str = MISSING
     anchor_body_name: str = MISSING
     body_names: list[str] = MISSING
+
+    ee_body_pos_knee_body_names: list[str] = MISSING
+    ee_body_pos_ankle_body_names: list[str] = MISSING
+    ee_body_pos_wrist_body_names: list[str] = MISSING
+    bad_steps_threshold: int = MISSING
 
     pose_range: dict[str, tuple[float, float]] = {}
     velocity_range: dict[str, tuple[float, float]] = {}
