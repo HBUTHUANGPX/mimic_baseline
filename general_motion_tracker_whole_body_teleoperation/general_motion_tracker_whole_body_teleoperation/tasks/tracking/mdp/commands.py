@@ -314,7 +314,7 @@ class MotionCommand(CommandTerm):
         # 最终坏跟踪终止指示器 I_bad_tracking_terminate(k)
         self.bad_tracking_terminate = torch.where(
             self.is_recovering,
-            self.consecutive_bad_steps >= self.cfg.bad_steps_threshold,  # tau_bad
+            self.consecutive_bad_steps >= self.bad_steps_threshold,  # tau_bad
             self.bad_tracking_indicator
         )
 
@@ -492,8 +492,8 @@ class MotionCommand(CommandTerm):
         self.scale_difficulty = self.scale_difficulty.clip(0)
         self._pose_ranges = self.pose_ranges * self.scale_difficulty
         self._velocity_ranges = self.velocity_ranges * self.scale_difficulty
-
-
+        self.bad_steps_threshold =  self.cfg.bad_steps_threshold*self.scale_difficulty
+        
     def _set_debug_vis_impl(self, debug_vis: bool):
         if debug_vis:
             if not hasattr(self, "current_anchor_visualizer"):
