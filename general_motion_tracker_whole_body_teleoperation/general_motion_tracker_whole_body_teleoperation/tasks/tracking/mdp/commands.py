@@ -102,6 +102,7 @@ class MotionCommand(CommandTerm):
             for key in ["x", "y", "z", "roll", "pitch", "yaw"]
         ]
         self.pose_ranges = torch.tensor(range_list, device=self.device)
+        self.scale_difficulty = torch.zeros(1, device=self.device)
         self.soft_joint_pos_limits = self.robot.data.soft_joint_pos_limits.clone()
 
     @property
@@ -140,6 +141,9 @@ class MotionCommand(CommandTerm):
         self.metrics["error_body_ang_vel"] = torch.zeros(
             self.num_envs, device=self.device
         )
+        self.metrics["scale_difficulty"] = torch.zeros(
+            self.num_envs, device=self.device
+        )
 
     def _update_metrics(self):
         self.metrics["error_anchor_pos"] = self.anchor_pos_error_norm
@@ -152,6 +156,7 @@ class MotionCommand(CommandTerm):
         self.metrics["error_body_ang_vel"] = self.body_ang_vel_error_norm.mean(dim=-1)
         self.metrics["error_joint_pos"] = self.joint_pos_error_norm
         self.metrics["error_joint_vel"] = self.joint_vel_error_norm
+        self.metrics["scale_difficulty"] = self.scale_difficulty*torch.ones(self.num_envs, device=self.device)
 
     def _adaptive_sampling(self, env_ids: Sequence[int]):
         episode_failed = self._env.termination_manager.terminated[env_ids]
@@ -211,6 +216,7 @@ class MotionCommand(CommandTerm):
         self.body_pos_start_w[env_ids] = (self.motion.body_pos_w[self.time_steps]*torch.tensor([1,1,0], device=self.device)[None,...])[env_ids]
         self.consecutive_bad_steps[env_ids] = 0  # 重置坏跟踪连续计数器
         self._update_motion_cache()
+        self._update_difficulty(env_ids) 
         self._reset_env_by_motion(
             env_ids
         )  # 根据采样的time_stamps对应的motion数据重置环境状态
@@ -411,8 +417,8 @@ class MotionCommand(CommandTerm):
         joint_vel = self.joint_vel[env_ids]
 
         rand_samples = sample_uniform(
-            self.pose_ranges[:, 0],
-            self.pose_ranges[:, 1],
+            self._pose_ranges[:, 0],
+            self._pose_ranges[:, 1],
             (len(env_ids), 6),
             device=self.device,
         )
@@ -422,8 +428,8 @@ class MotionCommand(CommandTerm):
         )
         root_ori = quat_mul(orientations_delta, root_ori)
         rand_samples = sample_uniform(
-            self.velocity_ranges[:, 0],
-            self.velocity_ranges[:, 1],
+            self._velocity_ranges[:, 0],
+            self._velocity_ranges[:, 1],
             (len(env_ids), 6),
             device=self.device,
         )
@@ -468,6 +474,25 @@ class MotionCommand(CommandTerm):
         )
         self._current_bin_failed.zero_()
         # self.reached_motion_end = self.time_steps > self.motion.time_step_total
+
+    def _update_difficulty(self,env_ids: Sequence[int]):
+        # 触发了timeout提高难度,触发了bad_tracking_terminate降低难度
+        self._time_out = torch.mean(
+            self._env.unwrapped.termination_manager.get_term(
+                "time_out"
+            ).float()
+        )
+        self._bad_tracking_terminate = torch.mean(
+            self._env.unwrapped.termination_manager.get_term(
+                "bad_tracking_terminate"
+            ).float()
+        )
+        value = (self._time_out - self._bad_tracking_terminate)*1e-2 * env_ids.shape[0]/self.num_envs
+        self.scale_difficulty += value
+        self.scale_difficulty = self.scale_difficulty.clip(0)
+        self._pose_ranges = self.pose_ranges * self.scale_difficulty
+        self._velocity_ranges = self.velocity_ranges * self.scale_difficulty
+
 
     def _set_debug_vis_impl(self, debug_vis: bool):
         if debug_vis:
@@ -539,7 +564,7 @@ class MotionCommand(CommandTerm):
             self.motion_projected_gravity_b[:, 2]
             - self.robot_projected_gravity_b[:, 2]
         ).abs() > threshold 
-    
+
     def bad_anchor_pos(self, threshold: float) -> torch.Tensor:
         return self.anchor_pos_error_norm > threshold
 
