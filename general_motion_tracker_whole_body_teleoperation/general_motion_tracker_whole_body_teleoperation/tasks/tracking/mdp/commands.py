@@ -87,6 +87,7 @@ class MotionCommand(CommandTerm):
         self._perpare_metrics()
 
         self.body_pos_start_w = self.motion.body_pos_w[self.time_steps]*torch.tensor([1,1,0], device=self.device)[None,...]
+        self.bad_steps_threshold = torch.zeros(self.num_envs,device=self.device)
 
         self._update_motion_cache()
         self._update_robot_state_cache()
@@ -487,7 +488,7 @@ class MotionCommand(CommandTerm):
                 "bad_tracking_terminate"
             ).float()
         )
-        value = (self._time_out - self._bad_tracking_terminate)*1e-2 * env_ids.shape[0]/self.num_envs
+        value = (self._time_out - self._bad_tracking_terminate) * env_ids.shape[0]/self.num_envs
         self.scale_difficulty += value
         self.scale_difficulty = self.scale_difficulty.clip(0)
         self._pose_ranges = self.pose_ranges * self.scale_difficulty
