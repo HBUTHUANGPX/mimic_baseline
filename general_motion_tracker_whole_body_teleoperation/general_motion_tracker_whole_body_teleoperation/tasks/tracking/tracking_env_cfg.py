@@ -157,8 +157,8 @@ class CommandsCfg:
             "x": (-0.1, 0.1),
             "z": (0.05, 0.1),
             "y": (-0.1, 0.1),
-            "roll": (-1.4, 1.4),
-            "pitch": (-1.4, 1.4),
+            "roll": (-0.1, 0.1),
+            "pitch": (-0.1, 0.1),
             "yaw": (-0.2, 0.2),
         },
         velocity_range=VELOCITY_RANGE,
@@ -658,6 +658,27 @@ class RewardsCfg:
         func=mdp.is_terminated,
         weight=-200,
     )
+    global_anchor_position_error_z = RewTerm(
+        func=mdp.motion_global_anchor_position_z_error_sum_square,
+        weight=-2.0,
+        params={
+            "command_name": "motion",
+        },
+    )
+    xy_anchor_movement_in_recovering = RewTerm(
+        func=mdp.xy_anchor_movement_in_recovering,
+        weight=-1.0,
+        params={
+            "command_name": "motion",
+        },
+    )
+    action_rate_l2_in_recovering = RewTerm(
+        func=mdp.action_rate_l2_in_recovering,
+        weight=-2.0,
+        params={
+            "command_name": "motion",
+        },
+    )
 
 
 @configclass
@@ -741,4 +762,3 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
         else:
             if self.scene.terrain.terrain_generator is not None:
                 self.scene.terrain.terrain_generator.curriculum = False
-

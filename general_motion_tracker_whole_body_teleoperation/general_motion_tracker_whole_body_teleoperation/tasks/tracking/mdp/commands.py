@@ -272,29 +272,30 @@ class MotionCommand(CommandTerm):
         self.robot_anchor_lin_vel_w = self.robot.data.body_lin_vel_w[
             :, self.robot_anchor_body_index
         ].clone()
+        self.root_lin_vel_b = self.robot.data.root_lin_vel_b.clone()
         self.robot_anchor_ang_vel_w = self.robot.data.body_ang_vel_w[
             :, self.robot_anchor_body_index
         ].clone()
 
     def _update_termination_cache(self):
-        self.bad_ref_pos = self.bad_anchor_pos_z_only(0.25)
-        self.bad_ref_ori = self.bad_anchor_ori(0.8)
-        self.ee_body_pos_knee = self.bad_motion_body_pos_z_only(
+        self._bad_ref_pos = self.bad_anchor_pos_z_only(0.25)
+        self._bad_ref_ori = self.bad_anchor_ori(0.8)
+        self._ee_body_pos_knee = self.bad_motion_body_pos_z_only(
             0.28, self.cfg.ee_body_pos_knee_body_names
         )
-        self.ee_body_pos_ankle = self.bad_motion_body_pos_z_only(
+        self._ee_body_pos_ankle = self.bad_motion_body_pos_z_only(
             0.28, self.cfg.ee_body_pos_ankle_body_names
         )
-        self.ee_body_pos_wrist = self.bad_motion_body_pos_z_only(
+        self._ee_body_pos_wrist = self.bad_motion_body_pos_z_only(
             0.25, self.cfg.ee_body_pos_wrist_body_names
         )
 
         self.bad_tracking_indicator = (
-            self.bad_ref_pos
-            | self.bad_ref_ori
-            | self.ee_body_pos_knee
-            | self.ee_body_pos_ankle
-            | self.ee_body_pos_wrist
+            self._bad_ref_pos
+            | self._bad_ref_ori
+            | self._ee_body_pos_knee
+            | self._ee_body_pos_ankle
+            | self._ee_body_pos_wrist
         )
 
         self.consecutive_bad_steps = torch.where(
@@ -303,7 +304,7 @@ class MotionCommand(CommandTerm):
             torch.zeros_like(self.consecutive_bad_steps)
         )
         # 恢复状态指示器 I_is_recovering(k)
-        self.is_recovering = self._is_recovering(0.1)
+        self.is_recovering = self._is_recovering(0.2)
         # 最终坏跟踪终止指示器 I_bad_tracking_terminate(k)
         self.bad_tracking_terminate = torch.where(
             self.is_recovering,

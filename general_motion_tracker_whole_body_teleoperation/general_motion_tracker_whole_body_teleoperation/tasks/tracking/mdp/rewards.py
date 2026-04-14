@@ -37,6 +37,24 @@ def motion_relative_body_position_error_exp(
     )
     return torch.exp(-error.mean(-1) / std**2)
 
+def motion_global_anchor_position_z_error_sum_square(
+    env: ManagerBasedRLEnv, command_name: str,
+) -> torch.Tensor:
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    error = torch.sum(torch.square(command.anchor_pos_error[..., 2:3]), dim=-1)
+    return error
+
+def xy_anchor_movement_in_recovering(
+    env: ManagerBasedRLEnv, command_name: str,
+) -> torch.Tensor:
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    xy_vel_sum = torch.sum(torch.square(command.robot_anchor_lin_vel_w[:, :2]), dim=-1)
+    return command.is_recovering*xy_vel_sum
+
+def action_rate_l2_in_recovering(env: ManagerBasedRLEnv, command_name: str,) -> torch.Tensor:
+    """Penalize the rate of change of the actions using L2 squared kernel."""
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    return command.is_recovering*torch.sum(torch.square(env.action_manager.action - env.action_manager.prev_action), dim=1)
 
 def motion_relative_body_orientation_error_exp(
     env: ManagerBasedRLEnv, command_name: str, std: float, body_names: list[str] | None = None
