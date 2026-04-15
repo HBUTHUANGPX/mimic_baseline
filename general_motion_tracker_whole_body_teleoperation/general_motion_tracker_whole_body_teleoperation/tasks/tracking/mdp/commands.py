@@ -28,7 +28,7 @@ from isaaclab.utils.math import (
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 from general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp.motion_loader import (
-    MotionLoader_robot as MotionLoader,
+    MotionLoader_human as MotionLoader,
 )
 
 
@@ -50,9 +50,14 @@ class MotionCommand(CommandTerm):
             dtype=torch.long,
             device=self.device,
         )
-
+        # 使用self.body_indexes将self.robot.body_names抽取出来
+        self.robot_body_names = [self.robot.body_names[i] for i in self.body_indexes]
         self.motion = MotionLoader(
-            self.cfg.motion_file, self.body_indexes, device=self.device
+            motion_file_group=self.cfg.motion_file,
+            robot_body_names=self.robot_body_names,
+            robot_joint_names=self.robot.joint_names,
+            body_indexes=self.body_indexes,
+            device=self.device,
         )
         self.time_steps = torch.zeros(
             self.num_envs, dtype=torch.long, device=self.device
@@ -217,7 +222,6 @@ class MotionCommand(CommandTerm):
         self.body_pos_start_w[env_ids] = (self.motion.body_pos_w[self.time_steps]*torch.tensor([1,1,0], device=self.device)[None,...])[env_ids]
         self.consecutive_bad_steps[env_ids] = 0  # 重置坏跟踪连续计数器
         self._update_motion_cache()
-        # self._update_difficulty(env_ids) 
         self._reset_env_by_motion(
             env_ids
         )  # 根据采样的time_stamps对应的motion数据重置环境状态
@@ -283,41 +287,6 @@ class MotionCommand(CommandTerm):
         self.robot_anchor_ang_vel_w = self.robot.data.body_ang_vel_w[
             :, self.robot_anchor_body_index
         ].clone()
-
-    # def _update_termination_cache(self):
-    #     self._bad_ref_pos = self.bad_anchor_pos_z_only(0.25)
-    #     self._bad_ref_ori = self.bad_anchor_ori(0.8)
-    #     self._ee_body_pos_knee = self.bad_motion_body_pos_z_only(
-    #         0.28, self.cfg.ee_body_pos_knee_body_names
-    #     )
-    #     self._ee_body_pos_ankle = self.bad_motion_body_pos_z_only(
-    #         0.28, self.cfg.ee_body_pos_ankle_body_names
-    #     )
-    #     self._ee_body_pos_wrist = self.bad_motion_body_pos_z_only(
-    #         0.25, self.cfg.ee_body_pos_wrist_body_names
-    #     )
-
-    #     self.bad_tracking_indicator = (
-    #         self._bad_ref_pos
-    #         | self._bad_ref_ori
-    #         | self._ee_body_pos_knee
-    #         | self._ee_body_pos_ankle
-    #         | self._ee_body_pos_wrist
-    #     )
-
-    #     self.consecutive_bad_steps = torch.where(
-    #         self.bad_tracking_indicator,
-    #         self.consecutive_bad_steps + 1,
-    #         torch.zeros_like(self.consecutive_bad_steps)
-    #     )
-    #     # 恢复状态指示器 I_is_recovering(k)
-    #     self.is_recovering = self._is_recovering(0.03)
-    #     # 最终坏跟踪终止指示器 I_bad_tracking_terminate(k)
-    #     self.bad_tracking_terminate = torch.where(
-    #         self.is_recovering,
-    #         self.consecutive_bad_steps >= self.bad_steps_threshold,  # tau_bad
-    #         self.bad_tracking_indicator
-    #     )
 
     def _make_calculate(self):
         num_bodies = len(self.cfg.body_names)
@@ -476,26 +445,6 @@ class MotionCommand(CommandTerm):
         self._current_bin_failed.zero_()
         # self.reached_motion_end = self.time_steps > self.motion.time_step_total
 
-    def _update_difficulty(self,env_ids: Sequence[int]):
-        # 触发了timeout提高难度,触发了bad_tracking_terminate降低难度
-        self._time_out = torch.mean(
-            self._env.unwrapped.termination_manager.get_term(
-                "time_out"
-            ).float()
-        )
-        self._bad_tracking_terminate = torch.mean(
-            self._env.unwrapped.termination_manager.get_term(
-                "bad_tracking_terminate"
-            ).float()
-        )
-        value = (self._time_out) * env_ids.shape[0]/self.num_envs *25
-        # self.scale_difficulty += value
-        # self.scale_difficulty = self.scale_difficulty.clip(0,0.5)
-
-        self._pose_ranges = self.pose_ranges * 1#(0.5+self.scale_difficulty)
-        self._velocity_ranges = self.velocity_ranges * 1#(0.5+self.scale_difficulty)
-        self.bad_steps_threshold =  self.cfg.bad_steps_threshold
-
     def _set_debug_vis_impl(self, debug_vis: bool):
         if debug_vis:
             if not hasattr(self, "current_anchor_visualizer"):
@@ -558,47 +507,6 @@ class MotionCommand(CommandTerm):
             self.goal_body_visualizers[i].visualize(
                 self.body_pos_relative_w[:, i], self.body_quat_relative_w[:, i]
             )
-
-    def _is_recovering(self, threshold: float) -> torch.Tensor:
-        return self.bad_motion_body_pos(
-            threshold,
-            body_names=["left_shoulder_pitch_link", "right_shoulder_pitch_link"],
-        )
-
-    def bad_anchor_pos(self, threshold: float) -> torch.Tensor:
-        return self.anchor_pos_error_norm > threshold
-
-    def bad_anchor_pos_z_only(self, threshold: float) -> torch.Tensor:
-        return torch.abs(self.anchor_pos_error[:, -1]) > threshold
-
-    def bad_anchor_ori(
-        self, threshold: float
-    ) -> torch.Tensor:
-        return (
-            self.motion_projected_gravity_b[:, 2]
-            - self.robot_projected_gravity_b[:, 2]
-        ).abs() > threshold  
-
-    def bad_motion_body_pos(
-        self, threshold: float, body_names: list[str] | None = None
-    ) -> torch.Tensor:
-        body_indexes = self._get_body_indexes(body_names)
-        error = self.body_pos_error_norm[:, body_indexes]
-        return torch.any(error > threshold, dim=-1)
-
-    def bad_motion_body_pos_z_only(
-        self, threshold: float, body_names: list[str] | None = None
-    ) -> torch.Tensor:
-        body_indexes = self._get_body_indexes(body_names)
-        error = torch.abs(self.body_pos_error[:, body_indexes, -1])
-        return torch.any(error > threshold, dim=-1)     
-
-    def _get_body_indexes(self, body_names: list[str] | None) -> list[int]:
-        return [
-            i
-            for i, name in enumerate(self.cfg.body_names)
-            if (body_names is None) or (name in body_names)
-        ]
 
 
 @configclass

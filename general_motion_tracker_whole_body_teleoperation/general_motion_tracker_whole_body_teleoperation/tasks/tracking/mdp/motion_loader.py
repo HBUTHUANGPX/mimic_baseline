@@ -232,6 +232,220 @@ class MotionLoader_robot:
                 valid_center_mask[valid_start:valid_end] = True
         return valid_center_mask
 
+class MotionLoader_human:
+    def __init__(
+        self,
+        motion_file_group: dict[str, list[str] | str] | str,
+        robot_body_names: Sequence[int] | None = None,
+        robot_joint_names: Sequence[int] | None = None,
+        body_indexes: Sequence[int] | None = None,
+        history_frames: int = 0,
+        future_frames: int = 0,
+        device: str = "cpu",
+    ) -> None:
+        if isinstance(motion_file_group, str):
+            motion_file_group = {"default": motion_file_group}
+        self.device = device
+        self.group_names: list[str] = []
+        self.extracted_list: list[str] = []
+        self.motion_lengths: list[int] = []
+        self.num_motions = 0
+        self.fps = None
+        self.file_joint_names = None
+        self.file_body_names = None
+        # 传入仿真器的机器人模型中身体部位的名称和关节名称
+        self._robot_body_names = robot_body_names
+        self._robot_joint_names = robot_joint_names
+        # 传入仿真器中需要加载的机器人身体部位的索引
+        self._body_indexes = body_indexes
+
+        self.history_frames = history_frames
+        self.future_frames = future_frames
+        self.window_size = history_frames + future_frames + 1
+
+        self._prepare_np_list()
+
+        motion_group_list: list[int] = []
+        motion_id_list: list[int] = []
+        motion_group_index = 0
+        for group_name, paths in motion_file_group.items():
+            normalized_paths = self._normalize_paths(paths)
+            print(f"\nGroup: {group_name}")
+            print(f"[INFO] Loading {len(normalized_paths)} motion files for training.")
+            # print(f"[INFO] load motion file: {normalized_paths}")
+
+            extracted_list = [
+                self.extract_part(path)
+                for path in normalized_paths
+                if self.extract_part(path) is not None
+            ]
+
+            for local_motion_id, motion_path in enumerate(normalized_paths):
+                self._validate_motion_file(motion_path)
+                data = np.load(motion_path)
+                self._validate_fps(data)
+                self._validate_joint_names(data)
+                self._validate_link_names(data)
+                self._append_motion_data(data)
+
+                num_frames = self.np_joint_pos_list[-1].shape[0]
+                self.motion_lengths.append(num_frames)
+
+                motion_group_list.extend([motion_group_index] * num_frames)
+                motion_id_list.extend([self.num_motions + local_motion_id] * num_frames)
+
+            self.extracted_list.extend(extracted_list)
+            self.group_names.append(group_name)
+            self.num_motions += len(normalized_paths)
+            motion_group_index += 1
+
+        assert self.num_motions > 0, "At least one motion file is required."
+        
+        self._motion_data_np_list_to_tensor(device)
+
+        self._motion_id = torch.tensor(
+            motion_id_list, dtype=torch.long, device=device
+        ).unsqueeze(1)
+        self._motion_group = torch.tensor(
+            motion_group_list, dtype=torch.long, device=device
+        ).unsqueeze(1)
+
+        self.time_step_total = self.joint_pos.shape[0]
+        self.motion_indices = self._build_motion_indices(device)
+        self.window_offsets = torch.arange(
+            -self.history_frames,
+            self.future_frames + 1,
+            dtype=torch.long,
+            device=device,
+        )
+        self.valid_center_mask = self._build_valid_center_mask(device)
+        self.valid_center_indices = torch.nonzero(
+            self.valid_center_mask, as_tuple=False
+        ).squeeze(-1)
+        assert (
+            self.valid_center_indices.numel() > 0
+        ), "No valid center frames found for the configured window size."
+
+    def _prepare_np_list(self):
+        self.np_joint_pos_list: list[np.ndarray] = []
+        self.np_joint_vel_list: list[np.ndarray] = []
+        self.np_body_pos_w_list: list[np.ndarray] = []
+        self.np_body_quat_w_list: list[np.ndarray] = []
+        self.np_body_lin_vel_w_list: list[np.ndarray] = []
+        self.np_body_ang_vel_w_list: list[np.ndarray] = []
+
+    def _append_motion_data(self, data: np.lib.npyio.NpzFile) -> None:
+        self.np_joint_pos_list.append(data["robot_joint_pos"].astype(np.float32)[:, self._robot_joint_indexes])
+        self.np_joint_vel_list.append(data["robot_joint_vel"].astype(np.float32)[:, self._robot_joint_indexes])
+        self.np_body_pos_w_list.append(data["robot_body_pos"].astype(np.float32)[:, self._robot_body_indexes])
+        self.np_body_quat_w_list.append(data["robot_body_quat"].astype(np.float32)[:, self._robot_body_indexes][..., [3,0,1,2]])
+        self.np_body_lin_vel_w_list.append(data["robot_body_lin_vel"].astype(np.float32)[:, self._robot_body_indexes])
+        self.np_body_ang_vel_w_list.append(data["robot_body_ang_vel"].astype(np.float32)[:, self._robot_body_indexes])
+
+    def _motion_data_np_list_to_tensor(self, device: str) -> None:
+        self.joint_pos = self.np_list_to_tensor(self.np_joint_pos_list, device)
+        self.joint_vel = self.np_list_to_tensor(self.np_joint_vel_list, device)
+        self.body_pos_w = self.np_list_to_tensor(self.np_body_pos_w_list, device)[
+            :, self._body_indexes
+        ]
+        self.body_quat_w = self.np_list_to_tensor(self.np_body_quat_w_list, device)[
+            :, self._body_indexes
+        ]
+        self.body_lin_vel_w = self.np_list_to_tensor(
+            self.np_body_lin_vel_w_list, device
+        )[:, self._body_indexes]
+        self.body_ang_vel_w = self.np_list_to_tensor(
+            self.np_body_ang_vel_w_list, device
+        )[:, self._body_indexes]
+
+    def np_list_to_tensor(self, np_list: list[np.ndarray], device: str) -> torch.Tensor:
+        """Convert a NumPy array to a PyTorch tensor on the appropriate device."""
+        return torch.from_numpy(np.concatenate(np_list, axis=0)).to(device)
+
+    def extract_part(self, path: str) -> str | None:
+        """Extract an artifact-relative motion path."""
+        # if path.startswith("artifacts/"):
+        #     relative_path = path[len("artifacts/") :]
+        if path.endswith(".npz"):
+            return path
+        return None
+
+    def _normalize_paths(self, paths: list[str] | str) -> list[str]:
+        """Convert a path input to a normalized list."""
+        if isinstance(paths, str):
+            return [paths]
+        return list(paths)
+
+    def _validate_motion_file(self, motion_path: str) -> None:
+        """Ensure the referenced motion file exists."""
+        assert os.path.isfile(motion_path), f"Invalid file path: {motion_path}"
+
+    def _validate_fps(self, data: np.lib.npyio.NpzFile) -> None:
+        """Ensure all loaded motions share the same fps."""
+        if self.fps is None:
+            self.fps = data["fps"]
+        else:
+            assert self.fps == data["fps"], "All motion files must have the same fps."
+
+    def _validate_joint_names(self, data: np.lib.npyio.NpzFile) -> None:
+        """Ensure the motion file contains the required joint names."""
+        if self.file_joint_names is None:
+            self.file_joint_names = data["robot_joint_names"].tolist()
+            # 将file中的关节数据转换为仿真器的关节顺序,先获得索引
+            self._robot_joint_indexes = [self.file_joint_names.index(name) for name in self._robot_joint_names]
+        else:
+            file_joint_names = data["robot_joint_names"].tolist()
+            assert self.file_joint_names == file_joint_names, (
+                f"Motion file joint names {file_joint_names} do not match expected {self.file_joint_names}."
+            )
+
+    def _validate_link_names(self, data: np.lib.npyio.NpzFile) -> None:
+        """Ensure the motion file contains the required link names."""
+        if self.file_body_names is None:
+            self.file_body_names = data["robot_body_names"].tolist()
+            self._robot_body_indexes = [self.file_body_names.index(name) for name in self._robot_body_names]
+        else:
+            file_body_names = data["robot_body_names"].tolist()
+            assert self.file_body_names == file_body_names, (
+                f"Motion file body names {file_body_names} do not match expected {self.file_body_names}."
+            )
+
+    def _build_motion_indices(self, device: str) -> torch.Tensor:
+        """Build `[start, end)` index ranges for each motion segment."""
+        motion_indices = torch.zeros(
+            self.num_motions, 2, dtype=torch.long, device=device
+        )
+        start = 0
+        for motion_id, length in enumerate(self.motion_lengths):
+            end = start + length
+            motion_indices[motion_id] = torch.tensor(
+                [start, end], dtype=torch.long, device=device
+            )
+            start = end
+        return motion_indices
+
+    def _build_valid_center_mask(self, device: str) -> torch.Tensor:
+        """Mark frame indices that can serve as valid window centers.
+
+        A frame is valid when the full temporal window `[t - n, ..., t + m]`
+        stays inside the same trajectory.
+
+        Args:
+            device: Device used for the output tensor.
+
+        Returns:
+            Boolean tensor over the concatenated global timeline.
+        """
+        valid_center_mask = torch.zeros(
+            self.time_step_total, dtype=torch.bool, device=device
+        )
+        for motion_id in range(self.num_motions):
+            start, end = self.motion_indices[motion_id]
+            valid_start = start + self.history_frames
+            valid_end = end - self.future_frames
+            if valid_start < valid_end:
+                valid_center_mask[valid_start:valid_end] = True
+        return valid_center_mask
 
 # Example usage:
 if __name__ == "__main__":
@@ -256,7 +470,7 @@ if __name__ == "__main__":
         print(f"\nGroup: {group_name}")
         print(f"[INFO] Collected {len(paths)} motion files for training.")
 
-    ml_r = MotionLoader_robot(
+    ml_r = MotionLoader_human(
         motion_file_group=motion_file_group,
         body_indexes=[0, 1, 2],
         history_frames=2,

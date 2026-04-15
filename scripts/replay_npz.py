@@ -20,12 +20,12 @@ parser.add_argument("--registry_name", type=str, help="The name of the wand regi
 parser.add_argument(
     "--robot",
     choices=["Q1","g1"],
-    default="Q1"
+    default="g1"
 )
 parser.add_argument(
     "--motion_file",
     type=str,
-    required=True,
+    default = "soma-retargeter/assets/motions/test-export/Neutral_throw_ball_001__A057.npz"
 )
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
@@ -53,8 +53,8 @@ if args_cli.robot == "Q1":
     from general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp import MotionLoader
 elif args_cli.robot == "g1":
     from general_motion_tracker_whole_body_teleoperation.robots.g1 import G1_CYLINDER_CFG as ROBOT_CFG
-    from general_motion_tracker_whole_body_teleoperation.tasks.tracking_g1.mdp import MotionLoader
 
+from general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp import MotionLoader_human as MotionLoader
 
 @configclass
 class ReplayMotionsSceneCfg(InteractiveSceneCfg):
@@ -82,10 +82,14 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
 
     motion_file = args_cli.motion_file# "artifacts/Q1/100STYLE/LeanLeft/LeanLeft_FW.npz"
     motion_file_group ={"replay_motion": motion_file}
+    joint_names = robot.joint_names
+    body_names = robot.body_names
     motion = MotionLoader(
         motion_file_group,
-        torch.tensor([0], dtype=torch.long, device=sim.device),
-        sim.device,
+        body_indexes=torch.tensor([0], dtype=torch.long, device=sim.device),
+        robot_body_names = body_names,
+        robot_joint_names = joint_names,
+        device = sim.device,
     )
     time_steps = torch.zeros(scene.num_envs, dtype=torch.long, device=sim.device)
 
