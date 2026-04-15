@@ -301,24 +301,24 @@ class MotionLoader_human:
 
         assert self.num_motions > 0, "At least one motion file is required."
         
-        self._motion_data_np_list_to_tensor(device)
+        self._motion_data_np_list_to_tensor()
 
         self._motion_id = torch.tensor(
-            motion_id_list, dtype=torch.long, device=device
+            motion_id_list, dtype=torch.long, device=self.device
         ).unsqueeze(1)
         self._motion_group = torch.tensor(
-            motion_group_list, dtype=torch.long, device=device
+            motion_group_list, dtype=torch.long, device=self.device
         ).unsqueeze(1)
 
         self.time_step_total = self.joint_pos.shape[0]
-        self.motion_indices = self._build_motion_indices(device)
+        self.motion_indices = self._build_motion_indices()
         self.window_offsets = torch.arange(
             -self.history_frames,
             self.future_frames + 1,
             dtype=torch.long,
-            device=device,
+            device=self.device,
         )
-        self.valid_center_mask = self._build_valid_center_mask(device)
+        self.valid_center_mask = self._build_valid_center_mask()
         self.valid_center_indices = torch.nonzero(
             self.valid_center_mask, as_tuple=False
         ).squeeze(-1)
@@ -342,25 +342,27 @@ class MotionLoader_human:
         self.np_body_lin_vel_w_list.append(data["robot_body_lin_vel"].astype(np.float32)[:, self._robot_body_indexes])
         self.np_body_ang_vel_w_list.append(data["robot_body_ang_vel"].astype(np.float32)[:, self._robot_body_indexes])
 
-    def _motion_data_np_list_to_tensor(self, device: str) -> None:
-        self.joint_pos = self.np_list_to_tensor(self.np_joint_pos_list, device)
-        self.joint_vel = self.np_list_to_tensor(self.np_joint_vel_list, device)
-        self.body_pos_w = self.np_list_to_tensor(self.np_body_pos_w_list, device)[
-            :, self._body_indexes
-        ]
-        self.body_quat_w = self.np_list_to_tensor(self.np_body_quat_w_list, device)[
-            :, self._body_indexes
-        ]
+    def _motion_data_np_list_to_tensor(self,) -> None:
+        self.joint_pos = self.np_list_to_tensor(self.np_joint_pos_list)
+        self.joint_vel = self.np_list_to_tensor(self.np_joint_vel_list)
+
+        body_pos_w = self.np_list_to_tensor(self.np_body_pos_w_list)
+        self.body_pos_w = body_pos_w[:, self._body_indexes]
+
+        body_quat_w = self.np_list_to_tensor(self.np_body_quat_w_list)
+        self.body_quat_w = body_quat_w[:, self._body_indexes]
+
         self.body_lin_vel_w = self.np_list_to_tensor(
-            self.np_body_lin_vel_w_list, device
-        )[:, self._body_indexes]
-        self.body_ang_vel_w = self.np_list_to_tensor(
-            self.np_body_ang_vel_w_list, device
+            self.np_body_lin_vel_w_list
         )[:, self._body_indexes]
 
-    def np_list_to_tensor(self, np_list: list[np.ndarray], device: str) -> torch.Tensor:
+        self.body_ang_vel_w = self.np_list_to_tensor(
+            self.np_body_ang_vel_w_list
+        )[:, self._body_indexes]
+
+    def np_list_to_tensor(self, np_list: list[np.ndarray]) -> torch.Tensor:
         """Convert a NumPy array to a PyTorch tensor on the appropriate device."""
-        return torch.from_numpy(np.concatenate(np_list, axis=0)).to(device)
+        return torch.from_numpy(np.concatenate(np_list, axis=0)).to(self.device)
 
     def extract_part(self, path: str) -> str | None:
         """Extract an artifact-relative motion path."""
@@ -403,6 +405,8 @@ class MotionLoader_human:
         """Ensure the motion file contains the required link names."""
         if self.file_body_names is None:
             self.file_body_names = data["robot_body_names"].tolist()
+            print("robot_body_names",self._robot_body_names)
+            print("file_body_names",self.file_body_names)
             self._robot_body_indexes = [self.file_body_names.index(name) for name in self._robot_body_names]
         else:
             file_body_names = data["robot_body_names"].tolist()
@@ -410,34 +414,31 @@ class MotionLoader_human:
                 f"Motion file body names {file_body_names} do not match expected {self.file_body_names}."
             )
 
-    def _build_motion_indices(self, device: str) -> torch.Tensor:
+    def _build_motion_indices(self) -> torch.Tensor:
         """Build `[start, end)` index ranges for each motion segment."""
         motion_indices = torch.zeros(
-            self.num_motions, 2, dtype=torch.long, device=device
+            self.num_motions, 2, dtype=torch.long, device=self.device
         )
         start = 0
         for motion_id, length in enumerate(self.motion_lengths):
             end = start + length
             motion_indices[motion_id] = torch.tensor(
-                [start, end], dtype=torch.long, device=device
+                [start, end], dtype=torch.long, device=self.device
             )
             start = end
         return motion_indices
 
-    def _build_valid_center_mask(self, device: str) -> torch.Tensor:
+    def _build_valid_center_mask(self) -> torch.Tensor:
         """Mark frame indices that can serve as valid window centers.
 
         A frame is valid when the full temporal window `[t - n, ..., t + m]`
         stays inside the same trajectory.
 
-        Args:
-            device: Device used for the output tensor.
-
         Returns:
             Boolean tensor over the concatenated global timeline.
         """
         valid_center_mask = torch.zeros(
-            self.time_step_total, dtype=torch.bool, device=device
+            self.time_step_total, dtype=torch.bool, device=self.device
         )
         for motion_id in range(self.num_motions):
             start, end = self.motion_indices[motion_id]

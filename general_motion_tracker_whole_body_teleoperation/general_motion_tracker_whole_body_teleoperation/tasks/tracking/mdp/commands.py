@@ -50,11 +50,9 @@ class MotionCommand(CommandTerm):
             dtype=torch.long,
             device=self.device,
         )
-        # 使用self.body_indexes将self.robot.body_names抽取出来
-        self.robot_body_names = [self.robot.body_names[i] for i in self.body_indexes]
         self.motion = MotionLoader(
             motion_file_group=self.cfg.motion_file,
-            robot_body_names=self.robot_body_names,
+            robot_body_names=self.robot.body_names,
             robot_joint_names=self.robot.joint_names,
             body_indexes=self.body_indexes,
             device=self.device,
