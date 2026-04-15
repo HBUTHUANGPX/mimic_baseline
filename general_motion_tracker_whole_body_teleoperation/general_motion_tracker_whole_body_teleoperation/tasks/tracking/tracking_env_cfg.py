@@ -686,11 +686,56 @@ class TerminationsCfg:
     """Termination terms for the MDP."""
 
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
-    bad_tracking_terminate = DoneTerm(
-        func=mdp.bad_tracking_terminated,
-        params={"command_name": "motion"},
+    # bad_tracking_terminate = DoneTerm(
+    #     func=mdp.bad_tracking_terminated,
+    #     params={"command_name": "motion"},
+    # )
+    ref_pos = DoneTerm(
+        func=mdp.bad_anchor_pos_z_only,
+        params={"command_name": "motion", "threshold": 0.25},
+    )
+    ref_ori = DoneTerm(
+        func=mdp.bad_anchor_ori,
+        params={
+            "asset_cfg": SceneEntityCfg("robot"),
+            "command_name": "motion",
+            "threshold": 0.8,
+        },
+    )
+    ee_body_pos_knee = DoneTerm(
+        func=mdp.bad_motion_body_pos_z_only,
+        params={
+            "command_name": "motion",
+            "threshold": 0.28,
+            "body_names": [
+                "L_knee_link",
+                "R_knee_link",
+            ],
+        },
+    )
+    ee_body_pos_ankle = DoneTerm(
+        func=mdp.bad_motion_body_pos_z_only,
+        params={
+            "command_name": "motion",
+            "threshold": 0.28,
+            "body_names": [
+                "L_ankle_roll_link",
+                "R_ankle_roll_link",
+            ],
+        },
     )
 
+    ee_body_pos_wrist = DoneTerm(
+        func=mdp.bad_motion_body_pos_z_only,
+        params={
+            "command_name": "motion",
+            "threshold": 0.25,
+            "body_names": [
+                "L_wrist_pitch_link",
+                "R_wrist_pitch_link",
+            ],
+        },
+    )
     # reach_motion_clip_end = DoneTerm(
     #     func=mdp.reached_motion_end, params={"command_name": "motion"}
     # )

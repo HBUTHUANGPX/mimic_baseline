@@ -217,7 +217,7 @@ class MotionCommand(CommandTerm):
         self.body_pos_start_w[env_ids] = (self.motion.body_pos_w[self.time_steps]*torch.tensor([1,1,0], device=self.device)[None,...])[env_ids]
         self.consecutive_bad_steps[env_ids] = 0  # 重置坏跟踪连续计数器
         self._update_motion_cache()
-        self._update_difficulty(env_ids) 
+        # self._update_difficulty(env_ids) 
         self._reset_env_by_motion(
             env_ids
         )  # 根据采样的time_stamps对应的motion数据重置环境状态
