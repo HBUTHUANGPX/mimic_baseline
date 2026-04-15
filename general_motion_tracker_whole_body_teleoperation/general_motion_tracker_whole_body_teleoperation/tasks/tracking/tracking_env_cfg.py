@@ -658,27 +658,27 @@ class RewardsCfg:
         func=mdp.is_terminated,
         weight=-200,
     )
-    global_anchor_position_error_z = RewTerm(
-        func=mdp.motion_global_anchor_position_z_error_sum_square,
-        weight=-2.0,
-        params={
-            "command_name": "motion",
-        },
-    )
-    xy_anchor_movement_in_recovering = RewTerm(
-        func=mdp.xy_anchor_movement_in_recovering,
-        weight=-1.0,
-        params={
-            "command_name": "motion",
-        },
-    )
-    action_rate_l2_in_recovering = RewTerm(
-        func=mdp.action_rate_l2_in_recovering,
-        weight=-2.0,
-        params={
-            "command_name": "motion",
-        },
-    )
+    # global_anchor_position_error_z = RewTerm(
+    #     func=mdp.motion_global_anchor_position_z_error_sum_square,
+    #     weight=-2.0,
+    #     params={
+    #         "command_name": "motion",
+    #     },
+    # )
+    # xy_anchor_movement_in_recovering = RewTerm(
+    #     func=mdp.xy_anchor_movement_in_recovering,
+    #     weight=-1.0,
+    #     params={
+    #         "command_name": "motion",
+    #     },
+    # )
+    # action_rate_l2_in_recovering = RewTerm(
+    #     func=mdp.action_rate_l2_in_recovering,
+    #     weight=-2.0,
+    #     params={
+    #         "command_name": "motion",
+    #     },
+    # )
 
 
 @configclass

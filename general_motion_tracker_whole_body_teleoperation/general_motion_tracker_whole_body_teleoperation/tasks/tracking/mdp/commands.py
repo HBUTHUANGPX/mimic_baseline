@@ -92,7 +92,7 @@ class MotionCommand(CommandTerm):
         self._update_motion_cache()
         self._update_robot_state_cache()
         self._make_calculate()
-        self._update_termination_cache()
+        # self._update_termination_cache()
         range_list = [
             self.cfg.velocity_range.get(key, (0.0, 0.0))
             for key in ["x", "y", "z", "roll", "pitch", "yaw"]
@@ -284,40 +284,40 @@ class MotionCommand(CommandTerm):
             :, self.robot_anchor_body_index
         ].clone()
 
-    def _update_termination_cache(self):
-        self._bad_ref_pos = self.bad_anchor_pos_z_only(0.25)
-        self._bad_ref_ori = self.bad_anchor_ori(0.8)
-        self._ee_body_pos_knee = self.bad_motion_body_pos_z_only(
-            0.28, self.cfg.ee_body_pos_knee_body_names
-        )
-        self._ee_body_pos_ankle = self.bad_motion_body_pos_z_only(
-            0.28, self.cfg.ee_body_pos_ankle_body_names
-        )
-        self._ee_body_pos_wrist = self.bad_motion_body_pos_z_only(
-            0.25, self.cfg.ee_body_pos_wrist_body_names
-        )
+    # def _update_termination_cache(self):
+    #     self._bad_ref_pos = self.bad_anchor_pos_z_only(0.25)
+    #     self._bad_ref_ori = self.bad_anchor_ori(0.8)
+    #     self._ee_body_pos_knee = self.bad_motion_body_pos_z_only(
+    #         0.28, self.cfg.ee_body_pos_knee_body_names
+    #     )
+    #     self._ee_body_pos_ankle = self.bad_motion_body_pos_z_only(
+    #         0.28, self.cfg.ee_body_pos_ankle_body_names
+    #     )
+    #     self._ee_body_pos_wrist = self.bad_motion_body_pos_z_only(
+    #         0.25, self.cfg.ee_body_pos_wrist_body_names
+    #     )
 
-        self.bad_tracking_indicator = (
-            self._bad_ref_pos
-            | self._bad_ref_ori
-            | self._ee_body_pos_knee
-            | self._ee_body_pos_ankle
-            | self._ee_body_pos_wrist
-        )
+    #     self.bad_tracking_indicator = (
+    #         self._bad_ref_pos
+    #         | self._bad_ref_ori
+    #         | self._ee_body_pos_knee
+    #         | self._ee_body_pos_ankle
+    #         | self._ee_body_pos_wrist
+    #     )
 
-        self.consecutive_bad_steps = torch.where(
-            self.bad_tracking_indicator,
-            self.consecutive_bad_steps + 1,
-            torch.zeros_like(self.consecutive_bad_steps)
-        )
-        # 恢复状态指示器 I_is_recovering(k)
-        self.is_recovering = self._is_recovering(0.03)
-        # 最终坏跟踪终止指示器 I_bad_tracking_terminate(k)
-        self.bad_tracking_terminate = torch.where(
-            self.is_recovering,
-            self.consecutive_bad_steps >= self.bad_steps_threshold,  # tau_bad
-            self.bad_tracking_indicator
-        )
+    #     self.consecutive_bad_steps = torch.where(
+    #         self.bad_tracking_indicator,
+    #         self.consecutive_bad_steps + 1,
+    #         torch.zeros_like(self.consecutive_bad_steps)
+    #     )
+    #     # 恢复状态指示器 I_is_recovering(k)
+    #     self.is_recovering = self._is_recovering(0.03)
+    #     # 最终坏跟踪终止指示器 I_bad_tracking_terminate(k)
+    #     self.bad_tracking_terminate = torch.where(
+    #         self.is_recovering,
+    #         self.consecutive_bad_steps >= self.bad_steps_threshold,  # tau_bad
+    #         self.bad_tracking_indicator
+    #     )
 
     def _make_calculate(self):
         num_bodies = len(self.cfg.body_names)
@@ -418,8 +418,8 @@ class MotionCommand(CommandTerm):
         joint_vel = self.joint_vel[env_ids]
 
         rand_samples = sample_uniform(
-            self._pose_ranges[:, 0],
-            self._pose_ranges[:, 1],
+            self.pose_ranges[:, 0],
+            self.pose_ranges[:, 1],
             (len(env_ids), 6),
             device=self.device,
         )
@@ -429,8 +429,8 @@ class MotionCommand(CommandTerm):
         )
         root_ori = quat_mul(orientations_delta, root_ori)
         rand_samples = sample_uniform(
-            self._velocity_ranges[:, 0],
-            self._velocity_ranges[:, 1],
+            self.velocity_ranges[:, 0],
+            self.velocity_ranges[:, 1],
             (len(env_ids), 6),
             device=self.device,
         )
@@ -467,7 +467,7 @@ class MotionCommand(CommandTerm):
         self._update_motion_cache()
         self._update_robot_state_cache()
         self._make_calculate()
-        self._update_termination_cache()
+        # self._update_termination_cache()
 
         self.bin_failed_count = (
             self.cfg.adaptive_alpha * self._current_bin_failed
