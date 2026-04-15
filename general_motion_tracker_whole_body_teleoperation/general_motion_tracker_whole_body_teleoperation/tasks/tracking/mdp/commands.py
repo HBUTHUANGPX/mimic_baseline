@@ -311,7 +311,7 @@ class MotionCommand(CommandTerm):
             torch.zeros_like(self.consecutive_bad_steps)
         )
         # 恢复状态指示器 I_is_recovering(k)
-        self.is_recovering = self._is_recovering(0.2)
+        self.is_recovering = self._is_recovering(0.03)
         # 最终坏跟踪终止指示器 I_bad_tracking_terminate(k)
         self.bad_tracking_terminate = torch.where(
             self.is_recovering,
@@ -495,7 +495,7 @@ class MotionCommand(CommandTerm):
         self._pose_ranges = self.pose_ranges * 1#(0.5+self.scale_difficulty)
         self._velocity_ranges = self.velocity_ranges * 1#(0.5+self.scale_difficulty)
         self.bad_steps_threshold =  self.cfg.bad_steps_threshold
-        
+
     def _set_debug_vis_impl(self, debug_vis: bool):
         if debug_vis:
             if not hasattr(self, "current_anchor_visualizer"):
@@ -559,13 +559,11 @@ class MotionCommand(CommandTerm):
                 self.body_pos_relative_w[:, i], self.body_quat_relative_w[:, i]
             )
 
-    def _is_recovering(
-        self, threshold: float
-    ) -> torch.Tensor:
-        return (
-            self.motion_projected_gravity_b[:, 2]
-            - self.robot_projected_gravity_b[:, 2]
-        ).abs() > threshold 
+    def _is_recovering(self, threshold: float) -> torch.Tensor:
+        return self.bad_motion_body_pos(
+            threshold,
+            body_names=["left_shoulder_pitch_link", "right_shoulder_pitch_link"],
+        )
 
     def bad_anchor_pos(self, threshold: float) -> torch.Tensor:
         return self.anchor_pos_error_norm > threshold

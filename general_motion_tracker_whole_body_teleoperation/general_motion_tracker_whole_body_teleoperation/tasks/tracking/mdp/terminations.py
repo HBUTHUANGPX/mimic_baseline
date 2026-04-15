@@ -58,4 +58,4 @@ def reached_motion_end(env: ManagerBasedRLEnv, command_name: str) -> torch.Tenso
 
 def bad_tracking_terminated(env: ManagerBasedRLEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.bad_tracking_terminate
+    return command.consecutive_bad_steps >= command.bad_steps_threshold
