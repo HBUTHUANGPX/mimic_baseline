@@ -613,10 +613,10 @@ class MotionCommandCfg(CommandTermCfg):
     anchor_body_name: str = MISSING
     body_names: list[str] = MISSING
 
-    ee_body_pos_knee_body_names: list[str] = MISSING
-    ee_body_pos_ankle_body_names: list[str] = MISSING
-    ee_body_pos_wrist_body_names: list[str] = MISSING
-    bad_steps_threshold: int = MISSING
+    # ee_body_pos_knee_body_names: list[str] = MISSING
+    # ee_body_pos_ankle_body_names: list[str] = MISSING
+    # ee_body_pos_wrist_body_names: list[str] = MISSING
+    # bad_steps_threshold: int = MISSING
 
     pose_range: dict[str, tuple[float, float]] = {}
     velocity_range: dict[str, tuple[float, float]] = {}
