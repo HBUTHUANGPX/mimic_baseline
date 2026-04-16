@@ -55,6 +55,8 @@ class MotionCommand(CommandTerm):
             robot_body_names=self.robot.body_names,
             robot_joint_names=self.robot.joint_names,
             body_indexes=self.body_indexes,
+            history_frames=self.cfg.history_frames,
+            future_frames=self.cfg.future_frames,
             device=self.device,
         )
         self.time_steps = torch.zeros(
@@ -87,6 +89,37 @@ class MotionCommand(CommandTerm):
             device=self.device,
         )
         self.kernel = self.kernel / self.kernel.sum()
+        self.bin_frame_count = max(
+            int(1.0 / (env.cfg.decimation * env.cfg.sim.dt)),
+            1,
+        )
+        self.valid_center_bin_ids = torch.clamp(
+            self.motion.valid_center_indices // self.bin_frame_count,
+            0,
+            self.bin_count - 1,
+        )
+        self.valid_center_count_per_bin = torch.bincount(
+            self.valid_center_bin_ids, minlength=self.bin_count
+        )
+        self.valid_sampling_bin_mask = self.valid_center_count_per_bin > 0
+        max_valid_centers_per_bin = max(
+            int(self.valid_center_count_per_bin.max().item()),
+            1,
+        )
+        self.bin_valid_center_indices = torch.full(
+            (self.bin_count, max_valid_centers_per_bin),
+            self.motion.time_step_total,
+            dtype=torch.long,
+            device=self.device,
+        )
+        for bin_id in range(self.bin_count):
+            valid_count = int(self.valid_center_count_per_bin[bin_id].item())
+            if valid_count == 0:
+                continue
+            bin_valid_centers = self.motion.valid_center_indices[
+                self.valid_center_bin_ids == bin_id
+            ]
+            self.bin_valid_center_indices[bin_id, :valid_count] = bin_valid_centers
         self._perpare_metrics()
 
         self.body_pos_start_w = self.motion.body_pos_w[self.time_steps]*torch.tensor([1,1,0], device=self.device)[None,...]
@@ -166,8 +199,7 @@ class MotionCommand(CommandTerm):
         episode_failed = self._env.termination_manager.terminated[env_ids]
         if torch.any(episode_failed):
             current_bin_index = torch.clamp(
-                (self.time_steps * self.bin_count)
-                // max(self.motion.time_step_total, 1),
+                self.time_steps // self.bin_frame_count,
                 0,
                 self.bin_count - 1,
             )
@@ -189,6 +221,11 @@ class MotionCommand(CommandTerm):
         sampling_probabilities = torch.nn.functional.conv1d(
             sampling_probabilities, self.kernel.view(1, 1, -1)
         ).view(-1)
+        sampling_probabilities = (
+            sampling_probabilities * self.valid_sampling_bin_mask.float()
+        )
+        if sampling_probabilities.sum() <= 0:
+            sampling_probabilities = self.valid_sampling_bin_mask.float()
 
         sampling_probabilities = sampling_probabilities / sampling_probabilities.sum()
 
@@ -196,14 +233,7 @@ class MotionCommand(CommandTerm):
             sampling_probabilities, len(env_ids), replacement=True
         )
 
-        self.time_steps[env_ids] = (
-            (
-                sampled_bins
-                + sample_uniform(0.0, 1.0, (len(env_ids),), device=self.device)
-            )
-            / self.bin_count
-            * (self.motion.time_step_total - 1)
-        ).long()
+        self.time_steps[env_ids] = self._sample_time_steps_from_bins(sampled_bins)
 
         # Metrics
         H = -(sampling_probabilities * (sampling_probabilities + 1e-12).log()).sum()
@@ -212,6 +242,38 @@ class MotionCommand(CommandTerm):
         self.metrics["sampling_entropy"][:] = H_norm
         self.metrics["sampling_top1_prob"][:] = pmax
         self.metrics["sampling_top1_bin"][:] = imax.float() / self.bin_count
+
+    def _sample_time_steps_from_bins(self, sampled_bins: torch.Tensor) -> torch.Tensor:
+        candidate_time_steps = (
+            sampled_bins * self.bin_frame_count
+            + sample_uniform(
+                0.0,
+                float(self.bin_frame_count),
+                sampled_bins.shape,
+                device=self.device,
+            ).long()
+        )
+        candidate_time_steps = torch.clamp(
+            candidate_time_steps, 0, self.motion.time_step_total - 1
+        )
+        valid_counts = self.valid_center_count_per_bin[sampled_bins]
+        valid_centers = self.bin_valid_center_indices[sampled_bins]
+        right_indices = torch.searchsorted(
+            valid_centers, candidate_time_steps.unsqueeze(-1)
+        ).squeeze(-1)
+        right_indices = torch.clamp(right_indices, max=valid_counts - 1)
+        left_indices = torch.clamp(right_indices - 1, min=0)
+
+        left_centers = torch.gather(
+            valid_centers, 1, left_indices.view(-1, 1)
+        ).squeeze(-1)
+        right_centers = torch.gather(
+            valid_centers, 1, right_indices.view(-1, 1)
+        ).squeeze(-1)
+        choose_right = torch.abs(right_centers - candidate_time_steps) < torch.abs(
+            candidate_time_steps - left_centers
+        )
+        return torch.where(choose_right, right_centers, left_centers)
 
     def _resample_command(self, env_ids: Sequence[int]):
         if len(env_ids) == 0:
@@ -225,6 +287,22 @@ class MotionCommand(CommandTerm):
         )  # 根据采样的time_stamps对应的motion数据重置环境状态
 
     def _motion_command_reset(self, env_ids: Sequence[int]): ...
+
+    def _get_env_ids_to_resample(self) -> torch.Tensor:
+        overflow_mask = (self.time_steps < 0) | (
+            self.time_steps >= self.motion.time_step_total
+        )
+        valid_center_mask = torch.zeros(
+            self.num_envs, dtype=torch.bool, device=self.device
+        )
+        non_overflow_ids = torch.nonzero(~overflow_mask, as_tuple=False).squeeze(-1)
+        if non_overflow_ids.numel() > 0:
+            valid_center_mask[non_overflow_ids] = self.motion.valid_center_mask[
+                self.time_steps[non_overflow_ids]
+            ]
+        return torch.nonzero(
+            overflow_mask | (~valid_center_mask), as_tuple=False
+        ).squeeze(-1)
 
     def _update_motion_cache(self):
         # 在time_stamps更新后，更新缓存的motion数据,因为_resample_command在_update_command中被调用,所以当需要reset的env_ids数量为0时也要触发一次
@@ -429,7 +507,7 @@ class MotionCommand(CommandTerm):
         # TODO: 这地方太糟糕了,time_steps的增加和环境重置不应该放在此处.
         # 具体需要分析IsaacLab/source/isaaclab/isaaclab/envs/manager_based_rl_env.py中的step函数中的流程
         self.time_steps += 1
-        env_ids = torch.where(self.time_steps >= self.motion.time_step_total)[0]
+        env_ids = self._get_env_ids_to_resample()
         self._resample_command(env_ids)
         self._update_motion_cache()
         self._update_robot_state_cache()
@@ -528,6 +606,8 @@ class MotionCommandCfg(CommandTermCfg):
     velocity_range: dict[str, tuple[float, float]] = {}
 
     joint_position_range: tuple[float, float] = (-0.52, 0.52)
+    history_frames: int = 0
+    future_frames: int = 0
 
     adaptive_kernel_size: int = 1
     adaptive_lambda: float = 0.8
