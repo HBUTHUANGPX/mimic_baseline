@@ -470,9 +470,12 @@ if __name__ == "__main__":
     for group_name, paths in motion_file_group.items():
         print(f"\nGroup: {group_name}")
         print(f"[INFO] Collected {len(paths)} motion files for training.")
-
+    robot_body_names = ["pelvis"]
+    robot_joint_names = ["left_hip_pitch_joint"]
     ml_r = MotionLoader_human(
         motion_file_group=motion_file_group,
+        robot_body_names=robot_body_names,
+        robot_joint_names=robot_joint_names,
         body_indexes=[0, 1, 2],
         history_frames=2,
         future_frames=2,
