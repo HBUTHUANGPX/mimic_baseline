@@ -30,6 +30,14 @@ if TYPE_CHECKING:
 from general_motion_tracker_whole_body_teleoperation.utils.motion_loader import (
     MotionLoader_human as MotionLoader,
 )
+from general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp.adaptive_sample import (
+    AdaptiveSamplingModule,
+    AdaptiveSamplingModuleCfg,
+    LegacyBinAdaptiveSampling,
+    LegacyBinAdaptiveSamplingCfg,
+    SonicBinAdaptiveSampling,
+    SonicBinAdaptiveSamplingCfg,
+)
 
 
 class MotionCommand(CommandTerm):
@@ -68,6 +76,7 @@ class MotionCommand(CommandTerm):
         self.time_steps = torch.zeros(
             self.num_envs, dtype=torch.long, device=self.device
         )
+        self._previous_time_steps = None
         self.body_pos_relative_w = torch.zeros(
             self.num_envs, len(cfg.body_names), 3, device=self.device
         )
@@ -91,17 +100,6 @@ class MotionCommand(CommandTerm):
             )
             + 1
         )
-        self.bin_failed_count = torch.zeros(
-            self.bin_count, dtype=torch.float, device=self.device
-        )
-        self._current_bin_failed = torch.zeros(
-            self.bin_count, dtype=torch.float, device=self.device
-        )
-        self.kernel = torch.tensor(
-            [self.cfg.adaptive_lambda**i for i in range(self.cfg.adaptive_kernel_size)],
-            device=self.device,
-        )
-        self.kernel = self.kernel / self.kernel.sum()
         self.bin_frame_count = max(
             int(1.0 / (env.cfg.decimation * env.cfg.sim.dt)),
             1,
@@ -133,6 +131,7 @@ class MotionCommand(CommandTerm):
                 self.valid_center_bin_ids == bin_id
             ]
             self.bin_valid_center_indices[bin_id, :valid_count] = bin_valid_centers
+        self.adaptive_sampler = self._build_adaptive_sampler()
         self._perpare_metrics()
 
         self.body_pos_start_w = self.motion.body_pos_w[self.time_steps]*torch.tensor([1,1,0], device=self.device)[None,...]
@@ -209,49 +208,19 @@ class MotionCommand(CommandTerm):
         self.metrics["error_joint_vel"] = self.joint_vel_error_norm
         self.metrics["scale_difficulty"] = self.scale_difficulty*torch.ones(self.num_envs, device=self.device)
 
-    def _adaptive_sampling(self, env_ids: Sequence[int]):
-        episode_failed = self._env.termination_manager.terminated[env_ids]
-        if torch.any(episode_failed):
-            current_bin_index = torch.clamp(
-                self.time_steps // self.bin_frame_count,
-                0,
-                self.bin_count - 1,
+    def _build_adaptive_sampler(self) -> AdaptiveSamplingModule:
+        sampler_cfg = self.cfg.adaptive_sampler
+        sampler_class = sampler_cfg.class_type
+        if not issubclass(sampler_class, AdaptiveSamplingModule):
+            raise ValueError(
+                "adaptive_sampler.class_type must inherit from "
+                "AdaptiveSamplingModule."
             )
-            fail_bins = current_bin_index[env_ids][episode_failed]
-            self._current_bin_failed[:] = torch.bincount(
-                fail_bins, minlength=self.bin_count
-            )
+        return sampler_class(self, sampler_cfg)
 
-        # Sample
-        sampling_probabilities = (
-            self.bin_failed_count
-            + self.cfg.adaptive_uniform_ratio / float(self.bin_count)
-        )
-        sampling_probabilities = torch.nn.functional.pad(
-            sampling_probabilities.unsqueeze(0).unsqueeze(0),
-            (0, self.cfg.adaptive_kernel_size - 1),  # Non-causal kernel
-            mode="replicate",
-        )
-        sampling_probabilities = torch.nn.functional.conv1d(
-            sampling_probabilities, self.kernel.view(1, 1, -1)
-        ).view(-1)
-        sampling_probabilities = (
-            sampling_probabilities * self.valid_sampling_bin_mask.float()
-        )
-        if sampling_probabilities.sum() <= 0:
-            sampling_probabilities = self.valid_sampling_bin_mask.float()
-
-        sampling_probabilities = sampling_probabilities / sampling_probabilities.sum()
-
-        sampled_bins = torch.multinomial(
-            sampling_probabilities, len(env_ids), replacement=True
-        )
-
-        self.time_steps[env_ids] = self._sample_time_steps_from_bins(sampled_bins)
-
-        # Metrics
+    def _update_sampling_metrics(self, sampling_probabilities: torch.Tensor):
         H = -(sampling_probabilities * (sampling_probabilities + 1e-12).log()).sum()
-        H_norm = H / math.log(self.bin_count)
+        H_norm = H / max(math.log(self.bin_count), 1e-12)
         pmax, imax = sampling_probabilities.max(dim=0)
         self.metrics["sampling_entropy"][:] = H_norm
         self.metrics["sampling_top1_prob"][:] = pmax
@@ -289,10 +258,28 @@ class MotionCommand(CommandTerm):
         )
         return torch.where(choose_right, right_centers, left_centers)
 
+    def _resample_time_steps(
+        self,
+        env_ids: Sequence[int],
+        update_failure_statistics: bool = True,
+    ):
+        if len(env_ids) == 0:
+            return
+        self.adaptive_sampler.on_resample_start(env_ids, update_failure_statistics)
+        sampling_probabilities = self.adaptive_sampler.build_sampling_probabilities()
+        sampled_bins = torch.multinomial(
+            sampling_probabilities, len(env_ids), replacement=True
+        )
+        self.time_steps[env_ids] = self._sample_time_steps_from_bins(sampled_bins)
+        self.adaptive_sampler.on_resample_complete(
+            env_ids, sampled_bins, update_failure_statistics
+        )
+        self._update_sampling_metrics(sampling_probabilities)
+
     def _resample_command(self, env_ids: Sequence[int]):
         if len(env_ids) == 0:
             return
-        self._adaptive_sampling(env_ids)  # 对time_stamps进行自适应采样
+        self._resample_time_steps(env_ids)
         self.body_pos_start_w[env_ids] = (self.motion.body_pos_w[self.time_steps]*torch.tensor([1,1,0], device=self.device)[None,...])[env_ids]
         self.human_body_pos_start_w[env_ids] = (self.motion.human_body_pos_w[self.time_steps]*torch.tensor([1,1,0], device=self.device)[None,...])[env_ids]
         self.consecutive_bad_steps[env_ids] = 0  # 重置坏跟踪连续计数器
@@ -300,8 +287,6 @@ class MotionCommand(CommandTerm):
         self._reset_env_by_motion(
             env_ids
         )  # 根据采样的time_stamps对应的motion数据重置环境状态
-
-    def _motion_command_reset(self, env_ids: Sequence[int]): ...
 
     def _get_env_ids_to_resample(self) -> torch.Tensor:
         overflow_mask = (self.time_steps < 0) | (
@@ -349,7 +334,6 @@ class MotionCommand(CommandTerm):
             + self._env.scene.env_origins[:, None, :]
         )
         self.human_body_quat_w = self.motion.human_body_quat_w[self.time_steps]
-        # TODO: human anchor是哪一个
         self.human_anchor_pos_w = (
             self.motion.human_body_pos_w[self.time_steps, self.human_body_indexes]
             - self.human_body_pos_start_w[:, self.human_body_indexes]
@@ -536,6 +520,7 @@ class MotionCommand(CommandTerm):
     def _update_command(self):
         # TODO: 这地方太糟糕了,time_steps的增加和环境重置不应该放在此处.
         # 具体需要分析IsaacLab/source/isaaclab/isaaclab/envs/manager_based_rl_env.py中的step函数中的流程
+        self._previous_time_steps = self.time_steps.clone()
         self.time_steps += 1
         env_ids = self._get_env_ids_to_resample()
         self._resample_command(env_ids)
@@ -543,12 +528,7 @@ class MotionCommand(CommandTerm):
         self._update_robot_state_cache()
         self._make_calculate()
         # self._update_termination_cache()
-
-        self.bin_failed_count = (
-            self.cfg.adaptive_alpha * self._current_bin_failed
-            + (1 - self.cfg.adaptive_alpha) * self.bin_failed_count
-        )
-        self._current_bin_failed.zero_()
+        self.adaptive_sampler.on_step_end()
         # self.reached_motion_end = self.time_steps > self.motion.time_step_total
 
     def _set_debug_vis_impl(self, debug_vis: bool):
@@ -684,13 +664,7 @@ class MotionCommandCfg(CommandTermCfg):
     history_frames: int = 0
     future_frames: int = 0
 
-    adaptive_kernel_size: int = 1
-    adaptive_lambda: float = 0.8
-    adaptive_uniform_ratio: float = 0.1
-    adaptive_alpha: float = 0.001
-    enable_timing_metrics: bool = True
-    timing_sync_cuda: bool = False
-    timing_ema_alpha: float = 0.1
+    adaptive_sampler: AdaptiveSamplingModuleCfg = SonicBinAdaptiveSamplingCfg()
 
     anchor_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(
         prim_path="/Visuals/Command/pose"
