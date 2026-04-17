@@ -27,7 +27,7 @@ from isaaclab.utils.math import (
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
-from general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp.motion_loader import (
+from general_motion_tracker_whole_body_teleoperation.utils.motion_loader import (
     MotionLoader_human as MotionLoader,
 )
 
@@ -47,6 +47,11 @@ class MotionCommand(CommandTerm):
         )
         self.body_indexes = torch.tensor(
             self.robot.find_bodies(self.cfg.body_names, preserve_order=True)[0],
+            dtype=torch.long,
+            device=self.device,
+        )
+        self.human_body_indexes = torch.tensor(
+            self.cfg.desire_human_joint_names.index(self.cfg.human_anchor_name),
             dtype=torch.long,
             device=self.device,
         )
@@ -71,10 +76,10 @@ class MotionCommand(CommandTerm):
         )
         self.body_quat_relative_w[:, :, 0] = 1.0
         self.huamn_body_pos_relative_w = torch.zeros(
-            self.num_envs, len(self.motion.desire_human_joint_names), 3, device=self.device
+            self.num_envs, len(self.cfg.desire_human_joint_names), 3, device=self.device
         )
         self.huamn_body_quat_relative_w = torch.zeros(
-            self.num_envs, len(self.motion.desire_human_joint_names), 4, device=self.device
+            self.num_envs, len(self.cfg.desire_human_joint_names), 4, device=self.device
         )
         self.huamn_body_quat_relative_w[:, :, 0] = 1.0
         self.consecutive_bad_steps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
@@ -340,18 +345,18 @@ class MotionCommand(CommandTerm):
         ]
         self.human_body_pos_w = (
             self.motion.human_body_pos_w[self.time_steps]
-            - self.human_body_pos_start_w [:, 0:1,:]
+            - self.human_body_pos_start_w [:, self.human_body_indexes:self.human_body_indexes+1,:]
             + self._env.scene.env_origins[:, None, :]
         )
         self.human_body_quat_w = self.motion.human_body_quat_w[self.time_steps]
         # TODO: human anchor是哪一个
         self.human_anchor_pos_w = (
-            self.motion.human_body_pos_w[self.time_steps, 0]
-            - self.human_body_pos_start_w[:, 0]
+            self.motion.human_body_pos_w[self.time_steps, self.human_body_indexes]
+            - self.human_body_pos_start_w[:, self.human_body_indexes]
             + self._env.scene.env_origins
         )
         self.human_anchor_quat_w = self.motion.human_body_quat_w[
-            self.time_steps, 0
+            self.time_steps, self.human_body_indexes
         ]
         self.anchor_lin_vel_w = self.motion.body_lin_vel_w[
             self.time_steps, self.motion_anchor_body_index
@@ -648,32 +653,29 @@ class MotionCommandCfg(CommandTermCfg):
     motion_file: dict[str, list[str] | str] | str = MISSING
     anchor_body_name: str = MISSING
     body_names: list[str] = MISSING
-    human_joint_names: list[str] =  ['Root', 'Hips', 'Spine1', 'Spine2', 'Chest', 'Neck1', 'Neck2', 'Head', 'HeadEnd', 'Jaw', 'LeftEye', 'RightEye', 'LeftShoulder', 'LeftArm', 'LeftForeArm', 'LeftHand', 'LeftHandThumb1', 'LeftHandThumb2', 'LeftHandThumb3', 'LeftHandThumbEnd', 'LeftHandIndex1', 'LeftHandIndex2', 'LeftHandIndex3', 'LeftHandIndex4', 'LeftHandIndexEnd', 'LeftHandMiddle1', 'LeftHandMiddle2', 'LeftHandMiddle3', 'LeftHandMiddle4', 'LeftHandMiddleEnd', 'LeftHandRing1', 'LeftHandRing2', 'LeftHandRing3', 'LeftHandRing4', 'LeftHandRingEnd', 'LeftHandPinky1', 'LeftHandPinky2', 'LeftHandPinky3', 'LeftHandPinky4', 'LeftHandPinkyEnd', 'RightShoulder', 'RightArm', 'RightForeArm', 'RightHand', 'RightHandThumb1', 'RightHandThumb2', 'RightHandThumb3', 'RightHandThumbEnd', 'RightHandIndex1', 'RightHandIndex2', 'RightHandIndex3', 'RightHandIndex4', 'RightHandIndexEnd', 'RightHandMiddle1', 'RightHandMiddle2', 'RightHandMiddle3', 'RightHandMiddle4', 'RightHandMiddleEnd', 'RightHandRing1', 'RightHandRing2', 'RightHandRing3', 'RightHandRing4', 'RightHandRingEnd', 'RightHandPinky1', 'RightHandPinky2', 'RightHandPinky3', 'RightHandPinky4', 'RightHandPinkyEnd', 'LeftLeg', 'LeftShin', 'LeftFoot', 'LeftToeBase', 'LeftToeEnd', 'RightLeg', 'RightShin', 'RightFoot', 'RightToeBase', 'RightToeEnd']
     desire_human_joint_names: list[str] =  [
         'Hips', 
         'Spine1', 'Spine2', 'Chest', 
         'Neck1', 'Neck2', 'Head', 'HeadEnd', 
-        # 'Jaw', 'LeftEye', 'RightEye', 
         'LeftShoulder', 'LeftArm', 'LeftForeArm', 'LeftHand', 
-        # 'LeftHandThumb1', 'LeftHandThumb2', 'LeftHandThumb3', 'LeftHandThumbEnd', 
-        # 'LeftHandIndex1', 'LeftHandIndex2', 'LeftHandIndex3', 'LeftHandIndex4', 'LeftHandIndexEnd', 
-        # 'LeftHandMiddle1', 'LeftHandMiddle2', 'LeftHandMiddle3', 'LeftHandMiddle4', 'LeftHandMiddleEnd', 
-        # 'LeftHandRing1', 'LeftHandRing2', 'LeftHandRing3', 'LeftHandRing4', 'LeftHandRingEnd', 
-        # 'LeftHandPinky1', 'LeftHandPinky2', 'LeftHandPinky3', 'LeftHandPinky4', 'LeftHandPinkyEnd', 
         'RightShoulder', 'RightArm', 'RightForeArm', 'RightHand', 
-        # 'RightHandThumb1', 'RightHandThumb2', 'RightHandThumb3', 'RightHandThumbEnd', 
-        # 'RightHandIndex1', 'RightHandIndex2', 'RightHandIndex3', 'RightHandIndex4', 'RightHandIndexEnd', 
-        # 'RightHandMiddle1', 'RightHandMiddle2', 'RightHandMiddle3', 'RightHandMiddle4', 'RightHandMiddleEnd', 
-        # 'RightHandRing1', 'RightHandRing2', 'RightHandRing3', 'RightHandRing4', 'RightHandRingEnd', 
-        # 'RightHandPinky1', 'RightHandPinky2', 'RightHandPinky3', 'RightHandPinky4', 'RightHandPinkyEnd', 
         'LeftLeg', 'LeftShin', 'LeftFoot', 'LeftToeBase', 'LeftToeEnd', 
         'RightLeg', 'RightShin', 'RightFoot', 'RightToeBase', 'RightToeEnd'
     ]
-    human_anchor_name:
-    # ee_body_pos_knee_body_names: list[str] = MISSING
-    # ee_body_pos_ankle_body_names: list[str] = MISSING
-    # ee_body_pos_wrist_body_names: list[str] = MISSING
-    # bad_steps_threshold: int = MISSING
+    desire_human_joint_names_for_human_bodys: list[str]= [
+        'Hips', 
+        'Spine1', 'Spine2', 'Chest', 
+        'Neck1', 'Neck2', 'Head', 'HeadEnd', 
+        'LeftShoulder', 'LeftArm', 'LeftForeArm', 'LeftHand', 
+        'RightShoulder', 'RightArm', 'RightForeArm', 'RightHand', 
+        'LeftLeg', 'LeftShin', 'LeftFoot', 'LeftToeBase', 'LeftToeEnd', 
+        'RightLeg', 'RightShin', 'RightFoot', 'RightToeBase', 'RightToeEnd'
+    ]
+    desire_human_joint_names_for_six_point_human_bodys: list[str]= [
+        'Hips', 'HeadEnd', 'LeftHand', 'RightHand', 'LeftToeEnd', 'RightToeEnd'
+    ]
+    
+    human_anchor_name: str = 'Hips'
 
     pose_range: dict[str, tuple[float, float]] = {}
     velocity_range: dict[str, tuple[float, float]] = {}

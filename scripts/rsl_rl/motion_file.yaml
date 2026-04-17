@@ -10,12 +10,13 @@ motion_group:
       # "artifacts/g1/mimic_kit/g1_spinkick.npz"
       # "soma-retargeter/assets/motions/test-export/dance_basic_chaines_180_R_001__A306.npz"
       # "artifacts/g1/xsens_bvh/251203/03_fast_forward_walk_120Hz.npz"
+      "soma-retargeter/assets/motions/soma_uniform_bvh_export/240918/body_check_001__A548_M.npz"
     ]
     # file_name: [ "artifacts/g1/xsens_bvh/251203/03_fast_forward_walk_120Hz.npz", "artifacts/g1/xsens_bvh/251203/01_slowly_forward_walk_120Hz.npz" ]
     # folder_name: ["artifacts/g1/xsens_bvh"]
     folder_name: [
       # "soma-retargeter/assets/motions/test-export"
-      "soma-retargeter/assets/motions/soma_uniform_bvh_export/240918"
+      # "soma-retargeter/assets/motions/soma_uniform_bvh_export/240918"
     ]
     wo_file_name: []
     wo_folder_name: []
