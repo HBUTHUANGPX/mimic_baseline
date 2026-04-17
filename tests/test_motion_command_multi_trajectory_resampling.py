@@ -94,6 +94,9 @@ def _install_stub_dependencies():
     )
     isaaclab_utils_math.quat_inv = lambda quat: quat
     isaaclab_utils_math.quat_mul = lambda q1, q2: q1
+    isaaclab_utils_math.rot6d_from_quat = lambda quat: torch.zeros(
+        *quat.shape[:-1], 6, dtype=quat.dtype, device=quat.device
+    )
     isaaclab_utils_math.sample_uniform = (
         lambda low, high, shape, device=None: torch.zeros(shape, device=device)
     )

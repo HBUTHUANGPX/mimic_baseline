@@ -39,6 +39,32 @@ from general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp.adaptive
     SonicBinAdaptiveSamplingCfg,
 )
 
+@torch.jit.script
+def rot6d_from_quat(quaternions: torch.Tensor) -> torch.Tensor:
+    """Convert quaternions to the flattened first two rotation-matrix columns.
+
+    Args:
+        quaternions: The quaternion orientation in (w, x, y, z). Shape is (..., 4).
+
+    Returns:
+        Flattened 6D rotation representation. Shape is (..., 6).
+    """
+    r, i, j, k = torch.unbind(quaternions, -1)
+    two_s = 2.0 / (quaternions * quaternions).sum(-1)
+
+    o = torch.stack(
+        (
+            1 - two_s * (j * j + k * k),
+            two_s * (i * j - k * r),
+            two_s * (i * j + k * r),
+            1 - two_s * (i * i + k * k),
+            two_s * (i * k - j * r),
+            two_s * (j * k + i * r),
+        ),
+        -1,
+    )
+    return o.reshape(quaternions.shape[:-1] + (6,))
+
 
 class MotionCommand(CommandTerm):
     cfg: MotionCommandCfg
@@ -134,8 +160,14 @@ class MotionCommand(CommandTerm):
         self.adaptive_sampler = self._build_adaptive_sampler()
         self._perpare_metrics()
 
-        self.body_pos_start_w = self.motion.body_pos_w[self.time_steps]*torch.tensor([1,1,0], device=self.device)[None,...]
-        self.human_body_pos_start_w = self.motion.human_body_pos_w[self.time_steps]*torch.tensor([1,1,0], device=self.device)[None,...]
+        self._xy_plane_mask = torch.tensor([1.0, 1.0, 0.0], device=self.device)
+        self.body_pos_start_w = (
+            self.motion.body_pos_w[self.time_steps] * self._xy_plane_mask[None, None, :]
+        )
+        self.human_body_pos_start_w = (
+            self.motion.human_body_pos_w[self.time_steps]
+            * self._xy_plane_mask[None, None, :]
+        )
         self.bad_steps_threshold = torch.zeros(self.num_envs,device=self.device)
 
         self._update_motion_cache()
@@ -280,8 +312,13 @@ class MotionCommand(CommandTerm):
         if len(env_ids) == 0:
             return
         self._resample_time_steps(env_ids)
-        self.body_pos_start_w[env_ids] = (self.motion.body_pos_w[self.time_steps]*torch.tensor([1,1,0], device=self.device)[None,...])[env_ids]
-        self.human_body_pos_start_w[env_ids] = (self.motion.human_body_pos_w[self.time_steps]*torch.tensor([1,1,0], device=self.device)[None,...])[env_ids]
+        self.body_pos_start_w[env_ids] = (
+            self.motion.body_pos_w[self.time_steps] * self._xy_plane_mask[None, None, :]
+        )[env_ids]
+        self.human_body_pos_start_w[env_ids] = (
+            self.motion.human_body_pos_w[self.time_steps]
+            * self._xy_plane_mask[None, None, :]
+        )[env_ids]
         self.consecutive_bad_steps[env_ids] = 0  # 重置坏跟踪连续计数器
         self._update_motion_cache()
         self._reset_env_by_motion(
@@ -396,8 +433,9 @@ class MotionCommand(CommandTerm):
         )
         self.joint_pos_delta = self.joint_pos - self.robot_joint_pos
         # Global-anchor alignment used by rewards/terminations.
-        delta_pos_w = robot_anchor_pos_w_repeat.clone()
-        delta_pos_w[..., 2] = anchor_pos_w_repeat[..., 2]
+        delta_pos_w = torch.cat(
+            [robot_anchor_pos_w_repeat[..., :2], anchor_pos_w_repeat[..., 2:3]], dim=-1
+        )
         delta_ori_w = yaw_quat(
             quat_mul(robot_anchor_quat_w_repeat, quat_inv(anchor_quat_w_repeat))
         )
@@ -407,10 +445,7 @@ class MotionCommand(CommandTerm):
         )
 
         # Robot anchor orientation in 6D representation.
-        robot_anchor_ori_mat = matrix_from_quat(self.robot_anchor_quat_w)
-        self.robot_anchor_ori_w = robot_anchor_ori_mat[..., :2].reshape(
-            self.num_envs, -1
-        )
+        self.robot_anchor_ori_w = rot6d_from_quat(self.robot_anchor_quat_w)
         # self.robot_anchor_ori_w = self.robot_anchor_quat_w
         # Robot body pose in robot-anchor frame.
         robot_body_pos_b, robot_body_ori_b = subtract_frame_transforms(
@@ -421,7 +456,7 @@ class MotionCommand(CommandTerm):
         )
         self.robot_body_pos_b = robot_body_pos_b
         # self.robot_body_ori_b = robot_body_ori_b.reshape(self.num_envs, -1)
-        self.robot_body_ori_b = matrix_from_quat(robot_body_ori_b)[..., :2].reshape(
+        self.robot_body_ori_b = rot6d_from_quat(robot_body_ori_b).reshape(
             self.num_envs, -1
         )
         # Motion anchor pose in robot-anchor frame.
@@ -432,9 +467,7 @@ class MotionCommand(CommandTerm):
             self.anchor_quat_w,
         )
         self.motion_anchor_pos_b = motion_anchor_pos_b
-        self.motion_anchor_ori_b = matrix_from_quat(motion_anchor_ori_b)[
-            ..., :2
-        ].reshape(self.num_envs, -1)
+        self.motion_anchor_ori_b = rot6d_from_quat(motion_anchor_ori_b).reshape(self.num_envs, -1)
         # self.motion_anchor_ori_b = motion_anchor_ori_b
         # Shared error tensors used by rewards/terminations/metrics.
         self.anchor_pos_error = self.anchor_pos_w - self.robot_anchor_pos_w
