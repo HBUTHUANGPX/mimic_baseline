@@ -55,6 +55,7 @@ class MotionCommand(CommandTerm):
             robot_body_names=self.robot.body_names,
             robot_joint_names=self.robot.joint_names,
             body_indexes=self.body_indexes,
+            desire_human_joint_names = self.cfg.desire_human_joint_names,
             history_frames=self.cfg.history_frames,
             future_frames=self.cfg.future_frames,
             device=self.device,
@@ -69,6 +70,13 @@ class MotionCommand(CommandTerm):
             self.num_envs, len(cfg.body_names), 4, device=self.device
         )
         self.body_quat_relative_w[:, :, 0] = 1.0
+        self.huamn_body_pos_relative_w = torch.zeros(
+            self.num_envs, len(self.motion.desire_human_joint_names), 3, device=self.device
+        )
+        self.huamn_body_quat_relative_w = torch.zeros(
+            self.num_envs, len(self.motion.desire_human_joint_names), 4, device=self.device
+        )
+        self.huamn_body_quat_relative_w[:, :, 0] = 1.0
         self.consecutive_bad_steps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
 
         self.bin_count = (
@@ -123,6 +131,7 @@ class MotionCommand(CommandTerm):
         self._perpare_metrics()
 
         self.body_pos_start_w = self.motion.body_pos_w[self.time_steps]*torch.tensor([1,1,0], device=self.device)[None,...]
+        self.human_body_pos_start_w = self.motion.human_body_pos_w[self.time_steps]*torch.tensor([1,1,0], device=self.device)[None,...]
         self.bad_steps_threshold = torch.zeros(self.num_envs,device=self.device)
 
         self._update_motion_cache()
@@ -280,6 +289,7 @@ class MotionCommand(CommandTerm):
             return
         self._adaptive_sampling(env_ids)  # 对time_stamps进行自适应采样
         self.body_pos_start_w[env_ids] = (self.motion.body_pos_w[self.time_steps]*torch.tensor([1,1,0], device=self.device)[None,...])[env_ids]
+        self.human_body_pos_start_w[env_ids] = (self.motion.human_body_pos_w[self.time_steps]*torch.tensor([1,1,0], device=self.device)[None,...])[env_ids]
         self.consecutive_bad_steps[env_ids] = 0  # 重置坏跟踪连续计数器
         self._update_motion_cache()
         self._reset_env_by_motion(
@@ -327,6 +337,21 @@ class MotionCommand(CommandTerm):
         )
         self.anchor_quat_w = self.motion.body_quat_w[
             self.time_steps, self.motion_anchor_body_index
+        ]
+        self.human_body_pos_w = (
+            self.motion.human_body_pos_w[self.time_steps]
+            - self.human_body_pos_start_w [:, 0:1,:]
+            + self._env.scene.env_origins[:, None, :]
+        )
+        self.human_body_quat_w = self.motion.human_body_quat_w[self.time_steps]
+        # TODO: human anchor是哪一个
+        self.human_anchor_pos_w = (
+            self.motion.human_body_pos_w[self.time_steps, 0]
+            - self.human_body_pos_start_w[:, 0]
+            + self._env.scene.env_origins
+        )
+        self.human_anchor_quat_w = self.motion.human_body_quat_w[
+            self.time_steps, 0
         ]
         self.anchor_lin_vel_w = self.motion.body_lin_vel_w[
             self.time_steps, self.motion_anchor_body_index
@@ -553,11 +578,30 @@ class MotionCommand(CommandTerm):
                         )
                     )
 
+            if not hasattr(self, "human_goal_anchor_visualizer"):
+                self.human_goal_anchor_visualizer = VisualizationMarkers(
+                    self.cfg.human_anchor_visualizer_cfg.replace(
+                        prim_path="/Visuals/Command/current/human_goal_anchor"
+                    )
+                )
+                self.human_goal_body_visualizers = []
+                for name in self.cfg.desire_human_joint_names:
+                    self.human_goal_body_visualizers.append(
+                        VisualizationMarkers(
+                            self.cfg.human_body_visualizer_cfg.replace(
+                                prim_path="/Visuals/Command/human_goal_body/" + name
+                            )
+                        )
+                    )
+
             self.current_anchor_visualizer.set_visibility(True)
             self.goal_anchor_visualizer.set_visibility(True)
+            self.human_goal_anchor_visualizer.set_visibility(True)
             for i in range(len(self.cfg.body_names)):
                 self.current_body_visualizers[i].set_visibility(True)
                 self.goal_body_visualizers[i].set_visibility(True)
+            for i in range(len(self.cfg.desire_human_joint_names)):
+                self.human_goal_body_visualizers[i].set_visibility(True)
 
         else:
             if hasattr(self, "current_anchor_visualizer"):
@@ -566,6 +610,10 @@ class MotionCommand(CommandTerm):
                 for i in range(len(self.cfg.body_names)):
                     self.current_body_visualizers[i].set_visibility(False)
                     self.goal_body_visualizers[i].set_visibility(False)
+            if hasattr(self, "human_goal_anchor_visualizer"):
+                self.human_goal_anchor_visualizer.set_visibility(False)
+                for i in range(len(self.cfg.desire_human_joint_names)):
+                    self.human_goal_body_visualizers[i].set_visibility(False)
 
     def _debug_vis_callback(self, event):
         if not self.robot.is_initialized:
@@ -575,13 +623,17 @@ class MotionCommand(CommandTerm):
             self.robot_anchor_pos_w, self.robot_anchor_quat_w
         )
         self.goal_anchor_visualizer.visualize(self.anchor_pos_w, self.anchor_quat_w)
-
+        self.human_goal_anchor_visualizer.visualize(self.human_anchor_pos_w, self.human_anchor_quat_w)
         for i in range(len(self.cfg.body_names)):
             self.current_body_visualizers[i].visualize(
                 self.robot_body_pos_w[:, i], self.robot_body_quat_w[:, i]
             )
             self.goal_body_visualizers[i].visualize(
                 self.body_pos_relative_w[:, i], self.body_quat_relative_w[:, i]
+            )
+        for i in range(len(self.cfg.desire_human_joint_names)):
+            self.human_goal_body_visualizers[i].visualize(
+                self.human_body_pos_w[:, i], self.human_body_quat_w[:, i]
             )
 
 
@@ -596,7 +648,28 @@ class MotionCommandCfg(CommandTermCfg):
     motion_file: dict[str, list[str] | str] | str = MISSING
     anchor_body_name: str = MISSING
     body_names: list[str] = MISSING
-
+    human_joint_names: list[str] =  ['Root', 'Hips', 'Spine1', 'Spine2', 'Chest', 'Neck1', 'Neck2', 'Head', 'HeadEnd', 'Jaw', 'LeftEye', 'RightEye', 'LeftShoulder', 'LeftArm', 'LeftForeArm', 'LeftHand', 'LeftHandThumb1', 'LeftHandThumb2', 'LeftHandThumb3', 'LeftHandThumbEnd', 'LeftHandIndex1', 'LeftHandIndex2', 'LeftHandIndex3', 'LeftHandIndex4', 'LeftHandIndexEnd', 'LeftHandMiddle1', 'LeftHandMiddle2', 'LeftHandMiddle3', 'LeftHandMiddle4', 'LeftHandMiddleEnd', 'LeftHandRing1', 'LeftHandRing2', 'LeftHandRing3', 'LeftHandRing4', 'LeftHandRingEnd', 'LeftHandPinky1', 'LeftHandPinky2', 'LeftHandPinky3', 'LeftHandPinky4', 'LeftHandPinkyEnd', 'RightShoulder', 'RightArm', 'RightForeArm', 'RightHand', 'RightHandThumb1', 'RightHandThumb2', 'RightHandThumb3', 'RightHandThumbEnd', 'RightHandIndex1', 'RightHandIndex2', 'RightHandIndex3', 'RightHandIndex4', 'RightHandIndexEnd', 'RightHandMiddle1', 'RightHandMiddle2', 'RightHandMiddle3', 'RightHandMiddle4', 'RightHandMiddleEnd', 'RightHandRing1', 'RightHandRing2', 'RightHandRing3', 'RightHandRing4', 'RightHandRingEnd', 'RightHandPinky1', 'RightHandPinky2', 'RightHandPinky3', 'RightHandPinky4', 'RightHandPinkyEnd', 'LeftLeg', 'LeftShin', 'LeftFoot', 'LeftToeBase', 'LeftToeEnd', 'RightLeg', 'RightShin', 'RightFoot', 'RightToeBase', 'RightToeEnd']
+    desire_human_joint_names: list[str] =  [
+        'Hips', 
+        'Spine1', 'Spine2', 'Chest', 
+        'Neck1', 'Neck2', 'Head', 'HeadEnd', 
+        # 'Jaw', 'LeftEye', 'RightEye', 
+        'LeftShoulder', 'LeftArm', 'LeftForeArm', 'LeftHand', 
+        # 'LeftHandThumb1', 'LeftHandThumb2', 'LeftHandThumb3', 'LeftHandThumbEnd', 
+        # 'LeftHandIndex1', 'LeftHandIndex2', 'LeftHandIndex3', 'LeftHandIndex4', 'LeftHandIndexEnd', 
+        # 'LeftHandMiddle1', 'LeftHandMiddle2', 'LeftHandMiddle3', 'LeftHandMiddle4', 'LeftHandMiddleEnd', 
+        # 'LeftHandRing1', 'LeftHandRing2', 'LeftHandRing3', 'LeftHandRing4', 'LeftHandRingEnd', 
+        # 'LeftHandPinky1', 'LeftHandPinky2', 'LeftHandPinky3', 'LeftHandPinky4', 'LeftHandPinkyEnd', 
+        'RightShoulder', 'RightArm', 'RightForeArm', 'RightHand', 
+        # 'RightHandThumb1', 'RightHandThumb2', 'RightHandThumb3', 'RightHandThumbEnd', 
+        # 'RightHandIndex1', 'RightHandIndex2', 'RightHandIndex3', 'RightHandIndex4', 'RightHandIndexEnd', 
+        # 'RightHandMiddle1', 'RightHandMiddle2', 'RightHandMiddle3', 'RightHandMiddle4', 'RightHandMiddleEnd', 
+        # 'RightHandRing1', 'RightHandRing2', 'RightHandRing3', 'RightHandRing4', 'RightHandRingEnd', 
+        # 'RightHandPinky1', 'RightHandPinky2', 'RightHandPinky3', 'RightHandPinky4', 'RightHandPinkyEnd', 
+        'LeftLeg', 'LeftShin', 'LeftFoot', 'LeftToeBase', 'LeftToeEnd', 
+        'RightLeg', 'RightShin', 'RightFoot', 'RightToeBase', 'RightToeEnd'
+    ]
+    human_anchor_name:
     # ee_body_pos_knee_body_names: list[str] = MISSING
     # ee_body_pos_ankle_body_names: list[str] = MISSING
     # ee_body_pos_wrist_body_names: list[str] = MISSING
@@ -626,3 +699,12 @@ class MotionCommandCfg(CommandTermCfg):
         prim_path="/Visuals/Command/pose"
     )
     body_visualizer_cfg.markers["frame"].scale = (0.1, 0.1, 0.1)
+    
+    human_anchor_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(
+        prim_path="/Visuals/Command/pose"
+    )
+    human_anchor_visualizer_cfg.markers["frame"].scale = (0.2, 0.2, 0.2)
+    human_body_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(
+        prim_path="/Visuals/Command/pose"
+    )
+    human_body_visualizer_cfg.markers["frame"].scale = (0.1, 0.1, 0.1)

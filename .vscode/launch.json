@@ -128,6 +128,18 @@
             ]
         },
         {
+            "name": "g1 normal play",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "/home/hpx/HPX_LOCO_2/mimic_baseline/scripts/rsl_rl/play.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--task", "Tracking-Flat-G1-v0",
+                "--domain_randomization",
+                "--num_envs", "128"
+            ]
+        },
+        {
             "name": "g1 terrain play",
             "type": "debugpy",
             "request": "launch",

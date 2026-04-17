@@ -239,6 +239,7 @@ class MotionLoader_human:
         robot_body_names: Sequence[int] | None = None,
         robot_joint_names: Sequence[int] | None = None,
         body_indexes: Sequence[int] | None = None,
+        desire_human_joint_names: Sequence[int] | None = None,
         history_frames: int = 0,
         future_frames: int = 0,
         device: str = "cpu",
@@ -253,12 +254,14 @@ class MotionLoader_human:
         self.fps = None
         self.file_joint_names = None
         self.file_body_names = None
+        self.human_joint_names = None
+        self.human_joint_indexes = None
         # 传入仿真器的机器人模型中身体部位的名称和关节名称
         self._robot_body_names = robot_body_names
         self._robot_joint_names = robot_joint_names
         # 传入仿真器中需要加载的机器人身体部位的索引
         self._body_indexes = body_indexes
-
+        self.desire_human_joint_names = desire_human_joint_names
         self.history_frames = history_frames
         self.future_frames = future_frames
         self.window_size = history_frames + future_frames + 1
@@ -286,6 +289,7 @@ class MotionLoader_human:
                 self._validate_fps(data)
                 self._validate_joint_names(data)
                 self._validate_link_names(data)
+                self._validate_human_joint_names(data)
                 self._append_motion_data(data)
 
                 num_frames = self.np_joint_pos_list[-1].shape[0]
@@ -333,6 +337,8 @@ class MotionLoader_human:
         self.np_body_quat_w_list: list[np.ndarray] = []
         self.np_body_lin_vel_w_list: list[np.ndarray] = []
         self.np_body_ang_vel_w_list: list[np.ndarray] = []
+        self.np_human_body_pos_w_list: list[np.ndarray] = []
+        self.np_human_body_quat_w_list: list[np.ndarray] = []
 
     def _append_motion_data(self, data: np.lib.npyio.NpzFile) -> None:
         self.np_joint_pos_list.append(data["robot_joint_pos"].astype(np.float32)[:, self._robot_joint_indexes])
@@ -341,16 +347,16 @@ class MotionLoader_human:
         self.np_body_quat_w_list.append(data["robot_body_quat"].astype(np.float32)[:, self._robot_body_indexes][..., [3,0,1,2]])
         self.np_body_lin_vel_w_list.append(data["robot_body_lin_vel"].astype(np.float32)[:, self._robot_body_indexes])
         self.np_body_ang_vel_w_list.append(data["robot_body_ang_vel"].astype(np.float32)[:, self._robot_body_indexes])
+        self.np_human_body_pos_w_list.append(data["human_global_pos"].astype(np.float32)[:,self.human_joint_indexes])
+        self.np_human_body_quat_w_list.append(data["human_global_quat"].astype(np.float32)[:,self.human_joint_indexes][..., [3,0,1,2]])
 
     def _motion_data_np_list_to_tensor(self,) -> None:
         self.joint_pos = self.np_list_to_tensor(self.np_joint_pos_list)
         self.joint_vel = self.np_list_to_tensor(self.np_joint_vel_list)
 
-        body_pos_w = self.np_list_to_tensor(self.np_body_pos_w_list)
-        self.body_pos_w = body_pos_w[:, self._body_indexes]
+        self.body_pos_w = self.np_list_to_tensor(self.np_body_pos_w_list)[:, self._body_indexes]
 
-        body_quat_w = self.np_list_to_tensor(self.np_body_quat_w_list)
-        self.body_quat_w = body_quat_w[:, self._body_indexes]
+        self.body_quat_w = self.np_list_to_tensor(self.np_body_quat_w_list)[:, self._body_indexes]
 
         self.body_lin_vel_w = self.np_list_to_tensor(
             self.np_body_lin_vel_w_list
@@ -359,6 +365,9 @@ class MotionLoader_human:
         self.body_ang_vel_w = self.np_list_to_tensor(
             self.np_body_ang_vel_w_list
         )[:, self._body_indexes]
+
+        self.human_body_pos_w = self.np_list_to_tensor(self.np_human_body_pos_w_list)
+        self.human_body_quat_w = self.np_list_to_tensor(self.np_human_body_quat_w_list)
 
     def np_list_to_tensor(self, np_list: list[np.ndarray]) -> torch.Tensor:
         """Convert a NumPy array to a PyTorch tensor on the appropriate device."""
@@ -388,6 +397,17 @@ class MotionLoader_human:
             self.fps = data["fps"]
         else:
             assert self.fps == data["fps"], "All motion files must have the same fps."
+
+    def _validate_human_joint_names(self, data: np.lib.npyio.NpzFile) -> None:
+        if self.human_joint_names is None:
+            self.human_joint_names = data["human_joint_names"].tolist()
+            self.human_joint_indexes = [self.human_joint_names.index(name) for name in self.desire_human_joint_names]
+            # print("human_joint_names:\r\n",self.human_joint_names)
+        else:
+            human_joint_names = data["human_joint_names"].tolist()
+            assert self.human_joint_names == human_joint_names, (
+                f"Motion file human joint names {human_joint_names} do not match expected {self.human_joint_names}."
+            )
 
     def _validate_joint_names(self, data: np.lib.npyio.NpzFile) -> None:
         """Ensure the motion file contains the required joint names."""
