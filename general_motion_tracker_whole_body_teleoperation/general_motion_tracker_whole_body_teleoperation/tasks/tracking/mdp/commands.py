@@ -170,7 +170,7 @@ class MotionCommand(CommandTerm):
         )
         self.bad_steps_threshold = torch.zeros(self.num_envs,device=self.device)
 
-        self._update_motion_cache()
+        self._update_motion_cache(full=True)
         self._update_robot_state_cache()
         self._make_calculate()
         # self._update_termination_cache()
@@ -320,7 +320,7 @@ class MotionCommand(CommandTerm):
             * self._xy_plane_mask[None, None, :]
         )[env_ids]
         self.consecutive_bad_steps[env_ids] = 0  # 重置坏跟踪连续计数器
-        self._update_motion_cache()
+        self._update_motion_cache(full = False)
         self._reset_env_by_motion(
             env_ids
         )  # 根据采样的time_stamps对应的motion数据重置环境状态
@@ -341,7 +341,7 @@ class MotionCommand(CommandTerm):
             overflow_mask | (~valid_center_mask), as_tuple=False
         ).squeeze(-1)
 
-    def _update_motion_cache(self):
+    def _update_motion_cache(self,full = False):
         # 在time_stamps更新后，更新缓存的motion数据,因为_resample_command在_update_command中被调用,所以当需要reset的env_ids数量为0时也要触发一次
         assert (
             self.time_steps.max() < self.motion.time_step_total
@@ -357,6 +357,8 @@ class MotionCommand(CommandTerm):
         self.body_ang_vel_w = self.motion.body_ang_vel_w[self.time_steps]
         self.joint_pos = self.motion.joint_pos[self.time_steps]
         self.joint_vel = self.motion.joint_vel[self.time_steps]
+        if not full:
+            return
         self.anchor_pos_w = (
             self.motion.body_pos_w[self.time_steps, self.motion_anchor_body_index]
             - self.body_pos_start_w[:, self.motion_anchor_body_index]
@@ -446,7 +448,6 @@ class MotionCommand(CommandTerm):
 
         # Robot anchor orientation in 6D representation.
         self.robot_anchor_ori_w = rot6d_from_quat(self.robot_anchor_quat_w)
-        # self.robot_anchor_ori_w = self.robot_anchor_quat_w
         # Robot body pose in robot-anchor frame.
         robot_body_pos_b, robot_body_ori_b = subtract_frame_transforms(
             robot_anchor_pos_w_repeat,
@@ -455,7 +456,6 @@ class MotionCommand(CommandTerm):
             self.robot_body_quat_w,
         )
         self.robot_body_pos_b = robot_body_pos_b
-        # self.robot_body_ori_b = robot_body_ori_b.reshape(self.num_envs, -1)
         self.robot_body_ori_b = rot6d_from_quat(robot_body_ori_b).reshape(
             self.num_envs, -1
         )
@@ -468,7 +468,6 @@ class MotionCommand(CommandTerm):
         )
         self.motion_anchor_pos_b = motion_anchor_pos_b
         self.motion_anchor_ori_b = rot6d_from_quat(motion_anchor_ori_b).reshape(self.num_envs, -1)
-        # self.motion_anchor_ori_b = motion_anchor_ori_b
         # Shared error tensors used by rewards/terminations/metrics.
         self.anchor_pos_error = self.anchor_pos_w - self.robot_anchor_pos_w
         self.anchor_lin_vel_error = self.anchor_lin_vel_w - self.robot_anchor_lin_vel_w
@@ -557,7 +556,7 @@ class MotionCommand(CommandTerm):
         self.time_steps += 1
         env_ids = self._get_env_ids_to_resample()
         self._resample_command(env_ids)
-        self._update_motion_cache()
+        self._update_motion_cache(full = True)
         self._update_robot_state_cache()
         self._make_calculate()
         # self._update_termination_cache()
