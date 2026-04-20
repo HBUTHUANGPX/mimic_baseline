@@ -65,18 +65,11 @@ def joint_pos_delta_window(env: ManagerBasedEnv, command_name: str) -> torch.Ten
     command: MotionCommand = env.command_manager.get_term(command_name)
     return command.joint_pos_delta
 
-def robot_joint_pos_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
-    command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.robot_joint_pos
-
 def motion_anchor_ori_b_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
     return command.motion_anchor_ori_b
 
-def robot_body_pos_b_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+def motion_anchor_pos_b_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.robot_body_pos_b.view(env.num_envs, -1)
+    return command.motion_anchor_pos_b
 
-def robot_body_ori_b_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
-    command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.robot_body_ori_b
