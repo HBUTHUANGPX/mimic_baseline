@@ -103,3 +103,35 @@ def test_generate_yaml_quotes_paths_with_spaces(tmp_path: Path):
 
     collected = collect_npz_paths(str(output_yaml))
     assert collected == {"pruned_set": [str(spaced_file)]}
+
+
+def test_main_generates_single_line_quoted_relative_path_for_space_named_motion(tmp_path: Path, monkeypatch):
+    from scripts.rsl_rl.generate_pruned_motion_yaml import main
+
+    monkeypatch.chdir(tmp_path)
+    source_dir = Path("soma-retargeter/assets/motions/soma_uniform_bvh_export/240529")
+    source_dir.mkdir(parents=True)
+    regular_file = source_dir / "neutral_button press_001__A543.npz"
+    mirrored_file = source_dir / "neutral_button press_001__A543_M.npz"
+    regular_file.touch()
+    mirrored_file.touch()
+
+    output_yaml = Path("scripts/rsl_rl/motion_file_pruned.yaml")
+    exit_code = main(
+        [
+            "--source-dir",
+            str(source_dir),
+            "--output",
+            str(output_yaml),
+            "--motion-group-name",
+            "pruned_set",
+        ]
+    )
+
+    assert exit_code == 0
+    raw_lines = output_yaml.read_text(encoding="utf-8").splitlines()
+    assert '    - "soma-retargeter/assets/motions/soma_uniform_bvh_export/240529/neutral_button press_001__A543.npz"' in raw_lines
+    assert not any("press_001__A543.npz" == line.strip() for line in raw_lines)
+
+    collected = collect_npz_paths(str(output_yaml))
+    assert collected == {"pruned_set": [str(regular_file)]}
