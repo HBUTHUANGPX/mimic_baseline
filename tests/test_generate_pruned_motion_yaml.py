@@ -81,3 +81,25 @@ def test_generate_yaml_writes_loader_compatible_motion_group(tmp_path: Path):
             str(source_dir / "take_a_sip_180_R_001__A552_M.npz"),
         ]
     }
+
+
+def test_generate_yaml_quotes_paths_with_spaces(tmp_path: Path):
+    from scripts.rsl_rl.generate_pruned_motion_yaml import generate_motion_yaml
+
+    source_dir = tmp_path / "motions"
+    source_dir.mkdir()
+    spaced_file = source_dir / "neutral_button press_001__A543.npz"
+    spaced_file.touch()
+
+    output_yaml = tmp_path / "motion_file_pruned.yaml"
+    generate_motion_yaml(
+        source_dir=source_dir,
+        output_path=output_yaml,
+        motion_group_name="pruned_set",
+    )
+
+    raw_text = output_yaml.read_text(encoding="utf-8")
+    assert f'- "{spaced_file}"' in raw_text
+
+    collected = collect_npz_paths(str(output_yaml))
+    assert collected == {"pruned_set": [str(spaced_file)]}

@@ -10,6 +10,18 @@ import yaml
 _MOTION_TAKE_PATTERN = re.compile(r"^(?P<action>.+?)__A\d{3}(?P<mirrored>_M)?$")
 
 
+class MotionYamlDumper(yaml.SafeDumper):
+    pass
+
+
+def _represent_motion_yaml_string(dumper: yaml.SafeDumper, value: str) -> yaml.ScalarNode:
+    style = '"' if any(character.isspace() for character in value) else None
+    return dumper.represent_scalar("tag:yaml.org,2002:str", value, style=style)
+
+
+MotionYamlDumper.add_representer(str, _represent_motion_yaml_string)
+
+
 def motion_action_key(path: str | Path) -> str:
     stem = Path(path).stem
     match = _MOTION_TAKE_PATTERN.match(stem)
@@ -83,7 +95,13 @@ def generate_motion_yaml(
 
     output_file.parent.mkdir(parents=True, exist_ok=True)
     output_file.write_text(
-        yaml.safe_dump(payload, sort_keys=False, allow_unicode=True),
+        yaml.dump(
+            payload,
+            Dumper=MotionYamlDumper,
+            sort_keys=False,
+            allow_unicode=True,
+            width=10_000,
+        ),
         encoding="utf-8",
     )
     return payload
