@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 
+import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -135,3 +136,107 @@ def test_main_generates_single_line_quoted_relative_path_for_space_named_motion(
 
     collected = collect_npz_paths(str(output_yaml))
     assert collected == {"pruned_set": [str(regular_file)]}
+
+
+def test_should_filter_out_matches_exclude_keywords_case_insensitively():
+    from scripts.rsl_rl.generate_pruned_motion_yaml import should_filter_out
+
+    assert should_filter_out("Walk/Chair_Sit_001.npz", ["sit"])
+    assert should_filter_out("Walk/Chair_Sit_001.npz", ["CHAIR"])
+    assert not should_filter_out("Walk/neutral_walk_001.npz", ["sit", "chair"])
+
+
+def test_collect_pruned_motion_files_applies_keywords_before_grouping(tmp_path: Path):
+    from scripts.rsl_rl.generate_pruned_motion_yaml import collect_pruned_motion_files
+
+    source_dir = tmp_path / "motions"
+    source_dir.mkdir()
+    kept = source_dir / "neutral_walk_001__A001.npz"
+    excluded_same_action = source_dir / "neutral_walk_001_sit__A002.npz"
+    excluded_other_action = source_dir / "chair_sit_001__A001.npz"
+    another_kept = source_dir / "neutral_throw_001__A001.npz"
+    kept.touch()
+    excluded_same_action.touch()
+    excluded_other_action.touch()
+    another_kept.touch()
+
+    selected = collect_pruned_motion_files(
+        source_dir,
+        filter_keywords=["sit"],
+    )
+
+    assert selected == [another_kept, kept]
+
+
+def test_main_generates_yaml_with_keyword_filters(tmp_path: Path, monkeypatch):
+    from scripts.rsl_rl.generate_pruned_motion_yaml import main
+
+    monkeypatch.chdir(tmp_path)
+    source_dir = Path("motions")
+    source_dir.mkdir()
+    kept = source_dir / "neutral_walk_001__A001.npz"
+    filtered = source_dir / "neutral_walk_sit_001__A001.npz"
+    not_included = source_dir / "neutral_throw_001__A001.npz"
+    kept.touch()
+    filtered.touch()
+    not_included.touch()
+
+    output_yaml = Path("motion_file_pruned.yaml")
+    exit_code = main(
+        [
+            "--source-dir",
+            str(source_dir),
+            "--output",
+            str(output_yaml),
+            "--filter-keywords",
+            "sit",
+            "--motion-group-name",
+            "pruned_set",
+        ]
+    )
+
+    assert exit_code == 0
+    collected = collect_npz_paths(str(output_yaml))
+    assert collected == {"pruned_set": [str(not_included), str(kept)]}
+
+
+def test_main_uses_default_filter_keywords_without_extra_args(tmp_path: Path, monkeypatch):
+    from scripts.rsl_rl.generate_pruned_motion_yaml import main
+
+    monkeypatch.chdir(tmp_path)
+    source_dir = Path("motions")
+    source_dir.mkdir()
+    kept = source_dir / "neutral_walk_001__A001.npz"
+    default_filtered = source_dir / "neutral_chair_001__A001.npz"
+    kept.touch()
+    default_filtered.touch()
+
+    output_yaml = Path("motion_file_pruned.yaml")
+    exit_code = main(
+        [
+            "--source-dir",
+            str(source_dir),
+            "--output",
+            str(output_yaml),
+            "--motion-group-name",
+            "pruned_set",
+        ]
+    )
+
+    assert exit_code == 0
+    collected = collect_npz_paths(str(output_yaml))
+    assert collected == {"pruned_set": [str(kept)]}
+
+
+def test_main_rejects_unsupported_keyword_arguments(tmp_path: Path, monkeypatch):
+    from scripts.rsl_rl.generate_pruned_motion_yaml import main
+
+    monkeypatch.chdir(tmp_path)
+    source_dir = Path("motions")
+    source_dir.mkdir()
+
+    with pytest.raises(SystemExit):
+        main(["--source-dir", str(source_dir), "--add-keywords", "chair"])
+
+    with pytest.raises(SystemExit):
+        main(["--source-dir", str(source_dir), "--filter_file", "include_keywords.txt"])

@@ -8,6 +8,48 @@ import yaml
 
 
 _MOTION_TAKE_PATTERN = re.compile(r"^(?P<action>.+?)__A\d{3}(?P<mirrored>_M)?$")
+DEFAULT_FILTER_KEYWORDS = [
+    "bed",
+    "bike",
+    "chair",
+    "climb",
+    "com_up_50cm",
+    "sitting",
+    "step_on",
+    "seat",
+    "table",
+    "_sit_",
+    "sit_",
+    "ladder",
+    "crutch",
+    "_bed_",
+    "_ride_",
+    "scooter",
+    "stepdown",
+    "acrobatics_",
+    "box_HSPU",
+    "cartwheel",
+    "50cm_box_",
+    "on_box",
+    "fall_from",
+    "handstand_ff_",
+    "on_1m",
+    "form_box",
+    "off_1m",
+    "230m",
+    "jump_over_obstacle_",
+    "lift_crate_come_up_",
+    "jump_to_shoulder_roll",
+    "kozak_dance",
+    "stair",
+    "handstand",
+    "box_jump",
+    "monkey_jump",
+    "safety_roll",
+    "box_dips",
+    "walking_on_edge",
+    "push_obstacle",
+]
 
 
 class MotionYamlDumper(yaml.SafeDumper):
@@ -20,6 +62,16 @@ def _represent_motion_yaml_string(dumper: yaml.SafeDumper, value: str) -> yaml.S
 
 
 MotionYamlDumper.add_representer(str, _represent_motion_yaml_string)
+
+
+def should_filter_out(
+    filename: str,
+    filter_keywords: Iterable[str] | None,
+) -> bool:
+    filename_lower = filename.lower()
+    exclude_terms = [keyword.lower() for keyword in (filter_keywords or []) if keyword]
+
+    return any(keyword in filename_lower for keyword in exclude_terms)
 
 
 def motion_action_key(path: str | Path) -> str:
@@ -45,11 +97,17 @@ def select_representative_motion(paths: Iterable[str | Path]) -> Path:
     return non_mirrored[0] if non_mirrored else candidates[0]
 
 
-def collect_pruned_motion_files(source_dir: str | Path) -> list[Path]:
+def collect_pruned_motion_files(
+    source_dir: str | Path,
+    filter_keywords: Iterable[str] | None = None,
+) -> list[Path]:
     source_path = Path(source_dir)
     grouped_paths: dict[str, list[Path]] = defaultdict(list)
 
     for npz_path in sorted(source_path.rglob("*.npz"), key=lambda path: path.as_posix()):
+        name_to_check = npz_path.relative_to(source_path).as_posix()
+        if should_filter_out(name_to_check, filter_keywords):
+            continue
         grouped_paths[motion_action_key(npz_path)].append(npz_path)
 
     selected = [
@@ -74,12 +132,16 @@ def generate_motion_yaml(
     output_path: str | Path,
     motion_group_name: str = "soma_uniform_bvh_export_pruned",
     relative_to: str | Path | None = None,
+    filter_keywords: Iterable[str] | None = None,
 ) -> dict:
     source_path = Path(source_dir)
     output_file = Path(output_path)
     relative_root = Path(relative_to) if relative_to is not None else Path.cwd()
 
-    selected_paths = collect_pruned_motion_files(source_path)
+    selected_paths = collect_pruned_motion_files(
+        source_path,
+        filter_keywords=filter_keywords,
+    )
     yaml_paths = [_format_yaml_path(path, relative_root) for path in selected_paths]
 
     payload = {
@@ -131,6 +193,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=".",
         help="Write file_name entries relative to this directory when possible.",
     )
+    parser.add_argument(
+        "--filter-keywords",
+        nargs="+",
+        default=DEFAULT_FILTER_KEYWORDS,
+        help="Exclude motions whose relative path contains any of these keywords.",
+    )
     return parser
 
 
@@ -143,6 +211,7 @@ def main(argv: list[str] | None = None) -> int:
         output_path=args.output,
         motion_group_name=args.motion_group_name,
         relative_to=args.relative_to,
+        filter_keywords=args.filter_keywords,
     )
 
     group = payload["motion_group"][args.motion_group_name]
