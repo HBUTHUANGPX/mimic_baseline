@@ -389,7 +389,7 @@ class EventCfg:
     push_robot = EventTerm(
         func=mdp.push_by_setting_velocity,
         mode="interval",
-        interval_range_s=(1.0, 3.0),
+        interval_range_s=(5.0, 10.0),
         params={"velocity_range": VELOCITY_RANGE},
     )
 
@@ -534,7 +534,7 @@ class TerminationsCfg:
         func=mdp.bad_motion_body_pos_z_only,
         params={
             "command_name": "motion",
-            "threshold": 0.28,
+            "threshold": 0.35,
             "body_names": [
                 "L_ankle_roll_link",
                 "R_ankle_roll_link",
