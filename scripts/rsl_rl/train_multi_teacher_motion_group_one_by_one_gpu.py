@@ -319,7 +319,7 @@ def main(
         )
         print(f"Training time: {round(time.time() - start_time, 2)} seconds")
         if not runner.logger.disable_logs:
-            if runner.logger.logger_type == "wandb":
+            if runner.logger.logger_type in {"wandb", "swanlab"}:
                 runner.logger.writer.stop()
         # close the simulator
     env.close()

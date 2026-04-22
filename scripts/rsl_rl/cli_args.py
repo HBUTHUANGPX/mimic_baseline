@@ -32,13 +32,20 @@ def add_rsl_rl_args(parser: argparse.ArgumentParser):
     arg_group.add_argument("--checkpoint", type=str, default=None, help="Checkpoint file to resume from.")
     # -- logger arguments
     arg_group.add_argument(
-        "--logger", type=str, default=None, choices={"wandb", "tensorboard", "neptune"}, help="Logger module to use."
+        "--logger",
+        type=str,
+        default=None,
+        choices={"wandb", "tensorboard", "neptune", "swanlab"},
+        help="Logger module to use.",
     )
     arg_group.add_argument(
-        "--log_project_name", type=str, default=None, help="Name of the logging project when using wandb or neptune."
+        "--log_project_name",
+        type=str,
+        default=None,
+        help="Name of the logging project when using wandb, neptune, or swanlab.",
     )
     arg_group.add_argument(
-        "--wandb_path", type=str, default=None, help="Name of the logging project when using wandb or neptune."
+        "--wandb_path", type=str, default=None, help="Deprecated compatibility argument."
     )
 
 
@@ -86,9 +93,10 @@ def update_rsl_rl_cfg(agent_cfg: RslRlBaseRunnerCfg, args_cli: argparse.Namespac
         agent_cfg.run_name = args_cli.run_name
     if args_cli.logger is not None:
         agent_cfg.logger = args_cli.logger
-    # set the project name for wandb and neptune
-    if agent_cfg.logger in {"wandb", "neptune"} and args_cli.log_project_name:
+    # set the project name for external loggers
+    if agent_cfg.logger in {"wandb", "neptune", "swanlab"} and args_cli.log_project_name:
         agent_cfg.wandb_project = args_cli.log_project_name
         agent_cfg.neptune_project = args_cli.log_project_name
+        agent_cfg.swanlab_project = args_cli.log_project_name
 
     return agent_cfg

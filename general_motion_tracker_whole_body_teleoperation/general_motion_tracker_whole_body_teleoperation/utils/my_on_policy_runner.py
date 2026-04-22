@@ -1,14 +1,10 @@
-import os
-
 from rsl_rl.env import VecEnv
 from rsl_rl.runners.on_policy_runner import OnPolicyRunner
 
 from isaaclab_rl.rsl_rl import export_policy_as_onnx
 
-import wandb
 from general_motion_tracker_whole_body_teleoperation.utils.exporter import (
     attach_onnx_metadata,
-    export_motion_policy_as_onnx,
 )
 
 
@@ -16,7 +12,7 @@ class MyOnPolicyRunner(OnPolicyRunner):
     def save(self, path: str, infos=None):
         """Save the model and training information."""
         super().save(path, infos)
-        if self.logger_type in ["wandb"]:
+        if self.logger_type in ["wandb", "swanlab"]:
             policy_path = path.split("model")[0]
             filename = policy_path.split("/")[-2] + ".onnx"
             export_policy_as_onnx(
@@ -25,10 +21,11 @@ class MyOnPolicyRunner(OnPolicyRunner):
                 path=policy_path,
                 filename=filename,
             )
+            run_name = getattr(self.logger.writer, "run_name", None)
             attach_onnx_metadata(
-                self.env.unwrapped, wandb.run.name, path=policy_path, filename=filename
+                self.env.unwrapped, run_name, path=policy_path, filename=filename
             )
-            wandb.save(policy_path + filename, base_path=os.path.dirname(policy_path))
+            self.logger.writer.save_file(policy_path + filename)
 
 
 class MotionOnPolicyRunner(OnPolicyRunner):
@@ -46,16 +43,10 @@ class MotionOnPolicyRunner(OnPolicyRunner):
     def save(self, path: str, infos=None):
         """Save the model and training information."""
         super().save(path, infos)
-        if self.logger_type in ["wandb"]:
-            policy_path = path.split("model")[0]
-            filename = policy_path.split("/")[-2] + ".onnx"
-            # export_motion_policy_as_onnx(
-            #     self.env.unwrapped, self.alg.policy, normalizer=self.obs_normalizer, path=policy_path, filename=filename
-            # )
-            # attach_onnx_metadata(self.env.unwrapped, wandb.run.name, path=policy_path, filename=filename)
-            # wandb.save(policy_path + filename, base_path=os.path.dirname(policy_path))
-
+        if self.logger_type in ["wandb", "swanlab"]:
             # link the artifact registry to this run
-            if self.registry_name is not None:
+            if self.logger_type == "wandb" and self.registry_name is not None:
+                import wandb
+
                 wandb.run.use_artifact(self.registry_name)
                 self.registry_name = None
