@@ -59,5 +59,10 @@ history + current + future -> current
 - robot anchor 世界坐标
 - 原始 human body 世界坐标
 - joint/body 名字和 anchor 名字
+- MuJoCo 可视化使用的人体 body 名字
 
 MuJoCo viewer 会用 robot feature 中的 6D rotation 和 joint pos 构建 qpos。
+free-base 机器人会先根据当前关节角求出 root body 到 anchor body 的局部变换，
+再由 anchor body 的世界位姿反解 XML 根 body 的 qpos。
+人体骨架显示只使用 `features.human_anchor_body` 和 `features.human_body_names` 指定的节点，
+导出的 `human_body_pos_w` 仍保留原始全量数据。

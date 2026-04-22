@@ -9,7 +9,11 @@ from pathlib import Path
 import numpy as np
 
 from motion_reconstruction.evaluation import ReconstructionResult
-from motion_reconstruction.evaluation.robot_state import human_skeleton_edges, robot_feature_to_qpos
+from motion_reconstruction.evaluation.robot_state import (
+    human_skeleton_edges,
+    robot_feature_to_qpos,
+    rot6d_to_quat_wxyz_numpy,
+)
 
 
 EMPTY_SCENE_XML = """
@@ -37,6 +41,10 @@ class RobotKinematics:
     data: object
     body_edges: list[tuple[int, int]]
     anchor_body_id: int | None
+    root_body_id: int | None
+    free_joint_id: int | None
+    free_qposadr: int | None
+    joint_qposadrs: list[int]
 
     def body_positions(self, qpos: np.ndarray) -> np.ndarray:
         mujoco = _import_mujoco()
@@ -46,6 +54,54 @@ class RobotKinematics:
         self.data.qvel[:] = 0.0
         mujoco.mj_forward(self.model, self.data)
         return np.asarray(self.data.xpos, dtype=np.float32).copy()
+
+    def qpos_from_anchor_feature(self, feature: np.ndarray, anchor_pos_w: np.ndarray) -> np.ndarray:
+        feature = np.asarray(feature, dtype=np.float32)
+        joint_pos = feature[6:]
+        if self.model.nq == joint_pos.shape[-1]:
+            return robot_feature_to_qpos(feature, anchor_pos_w=anchor_pos_w, expected_nq=self.model.nq)
+        if self.model.nq != joint_pos.shape[-1] + 7:
+            return robot_feature_to_qpos(feature, anchor_pos_w=anchor_pos_w, expected_nq=self.model.nq)
+        if self.anchor_body_id is None or self.root_body_id is None or self.free_qposadr is None:
+            return robot_feature_to_qpos(feature, anchor_pos_w=anchor_pos_w, expected_nq=self.model.nq)
+        if len(self.joint_qposadrs) != joint_pos.shape[-1]:
+            raise ValueError(
+                "MuJoCo 非 free joint 数量与 robot feature 不匹配: "
+                f"feature_joint_count={joint_pos.shape[-1]}, mujoco_joint_count={len(self.joint_qposadrs)}。"
+            )
+
+        qpos = np.zeros(self.model.nq, dtype=np.float32)
+        qpos[self.free_qposadr : self.free_qposadr + 3] = 0.0
+        qpos[self.free_qposadr + 3 : self.free_qposadr + 7] = np.array(
+            [1.0, 0.0, 0.0, 0.0],
+            dtype=np.float32,
+        )
+        for value, qposadr in zip(joint_pos, self.joint_qposadrs):
+            qpos[qposadr] = value
+
+        mujoco = _import_mujoco()
+        self.data.qpos[:] = qpos
+        self.data.qvel[:] = 0.0
+        mujoco.mj_forward(self.model, self.data)
+
+        root_pos = np.asarray(self.data.xpos[self.root_body_id], dtype=np.float32).copy()
+        root_quat = np.asarray(self.data.xquat[self.root_body_id], dtype=np.float32).copy()
+        anchor_pos = np.asarray(self.data.xpos[self.anchor_body_id], dtype=np.float32).copy()
+        anchor_quat = np.asarray(self.data.xquat[self.anchor_body_id], dtype=np.float32).copy()
+
+        root_inv = _quat_inverse(root_quat)
+        local_anchor_pos = _quat_rotate(root_inv, anchor_pos - root_pos)
+        local_anchor_quat = _quat_multiply(root_inv, anchor_quat)
+
+        desired_anchor_quat = rot6d_to_quat_wxyz_numpy(feature[:6])
+        desired_root_quat = _quat_multiply(desired_anchor_quat, _quat_inverse(local_anchor_quat))
+        desired_root_pos = np.asarray(anchor_pos_w, dtype=np.float32) - _quat_rotate(
+            desired_root_quat,
+            local_anchor_pos,
+        )
+        qpos[self.free_qposadr : self.free_qposadr + 3] = desired_root_pos
+        qpos[self.free_qposadr + 3 : self.free_qposadr + 7] = desired_root_quat
+        return qpos
 
     def center_from(self, positions: np.ndarray) -> np.ndarray:
         if self.anchor_body_id is not None:
@@ -130,8 +186,8 @@ def _draw_frame(
 
     if pair in {"human", "both"}:
         y_offset = -0.85 if pair == "both" else 0.0
-        human_positions = result.human_body_pos_w[frame_index]
-        human_center = _human_center(human_positions, result.human_body_names, result.human_anchor_body)
+        human_positions, human_body_names = _select_human_positions(result, frame_index)
+        human_center = _human_center(human_positions, human_body_names, result.human_anchor_body)
         recon_positions, recon_center = _robot_positions(
             robot,
             result.recon_from_human_feature[frame_index],
@@ -140,8 +196,8 @@ def _draw_frame(
         _draw_human_robot_pair(
             scene,
             robot,
-            result,
             human_positions,
+            human_body_names,
             recon_positions,
             human_center=human_center,
             robot_center=recon_center,
@@ -182,8 +238,8 @@ def _draw_robot_pair(
 def _draw_human_robot_pair(
     scene,
     robot: RobotKinematics,
-    result: ReconstructionResult,
     human_positions: np.ndarray,
+    human_body_names: list[str],
     recon_positions: np.ndarray,
     *,
     human_center: np.ndarray,
@@ -198,7 +254,7 @@ def _draw_human_robot_pair(
     _draw_skeleton(
         scene,
         human_positions - human_base + human_offset,
-        human_skeleton_edges(result.human_body_names),
+        human_skeleton_edges(human_body_names),
         (0.15, 0.95, 0.65, 1.0),
         point_radius=0.035,
         line_radius=0.012,
@@ -217,9 +273,25 @@ def _robot_positions(
     feature: np.ndarray,
     anchor_pos_w: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
-    qpos = robot_feature_to_qpos(feature, anchor_pos_w=anchor_pos_w, expected_nq=robot.model.nq)
+    qpos = robot.qpos_from_anchor_feature(feature, anchor_pos_w)
     positions = robot.body_positions(qpos)
     return positions, robot.center_from(positions)
+
+
+def _select_human_positions(result: ReconstructionResult, frame_index: int) -> tuple[np.ndarray, list[str]]:
+    positions = result.human_body_pos_w[frame_index]
+    source_names = list(result.human_body_names)
+    display_names = result.display_human_body_names or source_names
+    if display_names == source_names:
+        return positions, source_names
+
+    name_to_index = {name: index for index, name in enumerate(source_names)}
+    missing_names = [name for name in display_names if name not in name_to_index]
+    if missing_names:
+        raise ValueError(f"可视化人体 body 不存在: {missing_names}。可用名字: {source_names}")
+
+    selected_indices = np.asarray([name_to_index[name] for name in display_names], dtype=np.int64)
+    return positions[selected_indices], list(display_names)
 
 
 def _draw_skeleton(
@@ -303,12 +375,88 @@ def _load_robot_kinematics(xml_path: str | Path, anchor_body: str) -> RobotKinem
         if parent_id > 0:
             edges.append((parent_id, body_id))
     anchor_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, anchor_body)
+    free_joint_ids = [
+        joint_id
+        for joint_id in range(model.njnt)
+        if int(model.jnt_type[joint_id]) == int(mujoco.mjtJoint.mjJNT_FREE)
+    ]
+    if len(free_joint_ids) > 1:
+        raise ValueError("当前可视化只支持最多一个 free joint 的机器人 XML。")
+    free_joint_id = free_joint_ids[0] if free_joint_ids else None
+    root_body_id = int(model.jnt_bodyid[free_joint_id]) if free_joint_id is not None else _model_root_body_id(model)
+    free_qposadr = int(model.jnt_qposadr[free_joint_id]) if free_joint_id is not None else None
+    joint_qposadrs = _single_dof_joint_qposadrs(model, mujoco, free_joint_id)
     return RobotKinematics(
         model=model,
         data=data,
         body_edges=edges,
         anchor_body_id=anchor_id if anchor_id >= 0 else None,
+        root_body_id=root_body_id,
+        free_joint_id=free_joint_id,
+        free_qposadr=free_qposadr,
+        joint_qposadrs=joint_qposadrs,
     )
+
+
+def _model_root_body_id(model) -> int | None:
+    for body_id in range(1, model.nbody):
+        if int(model.body_parentid[body_id]) == 0:
+            return body_id
+    return None
+
+
+def _single_dof_joint_qposadrs(model, mujoco, free_joint_id: int | None) -> list[int]:
+    qposadrs: list[int] = []
+    for joint_id in range(model.njnt):
+        if joint_id == free_joint_id:
+            continue
+        joint_type = int(model.jnt_type[joint_id])
+        if joint_type == int(mujoco.mjtJoint.mjJNT_BALL):
+            raise ValueError("当前可视化只支持 hinge/slide robot joints，不支持 ball joint。")
+        if joint_type == int(mujoco.mjtJoint.mjJNT_FREE):
+            continue
+        qposadrs.append(int(model.jnt_qposadr[joint_id]))
+    return qposadrs
+
+
+def _quat_inverse(quat: np.ndarray) -> np.ndarray:
+    normalized = _quat_normalize(quat)
+    return np.array(
+        [normalized[0], -normalized[1], -normalized[2], -normalized[3]],
+        dtype=np.float32,
+    )
+
+
+def _quat_multiply(left: np.ndarray, right: np.ndarray) -> np.ndarray:
+    left = _quat_normalize(left)
+    right = _quat_normalize(right)
+    lw, lx, ly, lz = left
+    rw, rx, ry, rz = right
+    return _quat_normalize(
+        np.array(
+            [
+                lw * rw - lx * rx - ly * ry - lz * rz,
+                lw * rx + lx * rw + ly * rz - lz * ry,
+                lw * ry - lx * rz + ly * rw + lz * rx,
+                lw * rz + lx * ry - ly * rx + lz * rw,
+            ],
+            dtype=np.float32,
+        )
+    )
+
+
+def _quat_rotate(quat: np.ndarray, vector: np.ndarray) -> np.ndarray:
+    quat = _quat_normalize(quat)
+    vector = np.asarray(vector, dtype=np.float32)
+    qvec = quat[1:]
+    uv = np.cross(qvec, vector)
+    uuv = np.cross(qvec, uv)
+    return vector + 2.0 * (quat[0] * uv + uuv)
+
+
+def _quat_normalize(quat: np.ndarray, eps: float = 1e-8) -> np.ndarray:
+    quat = np.asarray(quat, dtype=np.float32)
+    return quat / max(float(np.linalg.norm(quat)), eps)
 
 
 def _set_camera(viewer) -> None:

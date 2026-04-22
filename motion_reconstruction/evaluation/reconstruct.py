@@ -33,6 +33,7 @@ class ReconstructionResult:
     human_body_names: list[str]
     robot_anchor_body: str
     human_anchor_body: str
+    display_human_body_names: list[str] | None = None
 
     def metrics(self) -> dict[str, float]:
         """返回当前帧 robot feature 的基础 MSE。"""
@@ -62,6 +63,10 @@ class ReconstructionResult:
             robot_joint_names=np.asarray(self.robot_joint_names, dtype=object),
             robot_body_names=np.asarray(self.robot_body_names, dtype=object),
             human_body_names=np.asarray(self.human_body_names, dtype=object),
+            display_human_body_names=np.asarray(
+                self.display_human_body_names or self.human_body_names,
+                dtype=object,
+            ),
             robot_anchor_body=np.array(self.robot_anchor_body),
             human_anchor_body=np.array(self.human_anchor_body),
         )
@@ -141,6 +146,7 @@ def reconstruct_motion(
 
     center_cpu = centers.detach().cpu()
     anchor_index = raw.robot_body_names.index(config.features.robot_anchor_body)
+    display_human_body_names = _configured_display_human_body_names(config, raw.human_body_names)
     return ReconstructionResult(
         fps=int(raw.fps),
         center_indices=center_cpu.numpy(),
@@ -154,7 +160,22 @@ def reconstruct_motion(
         human_body_names=list(raw.human_body_names),
         robot_anchor_body=config.features.robot_anchor_body,
         human_anchor_body=config.features.human_anchor_body,
+        display_human_body_names=display_human_body_names,
     )
+
+
+def _configured_display_human_body_names(
+    config: MotionReconstructionConfig,
+    source_names: list[str],
+) -> list[str]:
+    source_set = set(source_names)
+    names: list[str] = []
+    for name in [config.features.human_anchor_body, *config.features.human_body_names]:
+        if name not in source_set:
+            raise ValueError(f"human body '{name}' 不存在，无法用于可视化。可用名字: {source_names}")
+        if name not in names:
+            names.append(name)
+    return names
 
 
 def _mse(left: np.ndarray, right: np.ndarray) -> float:
