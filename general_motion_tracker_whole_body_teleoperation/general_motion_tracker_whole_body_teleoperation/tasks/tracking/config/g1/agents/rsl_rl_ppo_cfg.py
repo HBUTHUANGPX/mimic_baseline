@@ -89,6 +89,30 @@ class RslRlPpoActorCriticDistillCfg(RslRlPpoActorCriticCfg):
     student_obs_normalization: bool = (False,)
 
 
+@configclass
+class RslRlPpoActorCriticDualFSQCfg(RslRlPpoActorCriticCfg):
+    latent_dim: int = 64
+    robot_encoder_hidden_dims: tuple[int] | list[int] = [1024, 512, 256]
+    human_encoder_hidden_dims: tuple[int] | list[int] = [1024, 512, 256]
+    decoder_hidden_dims: tuple[int] | list[int] = [256, 512, 1024]
+    fsq_levels: int = 17
+    quantizer_type: str = "ifsq"
+    ifsq_boundary_fn: str = "sigmoid"
+    ifsq_boundary_scale: float = 1.6
+    dual_fsq_loss_weights: dict[str, float] = {
+        "robot_recon": 1.0,
+        "human_recon": 1.0,
+        "latent_align": 0.25,
+        "cycle_latent": 0.25,
+    }
+    detach_fsq_latent_in_policy: bool = False
+
+
+@configclass
+class RslRlPpoDualFSQAlgorithmCfg(RslRlPpoAlgorithmCfg):
+    dual_fsq_loss_coef: float = 0.01
+
+
 @configclass  # 无特权信息的single FSQ蒸馏训练
 class G1FlatPPODistillSingleFSQRunnerCfg(G1FlatPPORunnerCfg):
     obs_groups = (
@@ -142,6 +166,60 @@ class G1FlatPPOSingleFSQRunnerCfg(G1FlatPPORunnerCfg):
         self.class_name = "OnPolicyRunnerFSQ"
         self.policy.class_name = "ActorCriticSingleFSQ"
         self.algorithm.class_name = "PPOSingleFSQ"
+
+
+@configclass
+class G1FlatPPODualFSQRunnerCfg(G1FlatPPORunnerCfg):
+    obs_groups = (
+        {
+            "policy": [
+                "command_with_noise_wo_privilege",
+                "proprioception_with_noise_wo_privilege",
+                "last_action",
+            ],
+            "critic": [
+                "command",
+                "proprioception",
+                "last_action",
+            ],
+            "human_fsq_window": [
+                "human_fsq_window",
+            ],
+            "robot_fsq_window": [
+                "robot_fsq_window",
+            ],
+        },
+    )
+    experiment_name = "g1_flat_dual_fsq"
+    policy = RslRlPpoActorCriticDualFSQCfg(
+        init_noise_std=0.8,
+        actor_obs_normalization=True,
+        critic_obs_normalization=True,
+        actor_hidden_dims=[512, 256, 128],
+        critic_hidden_dims=[512, 256, 128],
+        activation="elu",
+    )
+    algorithm = RslRlPpoDualFSQAlgorithmCfg(
+        num_learning_epochs=5,
+        num_mini_batches=4,
+        learning_rate=1.0e-3,
+        schedule="adaptive",
+        gamma=0.99,
+        lam=0.95,
+        entropy_coef=0.005,
+        desired_kl=0.01,
+        max_grad_norm=1.0,
+        value_loss_coef=1.0,
+        use_clipped_value_loss=True,
+        clip_param=0.2,
+        dual_fsq_loss_coef=0.01,
+    )
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.class_name = "OnPolicyRunnerFSQ"
+        self.policy.class_name = "ActorCriticDualFSQ"
+        self.algorithm.class_name = "PPODualFSQ"
 
 
 @configclass  # 有特权信息WO DR 的训练

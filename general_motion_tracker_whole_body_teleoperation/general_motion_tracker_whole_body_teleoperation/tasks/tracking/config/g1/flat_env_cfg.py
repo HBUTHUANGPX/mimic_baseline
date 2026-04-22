@@ -55,3 +55,13 @@ class G1FlatDistillEnvCfg(G1FlatEnvCfg):
         self.commands.motion.future_frames = 10
         self.observations.proprioception_with_noise_wo_privilege.history_length = 8
         self.observations.proprioception.history_length = 8
+
+
+@configclass
+class G1FlatDualFSQEnvCfg(G1FlatEnvCfg):
+    def __post_init__(self):
+        super().__post_init__()
+        self.commands.motion.history_frames = 0
+        self.commands.motion.future_frames = 9
+        self.observations.proprioception_with_noise_wo_privilege.history_length = 8
+        self.observations.proprioception.history_length = 8

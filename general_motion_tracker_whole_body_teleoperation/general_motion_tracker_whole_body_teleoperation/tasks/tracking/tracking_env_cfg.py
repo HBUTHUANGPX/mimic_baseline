@@ -270,6 +270,20 @@ class ObservationsCfg:
 
         motion_group = ObsTerm(func=mdp.motion_group, params={"command_name": "motion"})
 
+    @configclass
+    class RobotFSQWindowCfg(ObsGroup):
+        robot_fsq_window = ObsTerm(func=mdp.robot_fsq_window, params={"command_name": "motion"})
+
+        def __post_init__(self):
+            self.enable_corruption = False
+
+    @configclass
+    class HumanFSQWindowCfg(ObsGroup):
+        human_fsq_window = ObsTerm(func=mdp.human_fsq_window, params={"command_name": "motion"})
+
+        def __post_init__(self):
+            self.enable_corruption = False
+
     command_window_with_noise_wo_privilege: CommandAllCfg = (
         CommandAllCfg()
     )  # 有噪 无特权 cmd
@@ -310,6 +324,8 @@ class ObservationsCfg:
 
     motion_id: MotionIdCfg = MotionIdCfg()
     motion_group: MotionGroupCfg = MotionGroupCfg()
+    robot_fsq_window: RobotFSQWindowCfg = RobotFSQWindowCfg()
+    human_fsq_window: HumanFSQWindowCfg = HumanFSQWindowCfg()
 
 
 @configclass

@@ -73,3 +73,10 @@ def motion_anchor_pos_b_window(env: ManagerBasedEnv, command_name: str) -> torch
     command: MotionCommand = env.command_manager.get_term(command_name)
     return command.motion_anchor_pos_b
 
+def robot_fsq_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    return command.robot_fsq_window
+
+def human_fsq_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    return command.human_fsq_window

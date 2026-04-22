@@ -89,6 +89,17 @@ class MotionCommand(CommandTerm):
             dtype=torch.long,
             device=self.device,
         )
+        self.human_anchor_body_index = self.cfg.desire_human_joint_names.index(
+            self.cfg.human_anchor_name
+        )
+        self.fsq_human_body_indexes = torch.tensor(
+            [
+                self.cfg.desire_human_joint_names.index(name)
+                for name in self.cfg.fsq_human_body_names
+            ],
+            dtype=torch.long,
+            device=self.device,
+        )
         self.motion = MotionLoader(
             motion_file_group=self.cfg.motion_file,
             robot_body_names=self.robot.body_names,
@@ -97,6 +108,16 @@ class MotionCommand(CommandTerm):
             desire_human_joint_names = self.cfg.desire_human_joint_names,
             history_frames=self.cfg.history_frames,
             future_frames=self.cfg.future_frames,
+            device=self.device,
+        )
+        self.robot_fsq_window = torch.zeros(
+            self.num_envs,
+            self.motion.window_size * (6 + self.motion.joint_pos.shape[-1]),
+            device=self.device,
+        )
+        self.human_fsq_window = torch.zeros(
+            self.num_envs,
+            self.motion.window_size * (6 + 3 * len(self.cfg.fsq_human_body_names)),
             device=self.device,
         )
         self.time_steps = torch.zeros(
@@ -357,6 +378,7 @@ class MotionCommand(CommandTerm):
         self.body_ang_vel_w = self.motion.body_ang_vel_w[self.time_steps]
         self.joint_pos = self.motion.joint_pos[self.time_steps]
         self.joint_vel = self.motion.joint_vel[self.time_steps]
+        self._update_fsq_window_cache()
         if not full:
             return
         self.anchor_pos_w = (
@@ -389,6 +411,47 @@ class MotionCommand(CommandTerm):
         ]
         self.motion_id = self.motion._motion_id[self.time_steps]
         self.motion_group = self.motion._motion_group[self.time_steps]
+
+    def _get_window_time_steps(self) -> torch.Tensor:
+        window_time_steps = self.time_steps[:, None] + self.motion.window_offsets[None, :]
+        return torch.clamp(window_time_steps, 0, self.motion.time_step_total - 1)
+
+    def _update_fsq_window_cache(self):
+        window_time_steps = self._get_window_time_steps()
+
+        robot_anchor_quat = self.motion.body_quat_w[
+            window_time_steps, self.motion_anchor_body_index
+        ]
+        robot_anchor_rot6d = rot6d_from_quat(robot_anchor_quat)
+        robot_joint_pos = self.motion.joint_pos[window_time_steps]
+        self.robot_fsq_window = torch.cat(
+            (robot_anchor_rot6d, robot_joint_pos),
+            dim=-1,
+        ).reshape(self.num_envs, -1)
+
+        human_anchor_quat = self.motion.human_body_quat_w[
+            window_time_steps, self.human_anchor_body_index
+        ]
+        human_anchor_rot6d = rot6d_from_quat(human_anchor_quat)
+        human_anchor_pos = self.motion.human_body_pos_w[
+            window_time_steps, self.human_anchor_body_index
+        ]
+        human_body_pos = self.motion.human_body_pos_w[window_time_steps][
+            :, :, self.fsq_human_body_indexes, :
+        ]
+        human_body_pos_w = human_body_pos - human_anchor_pos[:, :, None, :]
+        num_human_bodies = self.fsq_human_body_indexes.numel()
+        human_anchor_quat_w = human_anchor_quat[:, :, None, :].expand(
+            -1, -1, num_human_bodies, -1
+        )
+        human_body_pos_b = quat_apply_inverse(
+            human_anchor_quat_w.reshape(-1, 4),
+            human_body_pos_w.reshape(-1, 3),
+        ).reshape(self.num_envs, self.motion.window_size, -1)
+        self.human_fsq_window = torch.cat(
+            (human_anchor_rot6d, human_body_pos_b),
+            dim=-1,
+        ).reshape(self.num_envs, -1)
 
     def _update_robot_state_cache(self):
         self.robot_body_pos_w = self.robot.data.body_pos_w[:, self.body_indexes].clone()
@@ -685,6 +748,14 @@ class MotionCommandCfg(CommandTermCfg):
     ]
     desire_human_joint_names_for_six_point_human_bodys: list[str]= [
         'Hips', 'HeadEnd', 'LeftHand', 'RightHand', 'LeftToeEnd', 'RightToeEnd'
+    ]
+    fsq_human_body_names: list[str] = [
+        'Spine1', 'Spine2', 'Chest',
+        'Neck1', 'Neck2', 'Head', 'HeadEnd',
+        'LeftShoulder', 'LeftArm', 'LeftForeArm', 'LeftHand',
+        'RightShoulder', 'RightArm', 'RightForeArm', 'RightHand',
+        'LeftLeg', 'LeftShin', 'LeftFoot', 'LeftToeBase', 'LeftToeEnd',
+        'RightLeg', 'RightShin', 'RightFoot', 'RightToeBase', 'RightToeEnd'
     ]
     
     human_anchor_name: str = 'Hips'
