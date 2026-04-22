@@ -37,10 +37,10 @@ features:
 
 model:
   # 中文：编码器直接输出 latent_dim，两个编码器共享量化器。
-  latent_dim: 16
-  robot_encoder_hidden_dims: [512, 256]
-  human_encoder_hidden_dims: [512, 256]
-  decoder_hidden_dims: [256, 512]
+  latent_dim: 64
+  robot_encoder_hidden_dims: [1024, 512, 256]
+  human_encoder_hidden_dims: [1024, 512, 256]
+  decoder_hidden_dims: [256, 512, 1024]
   activation: elu
   quantizer:
     type: ifsq

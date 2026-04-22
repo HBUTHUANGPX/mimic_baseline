@@ -6,26 +6,9 @@ CLI 只负责读取配置和覆盖少量运行参数；训练逻辑在
 
 from __future__ import annotations
 
-import argparse
-
 from motion_reconstruction.config import load_config
+from motion_reconstruction.cli.common import ChineseArgumentParser
 from motion_reconstruction.training.trainer import MotionReconstructionTrainer
-
-
-class ChineseArgumentParser(argparse.ArgumentParser):
-    """将 argparse 默认帮助文本中的固定英文标签改成中文。"""
-
-    def format_usage(self) -> str:
-        return super().format_usage().replace("usage:", "用法:")
-
-    def format_help(self) -> str:
-        return (
-            super()
-            .format_help()
-            .replace("usage:", "用法:")
-            .replace("options:", "选项:")
-            .replace("show this help message and exit", "显示帮助信息并退出。")
-        )
 
 
 def main() -> None:

@@ -1,9 +1,13 @@
-"""面向 FSQ/iFSQ 动作重构的可复用训练包。
+"""面向 FSQ/iFSQ 动作重构的可复用训练包。"""
 
-该包提供 npz motion 加载、FeatureBuilder、FSQ/iFSQ 双编码器自编码器
-和独立训练流程。
-"""
+from .pipeline import MotionRuntimeBundle, build_autoencoder, build_motion_runtime, resolve_motion_files
 
-__all__ = ["__version__"]
+__all__ = [
+    "MotionRuntimeBundle",
+    "__version__",
+    "build_autoencoder",
+    "build_motion_runtime",
+    "resolve_motion_files",
+]
 
 __version__ = "0.1.0"

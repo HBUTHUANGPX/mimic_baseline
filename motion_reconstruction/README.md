@@ -13,17 +13,28 @@ motion 文件中加载数据，构建 robot/human 语义特征，并训练 FSQ �
   `history + current + future` window。
 - 使用 robot encoder、human encoder、共享 quantizer 和 robot decoder 训练。
 - 写入 TensorBoard log，并保存包含 schema、normalizer、quantizer config 的 checkpoint。
+- 从 checkpoint 导出当前帧重构结果和基础误差。
+- 使用 MuJoCo 播放原始 robot/重构 robot、原始 human/重构 robot 两组对比。
 
 ## 包结构
 
 | 模块 | 说明 |
 | --- | --- |
+| `pipeline.py` | 训练、评估、可视化共享的构建流程。 |
 | `data/` | motion 文件收集、raw `.npz` 加载、GPU window buffer。 |
 | `features/` | raw motion 到网络输入 feature 的语义转换层。 |
 | `models/` | FSQ/iFSQ quantizer、双 encoder、单 decoder。 |
 | `training/` | normalizer、loss、checkpoint、trainer、TensorBoard。 |
+| `evaluation/` | checkpoint 重构、误差计算、npz 导出。 |
+| `visualization/` | MuJoCo 播放原始动作和重构动作。 |
 | `config/` | YAML 配置 schema 和加载逻辑。 |
-| `cli/` | 训练入口。 |
+| `cli/` | 训练、评估、可视化入口。 |
+
+## 详细文档
+
+- [使用命令](docs/usage.md)
+- [架构说明](docs/architecture.md)
+- [开发约定](docs/development.md)
 
 ## 快速启动
 
@@ -66,6 +77,62 @@ outputs/motion_reconstruction/<run_name>/
 
 ```bash
 tensorboard --logdir outputs/motion_reconstruction
+```
+
+如果当前环境缺少 `tensorboard` 命令：
+
+```bash
+python3 -m pip install tensorboard
+python3 -m tensorboard.main --logdir outputs/motion_reconstruction
+```
+
+## 评估和导出
+
+训练完成后可以导出基础误差和重构数据：
+
+```bash
+python3 -m motion_reconstruction.cli.evaluate \
+  --config motion_reconstruction/configs/dual_fsq.yaml \
+  --checkpoint outputs/motion_reconstruction/smoke/checkpoints/latest.pt \
+  --output outputs/motion_reconstruction/smoke/eval \
+  --device cuda
+```
+
+输出包括：
+
+- `metrics.json`
+- `reconstruction.npz`
+
+当前评估默认使用合法中心帧，并导出 decoder 重构窗口中的 current 帧。
+
+## MuJoCo 可视化
+
+安装 MuJoCo：
+
+```bash
+python3 -m pip install mujoco
+```
+
+播放两组对比：
+
+```bash
+python3 -m motion_reconstruction.cli.visualize \
+  --config motion_reconstruction/configs/dual_fsq.yaml \
+  --checkpoint outputs/motion_reconstruction/smoke/checkpoints/latest.pt \
+  --xml-path assets/unitree_g1/g1_29dof_rev_1_0.xml \
+  --pair both \
+  --max-frames 1000 \
+  --loop
+```
+
+`--pair robot` 只播放原始 robot 与 robot encoder 重构 robot。
+
+`--pair human` 只播放原始 human 与 human encoder 重构 robot。
+
+默认会按各自 anchor 居中显示，便于观察姿态和关节重构；如果需要保留世界坐标轨迹，加入：
+
+```bash
+--keep-world
 ```
 
 ## 原始 `.npz` 字段
@@ -265,6 +332,5 @@ forward/loss、normalizer、checkpoint 和 1 epoch smoke train。
 
 ## 后续遗留项
 
-- 重构误差导出格式。
-- 原始/重构轨迹可视化方案。
-- 评估协议与指标。
+- 更完整的评估协议与分关节指标。
+- 更接近真实渲染的双机器人 mesh 对比。

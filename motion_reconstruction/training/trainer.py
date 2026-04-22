@@ -14,10 +14,7 @@ import torch
 from tqdm.auto import tqdm
 
 from motion_reconstruction.config.schema import MotionReconstructionConfig
-from motion_reconstruction.data import MotionSourceResolver, MotionWindowBuffer, RawMotionLoader
-from motion_reconstruction.features import FeatureBuilder, FeatureBuilderConfig
-from motion_reconstruction.models import DualFSQAutoEncoder
-from motion_reconstruction.models.quantizers import build_quantizer, normalized_quantizer_config
+from motion_reconstruction.pipeline import MotionRuntimeBundle, build_autoencoder, build_motion_runtime
 from motion_reconstruction.training.checkpoint import save_checkpoint
 from motion_reconstruction.training.losses import DualReconstructionLoss
 from motion_reconstruction.training.normalization import WindowFeatureNormalizer
@@ -59,24 +56,19 @@ class MotionReconstructionTrainer:
         self._emit(f"训练设备: {self.device}")
         self._emit("准备数据...")
 
-        self.features, self.buffer, self.normalizers = self._build_data()
+        self.runtime, self.normalizers = self._build_data()
+        self.features = self.runtime.features
+        self.buffer = self.runtime.buffer
         window_size = self.buffer.window_size
-        robot_input_dim = self.features.schema.robot_feature_dim * window_size
-        human_input_dim = self.features.schema.human_feature_dim * window_size
+        robot_input_dim = self.runtime.robot_input_dim
+        human_input_dim = self.runtime.human_input_dim
 
-        quantizer_config = normalized_quantizer_config(self.config.model.quantizer.__dict__, self.config.model.latent_dim)
-        self.quantizer_config = quantizer_config
-        quantizer = build_quantizer(quantizer_config, latent_dim=self.config.model.latent_dim)
-        self.model = DualFSQAutoEncoder(
+        self.model, self.quantizer_config = build_autoencoder(
+            self.config,
             robot_input_dim=robot_input_dim,
             human_input_dim=human_input_dim,
-            latent_dim=self.config.model.latent_dim,
-            robot_encoder_hidden_dims=self.config.model.robot_encoder_hidden_dims,
-            human_encoder_hidden_dims=self.config.model.human_encoder_hidden_dims,
-            decoder_hidden_dims=self.config.model.decoder_hidden_dims,
-            quantizer=quantizer,
-            activation=self.config.model.activation,
-        ).to(self.device)
+        )
+        self.model = self.model.to(self.device)
         self.optimizer = torch.optim.AdamW(
             self.model.parameters(),
             lr=self.config.train.learning_rate,
@@ -156,65 +148,24 @@ class MotionReconstructionTrainer:
         self.writer.close()
         self._emit(f"训练结束，latest checkpoint: {self.ckpt_dir / 'latest.pt'}")
 
-    def _build_data(self):
+    def _build_data(self) -> tuple[MotionRuntimeBundle, dict[str, WindowFeatureNormalizer]]:
         """加载 raw motion、构建特征、创建窗口缓冲并拟合归一化器。"""
-        if self.config.data.motion_yaml:
-            resolver = MotionSourceResolver.from_legacy_yaml(self.config.data.motion_yaml)
-        else:
-            resolver = MotionSourceResolver.from_direct_inputs(
-                files=self.config.data.files,
-                dirs=self.config.data.dirs,
-                exclude_files=self.config.data.exclude_files,
-                exclude_dirs=self.config.data.exclude_dirs,
-            )
-        resolved = resolver.resolve(groups=self.config.data.groups or None)
-        pairs = resolved.file_group_pairs
-        paths = [path for path, _ in pairs]
-        groups = [group for _, group in pairs]
-        self._emit(f"解析到 motion 文件: {len(paths)}")
-
-        raw = RawMotionLoader(paths, groups=groups).load(device=self.device)
-        self._emit(f"加载完成: frames={raw.num_frames}, clips={len(paths)}, fps={raw.fps}")
-        feature_builder = FeatureBuilder(
-            FeatureBuilderConfig(
-                robot_anchor_body=self.config.features.robot_anchor_body,
-                human_anchor_body=self.config.features.human_anchor_body,
-                human_body_names=self.config.features.human_body_names,
-            )
-        )
-        features = feature_builder.build(raw)
-        self._emit(
-            "特征维度: "
-            f"robot={features.schema.robot_feature_dim}, human={features.schema.human_feature_dim}"
-        )
-        buffer = MotionWindowBuffer(
-            robot_features=features.robot,
-            human_features=features.human,
-            motion_lengths=raw.motion_lengths,
-            history=self.config.train.history,
-            future=self.config.train.future,
-            device=self.device,
-        )
-        self._emit(
-            "窗口采样: "
-            f"history={self.config.train.history}, future={self.config.train.future}, "
-            f"window={buffer.window_size}, 合法中心帧={buffer.valid_center_indices.numel()}"
-        )
+        runtime = build_motion_runtime(self.config, device=self.device, emit=self._emit)
         normalizers = {
             # 中文：robot 归一化器在 robot 编码器输入、解码器输出目标和未来
             # 反归一化中共享。
             "robot": WindowFeatureNormalizer.from_frame_features(
-                features.robot,
-                window_size=buffer.window_size,
+                runtime.features.robot,
+                window_size=runtime.window_size,
                 eps=self.config.train.normalizer_eps,
             ).to(self.device),
             "human": WindowFeatureNormalizer.from_frame_features(
-                features.human,
-                window_size=buffer.window_size,
+                runtime.features.human,
+                window_size=runtime.window_size,
                 eps=self.config.train.normalizer_eps,
             ).to(self.device),
         }
-        return features, buffer, normalizers
+        return runtime, normalizers
 
     def _log_step(self, loss_output, output) -> None:
         """记录 step 级损失、量化器统计和可选潜变量直方图。"""
