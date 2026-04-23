@@ -161,6 +161,11 @@ python3 -m motion_reconstruction.cli.visualize \
 - `source=raw` 时保持旧行为
 - `source=hdf5-human` 时直接读取 `hdf5_parse` 导出的 human-only `.npz`
 - `hdf5-human` 推荐使用 `--inference-path human --pair human`
+- `hdf5-human` 会优先使用 `human_local_transforms + human_parent_indices`
+  按 `soma-retargeter` 参考播放器一致的
+  `FK -> visualization frame`
+  流程恢复人体全局姿态；只有缺少 local transforms 时，才会回退到
+  文件里显式保存的 `human_global_pos / human_global_quat`
 
 human-only 可视化示例：
 
@@ -198,6 +203,8 @@ python hdf5_parse/visualize_hdf5_soma_npz.py \
   指定的节点
 - `human encoder -> decoder` 输出的仍然是 robot motion
 - `hdf5-human` 模式下会用 human anchor trajectory 作为解码后 robot 的 anchor 轨迹
+- `pair=human` 下机器人直接用 `--xml-path` 的 MuJoCo XML 作为 viewer 主模型，
+  decoder 关节角直接写入 `qpos[7:]`
 
 ## 配置入口
 

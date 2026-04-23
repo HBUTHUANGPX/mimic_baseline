@@ -43,6 +43,43 @@ def _make_hdf5_human_npz(path: Path) -> Path:
     return path
 
 
+def _make_hdf5_human_npz_with_local_override(path: Path) -> Path:
+    human_joint_names = np.asarray(["Hips", "Head"], dtype=object)
+    root_inv_vis = np.array([-np.sqrt(0.5), 0.0, 0.0, np.sqrt(0.5)], dtype=np.float32)
+    human_local_transforms = np.asarray(
+        [
+            [
+                [0.0, 0.0, 0.0, *root_inv_vis],
+                [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+            ],
+            [
+                [1.0, 0.0, 0.0, *root_inv_vis],
+                [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+            ],
+        ],
+        dtype=np.float32,
+    )
+    wrong_global_pos = np.asarray(
+        [
+            [[0.0, 0.0, 0.0], [0.0, -1.0, 0.0]],
+            [[1.0, 0.0, 0.0], [1.0, -1.0, 0.0]],
+        ],
+        dtype=np.float32,
+    )
+    np.savez(
+        path,
+        fps=np.array(20, dtype=np.int32),
+        scalar_first=np.array(False),
+        human_joint_names=human_joint_names,
+        human_parent_indices=np.array([-1, 0], dtype=np.int32),
+        human_local_transforms=human_local_transforms,
+        human_global_pos=wrong_global_pos,
+        human_global_quat=np.zeros((2, 2, 4), dtype=np.float32),
+        timeline_frame_indices=np.array([10, 11], dtype=np.int32),
+    )
+    return path
+
+
 def test_build_hdf5_human_source_uses_anchor_positions_and_windows(tmp_path: Path) -> None:
     from motion_reconstruction.inference.sources import build_hdf5_human_source
 
@@ -98,6 +135,76 @@ def test_build_hdf5_human_source_requires_motion_npz(tmp_path: Path) -> None:
             feature_schema={"robot_joint_names": [], "robot_body_names": []},
             motion_npz=None,
         )
+
+
+def test_build_hdf5_human_source_uses_reference_player_local_semantics(tmp_path: Path) -> None:
+    from motion_reconstruction.inference.sources import build_hdf5_human_source
+
+    motion_path = _make_hdf5_human_npz_with_local_override(tmp_path / "human_local_first.npz")
+    config = MotionReconstructionConfig()
+    config.train.history = 0
+    config.train.future = 0
+    config.features.human_anchor_body = "Hips"
+    config.features.human_body_names = ["Head"]
+
+    bundle = build_hdf5_human_source(
+        motion_npz=motion_path,
+        config=config,
+        feature_schema={"robot_joint_names": [], "robot_body_names": []},
+        device="cpu",
+    )
+
+    hips_to_head = bundle.human_body_pos_w[:, 1] - bundle.human_body_pos_w[:, 0]
+    np.testing.assert_allclose(
+        hips_to_head.cpu().numpy(),
+        np.array([[0.0, 0.0, 1.0], [0.0, 0.0, 1.0]], dtype=np.float32),
+        atol=1e-6,
+    )
+
+
+def test_build_hdf5_human_source_matches_raw_source_human_semantics_for_raw_npz() -> None:
+    from motion_reconstruction.inference.sources import build_hdf5_human_source, build_raw_source
+    from motion_reconstruction.pipeline import ResolvedMotionFiles
+
+    sample = REPO_ROOT / "soma-retargeter" / "assets" / "motions" / "soma_uniform_bvh_export" / "240918" / "body_check_001__A548.npz"
+    assert sample.is_file()
+
+    config = MotionReconstructionConfig()
+    config.train.history = 0
+    config.train.future = 0
+
+    raw_bundle = build_raw_source(
+        config=config,
+        device="cpu",
+        resolved=ResolvedMotionFiles(paths=[sample], groups=["test"]),
+        progress=False,
+    )
+    hdf_bundle = build_hdf5_human_source(
+        motion_npz=sample,
+        config=config,
+        feature_schema={
+            "robot_joint_names": raw_bundle.robot_joint_names,
+            "robot_body_names": raw_bundle.robot_body_names,
+        },
+        device="cpu",
+    )
+
+    assert raw_bundle.human_body_names == hdf_bundle.human_body_names
+    np.testing.assert_allclose(
+        hdf_bundle.human_body_pos_w.cpu().numpy(),
+        raw_bundle.human_body_pos_w.cpu().numpy(),
+        atol=1e-6,
+    )
+    np.testing.assert_allclose(
+        hdf_bundle.human_features.cpu().numpy(),
+        raw_bundle.human_features.cpu().numpy(),
+        atol=1e-6,
+    )
+    np.testing.assert_allclose(
+        hdf_bundle.robot_anchor_pos_w.cpu().numpy(),
+        raw_bundle.human_body_pos_w[:, raw_bundle.human_body_names.index("Hips")].cpu().numpy(),
+        atol=1e-6,
+    )
 
 
 def test_build_raw_source_dispatches_to_runtime(monkeypatch: pytest.MonkeyPatch) -> None:

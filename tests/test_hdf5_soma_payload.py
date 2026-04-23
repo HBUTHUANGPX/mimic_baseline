@@ -128,3 +128,38 @@ def test_build_human_export_payload_preserves_human_fields_and_extras() -> None:
     assert "robot_name" not in payload
     assert "robot_joint_names" not in payload
     np.testing.assert_array_equal(payload["timeline_frame_indices"], np.array([10, 20], dtype=np.int32))
+
+
+def test_build_human_export_payload_matches_reference_player_semantics() -> None:
+    module = load_module()
+    joint_names = ["Hips", "Head"]
+    parent_indices = np.array([-1, 0], dtype=np.int32)
+    root_inv_vis = np.array([-np.sqrt(0.5), 0.0, 0.0, np.sqrt(0.5)], dtype=np.float32)
+    reference_local_transforms = np.array(
+        [
+            [0.0, 0.0, 0.0, *root_inv_vis],
+            [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+        ],
+        dtype=np.float32,
+    )
+    human_local_transforms = np.array(
+        [
+            [
+                [0.0, 0.0, 0.0, *root_inv_vis],
+                [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+            ]
+        ],
+        dtype=np.float32,
+    )
+
+    payload = module.build_human_export_payload(
+        fps=20,
+        joint_names=joint_names,
+        parent_indices=parent_indices,
+        reference_local_transforms=reference_local_transforms,
+        human_local_transforms=human_local_transforms,
+    )
+
+    hips_to_head = payload["human_global_pos"][0, 1] - payload["human_global_pos"][0, 0]
+    np.testing.assert_allclose(hips_to_head, np.array([0.0, 0.0, 1.0], dtype=np.float32), atol=1e-6)
+    np.testing.assert_array_equal(payload["human_up_axis"], np.array([0.0, 0.0, 1.0], dtype=np.float32))

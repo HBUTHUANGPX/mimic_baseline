@@ -10,7 +10,11 @@ import numpy as np
 import torch
 
 from motion_reconstruction.config.schema import MotionReconstructionConfig
-from motion_reconstruction.features.rotation import quat_inverse_rotate_wxyz, quat_to_rot6d_wxyz
+from motion_reconstruction.features.rotation import (
+    quat_inverse_rotate_wxyz,
+    quat_to_rot6d_wxyz,
+)
+from motion_reconstruction.human_pose import compute_visualized_global_joint_transforms_xyzw
 from motion_reconstruction.pipeline import ResolvedMotionFiles, build_motion_runtime
 
 
@@ -113,12 +117,27 @@ def build_hdf5_human_source(
         raise FileNotFoundError(f"找不到 human-only npz: {motion_path}")
     with np.load(motion_path, allow_pickle=True) as data:
         fps = int(np.asarray(data["fps"]).item())
+        scalar_first = _read_scalar_first(data)
         human_body_names = _read_names(data, "human_joint_names", "human_body_names")
-        human_global_pos = torch.as_tensor(np.asarray(data["human_global_pos"], dtype=np.float32), device=device)
-        human_global_quat = torch.as_tensor(
-            _to_wxyz(np.asarray(data["human_global_quat"], dtype=np.float32), _read_scalar_first(data)),
-            device=device,
-        )
+        if "human_local_transforms" in data and "human_parent_indices" in data:
+            human_global_pos_np, human_global_quat_np = _global_pose_from_local_transforms(
+                local_transforms=np.asarray(data["human_local_transforms"], dtype=np.float32),
+                parent_indices=np.asarray(data["human_parent_indices"], dtype=np.int32),
+                scalar_first=scalar_first,
+            )
+            human_global_pos = torch.as_tensor(human_global_pos_np, device=device)
+            human_global_quat = torch.as_tensor(_to_wxyz(human_global_quat_np, False), device=device)
+        elif "human_global_pos" in data and "human_global_quat" in data:
+            human_global_pos = torch.as_tensor(np.asarray(data["human_global_pos"], dtype=np.float32), device=device)
+            human_global_quat = torch.as_tensor(
+                _to_wxyz(np.asarray(data["human_global_quat"], dtype=np.float32), scalar_first),
+                device=device,
+            )
+        else:
+            raise KeyError(
+                "human-only npz 必须提供 human_local_transforms/human_parent_indices，"
+                "或提供 human_global_pos/human_global_quat 作为回退。"
+            )
 
     human_features = build_human_features(
         human_body_pos_w=human_global_pos,
@@ -225,3 +244,15 @@ def _index(names: list[str], name: str, label: str) -> int:
         return names.index(name)
     except ValueError as exc:
         raise ValueError(f"Unknown {label} '{name}'. Available names: {names}") from exc
+
+
+def _global_pose_from_local_transforms(
+    *,
+    local_transforms: np.ndarray,
+    parent_indices: np.ndarray,
+    scalar_first: bool,
+) -> tuple[np.ndarray, np.ndarray]:
+    local_transforms = np.asarray(local_transforms, dtype=np.float32).copy()
+    if scalar_first:
+        local_transforms[..., 3:7] = local_transforms[..., [4, 5, 6, 3]]
+    return compute_visualized_global_joint_transforms_xyzw(local_transforms, np.asarray(parent_indices, dtype=np.int32))

@@ -150,3 +150,110 @@ def test_cli_parser_uses_expected_defaults() -> None:
     assert args.device == "cuda"
     assert args.end_frame == -1
     assert args.batch_size is None
+
+
+def test_export_hdf5_to_soma_payload_matches_reference_player_display_semantics(monkeypatch) -> None:
+    module = load_module("hdf5_soma_export_for_export_test", EXPORT_MODULE_PATH)
+    root_inv_vis = np.array([-np.sqrt(0.5), 0.0, 0.0, np.sqrt(0.5)], dtype=np.float32)
+
+    selection = module.BodyFrameSelection(
+        root_pose7=np.zeros((1, 7), dtype=np.float32),
+        body_quats=np.zeros((1, 21, 4), dtype=np.float32),
+        betas=np.zeros((1, 10), dtype=np.float32),
+        frame_nums=np.array([7], dtype=np.int32),
+        frame_timestamps=np.array([123], dtype=np.int64),
+        fps=20.0,
+    )
+    motion = module.SMPLBodyMotion(
+        global_orient=np.zeros((1, 3), dtype=np.float32),
+        body_pose=np.zeros((1, 69), dtype=np.float32),
+        transl=np.zeros((1, 3), dtype=np.float32),
+        betas=np.zeros((1, 10), dtype=np.float32),
+        frame_nums=np.array([7], dtype=np.int32),
+        frame_timestamps=np.array([123], dtype=np.int64),
+        fps=20.0,
+    )
+    local_transforms = np.array(
+        [
+            [
+                [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+                [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+            ]
+        ],
+        dtype=np.float32,
+    )
+
+    monkeypatch.setattr(module, "load_body_frame_selection", lambda *args, **kwargs: selection)
+    monkeypatch.setattr(module, "selection_to_smpl_body_motion", lambda current: motion)
+    monkeypatch.setattr(module, "load_caption_json", lambda *args, **kwargs: {"config": {"Main Task": "Main"}, "segments": []})
+    monkeypatch.setattr(
+        module,
+        "align_caption_texts_to_frames",
+        lambda **kwargs: {
+            "main_task_texts": np.array(["UNKNOWN", "Main"], dtype=object),
+            "sub_task_texts": np.array(["UNKNOWN"], dtype=object),
+            "current_action_texts": np.array(["UNKNOWN"], dtype=object),
+            "interaction_texts": np.array(["UNKNOWN"], dtype=object),
+            "main_task_text_indices": np.array([1], dtype=np.int32),
+            "sub_task_text_indices": np.array([0], dtype=np.int32),
+            "current_action_text_indices": np.array([0], dtype=np.int32),
+            "interaction_text_indices": np.array([0], dtype=np.int32),
+        },
+    )
+    monkeypatch.setattr(module, "load_selected_joint_names", lambda *args, **kwargs: {"Hips", "Head"})
+    monkeypatch.setattr(
+        module,
+        "run_soma_inversion",
+        lambda *args, **kwargs: {
+            "joint_names": ["Root", "Hips", "Head"],
+            "parent_indices": np.array([0, 0, 1], dtype=np.int32),
+            "reference_local_transforms": np.array(
+                [
+                    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+                    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+                    [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+                ],
+                dtype=np.float32,
+            ),
+            "local_transforms": np.array(
+                [
+                    [
+                        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+                        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+                        [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+                    ]
+                ],
+                dtype=np.float32,
+            ),
+            "world_transforms": np.array(
+                [
+                    [
+                        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+                        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+                        [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+                    ]
+                ],
+                dtype=np.float32,
+            ),
+            "soma_poses": np.zeros((1, 3, 3), dtype=np.float32),
+            "soma_transl": np.zeros((1, 3), dtype=np.float32),
+            "soma_joint_orient": np.zeros((3, 3, 3), dtype=np.float32),
+            "per_vertex_error": np.zeros((1,), dtype=np.float32),
+        },
+    )
+
+    payload = module.export_hdf5_to_soma_payload("unused.hdf5")
+
+    hips = payload["human_joint_names"].tolist().index("Hips")
+    head = payload["human_joint_names"].tolist().index("Head")
+    hips_to_head = payload["human_global_pos"][0, head] - payload["human_global_pos"][0, hips]
+    np.testing.assert_allclose(hips_to_head, np.array([0.0, 0.0, 1.0], dtype=np.float32), atol=1e-6)
+    np.testing.assert_allclose(payload["human_local_transforms"][0, hips, 3:7], root_inv_vis, atol=1e-6)
+    calc_pos, calc_quat = module.apply_visualization_frame(
+        *module.compute_global_joint_transforms(
+            payload["human_local_transforms"],
+            payload["human_parent_indices"],
+        )
+    )
+    np.testing.assert_allclose(calc_pos[:, [hips, head]], payload["human_global_pos"][:, [hips, head]], atol=1e-6)
+    np.testing.assert_allclose(calc_quat[:, [hips, head]], payload["human_global_quat"][:, [hips, head]], atol=1e-6)

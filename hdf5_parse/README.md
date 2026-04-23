@@ -52,6 +52,16 @@
 - `soma_*` 中间结果
 - `per_vertex_error`
 
+这里的语义约定和 `soma-retargeter` 参考播放器保持一致：
+
+- `human_local_transforms` 保存的是 visualization frame 之前的 local skeleton
+- `human_global_pos / human_global_quat` 保存的是
+  `human_local_transforms -> FK -> visualization frame`
+  之后的结果
+
+这样 `play_npz_mujoco.py / play_npz_newton.py` 和 `motion_reconstruction` 读取当前导出的
+`.npz` 时，看到的是同一套人体骨架语义。
+
 ## 使用的数据字段
 
 导出链路只依赖下面这些字段：
@@ -164,6 +174,12 @@ python hdf5_parse/visualize_hdf5_soma_npz.py \
 
 - 这里的 decoder 输出不是重建后的 human skeleton，而是 robot feature
 - 因为 human-only 数据没有 robot 原始轨迹，viewer 会使用 `Hips` 的世界轨迹来摆放解码后的 robot
+- `pair=human` 下机器人直接使用 `--xml-path` 指定的 MuJoCo XML 作为主模型显示
+- decoder 输出的关节角直接写入 `qpos[7:]`，anchor 的世界位姿只用来反解 XML 根节点的 world 姿态
+- `motion_reconstruction` 读取这类 human-only `.npz` 时，会优先走
+  `human_local_transforms + human_parent_indices -> FK -> visualization frame`
+  这条参考播放器同款链路；只有缺少 local transforms 时，才回退到
+  文件里显式保存的 `human_global_pos / human_global_quat`
 
 ## 当前实现约束
 

@@ -34,6 +34,19 @@
 - `source=raw`
 - `source=hdf5-human`
 
+这里有一个语义边界需要特别注意：
+
+- `soma-retargeter` 的参考播放器把 `human_local_transforms` 当作权威输入
+- 然后按
+  `human_local_transforms -> FK -> visualization frame`
+  得到最终显示用的 `human_global_pos / human_global_quat`
+- `hdf5-human source` 现在也采用同一条链路
+- 只有当文件缺少 `human_local_transforms + human_parent_indices` 时，才回退到显式保存的
+  `human_global_pos / human_global_quat`
+
+这样做是为了让 `visualize_hdf5_soma_npz.py` 看到的人体骨架语义，与
+`soma-retargeter/app/play_npz_mujoco.py` 和 `play_npz_newton.py` 保持一致。
+
 ## What `human encoder -> decoder` Means
 
 当前模型是“双 encoder、单 decoder”结构：
@@ -79,6 +92,14 @@ robot 仍然需要一个 anchor 世界位置。
 - 节奏是不是对
 - 大致位移趋势是不是对
 
+在 `pair=human` 的 MuJoCo 播放里，机器人不是再画一套骨架，而是直接把传入的
+`--xml-path` 当成 viewer 主模型。每一帧的更新规则是：
+
+- decoder 输出的关节角直接写到 `qpos[7:]`
+- 先在当前关节角下求出 `anchor` 在 `root` 下的相对位姿
+- 再结合已知的 `anchor` 世界位姿，反解 `root` 在 world 下的平移和朝向
+- 最后 `mj_forward`，让 MuJoCo 用 XML 自带的 body/geom/mesh 直接显示机器人
+
 ## Supported Commands
 
 直接通过 `motion_reconstruction` CLI：
@@ -107,5 +128,4 @@ python hdf5_parse/visualize_hdf5_soma_npz.py \
 
 - `source=hdf5-human` 只支持 `inference-path=human`
 - 这种模式下推荐 `pair=human`
-- 如果强行请求 `pair=robot` 或 `pair=both`，当前实现会直接报错
 - 当前没有把 decoder 输出再映射回 human skeleton

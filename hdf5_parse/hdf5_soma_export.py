@@ -22,6 +22,14 @@ from smpl_motion_tools import (
     resolve_body_model_path,
     split_pose7_qwxyz_xyz,
 )
+from motion_reconstruction.human_pose import (
+    apply_visualization_frame_xyzw,
+    compute_global_joint_transforms_xyzw,
+    convert_root_to_pre_visualization_frame_xyzw,
+    quat_conjugate_batch_xyzw,
+    quat_mul_batch_xyzw,
+    quat_rotate_batch_xyzw,
+)
 
 
 UNKNOWN_TEXT = "UNKNOWN"
@@ -236,69 +244,28 @@ def _pose7_from_transforms(transforms: np.ndarray) -> np.ndarray:
 
 
 def quat_mul_batch(q1: np.ndarray, q2: np.ndarray) -> np.ndarray:
-    x1, y1, z1, w1 = np.moveaxis(q1, -1, 0)
-    x2, y2, z2, w2 = np.moveaxis(q2, -1, 0)
-    return np.stack(
-        (
-            w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
-            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
-            w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
-            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
-        ),
-        axis=-1,
-    ).astype(np.float32, copy=False)
+    return quat_mul_batch_xyzw(q1, q2)
 
 
 def quat_conjugate_batch(quat: np.ndarray) -> np.ndarray:
-    result = np.array(quat, dtype=np.float32, copy=True)
-    result[..., :3] *= -1.0
-    return result
+    return quat_conjugate_batch_xyzw(quat)
 
 
 def quat_rotate_batch(quat: np.ndarray, vec: np.ndarray) -> np.ndarray:
-    q_xyz = quat[..., :3]
-    qw = quat[..., 3:4]
-    uv = np.cross(q_xyz, vec)
-    uuv = np.cross(q_xyz, uv)
-    return (vec + 2.0 * (qw * uv + uuv)).astype(np.float32, copy=False)
+    return quat_rotate_batch_xyzw(quat, vec)
 
 
 def compute_global_joint_transforms(
     local_transforms: np.ndarray, parent_indices: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray]:
-    num_frames, num_joints = local_transforms.shape[:2]
-    global_positions = np.zeros((num_frames, num_joints, 3), dtype=np.float32)
-    global_rotations = np.zeros((num_frames, num_joints, 4), dtype=np.float32)
-
-    local_positions = local_transforms[..., :3]
-    local_rotations = local_transforms[..., 3:7]
-
-    for joint_idx in range(num_joints):
-        parent_idx = int(parent_indices[joint_idx])
-        if parent_idx < 0:
-            global_positions[:, joint_idx] = local_positions[:, joint_idx]
-            global_rotations[:, joint_idx] = local_rotations[:, joint_idx]
-            continue
-
-        parent_rot = global_rotations[:, parent_idx]
-        parent_pos = global_positions[:, parent_idx]
-        global_positions[:, joint_idx] = parent_pos + quat_rotate_batch(parent_rot, local_positions[:, joint_idx])
-        global_rotations[:, joint_idx] = quat_mul_batch(parent_rot, local_rotations[:, joint_idx])
-
-    return global_positions, global_rotations
+    return compute_global_joint_transforms_xyzw(local_transforms, parent_indices)
 
 
 def apply_visualization_frame(
-    positions: np.ndarray, rotations: np.ndarray
+    positions: np.ndarray,
+    rotations: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
-    y_up_to_z_up = np.array([np.sqrt(0.5), 0.0, 0.0, np.sqrt(0.5)], dtype=np.float32)
-    expanded = np.broadcast_to(y_up_to_z_up, rotations.shape)
-    corrected_positions = quat_rotate_batch(expanded, positions)
-    corrected_rotations = quat_mul_batch(
-        quat_mul_batch(expanded, rotations),
-        quat_conjugate_batch(expanded),
-    )
-    return corrected_positions.astype(np.float32, copy=False), corrected_rotations.astype(np.float32, copy=False)
+    return apply_visualization_frame_xyzw(positions, rotations)
 
 
 def drop_soma_virtual_root(
@@ -354,7 +321,10 @@ def build_human_export_payload(
         human_local_transforms,
         np.asarray(parent_indices, dtype=np.int32),
     )
-    human_global_pos, human_global_quat = apply_visualization_frame(global_positions, global_rotations)
+    human_global_pos, human_global_quat = apply_visualization_frame(
+        global_positions,
+        global_rotations,
+    )
 
     payload = {
         "fps": np.asarray(int(round(float(fps))), dtype=np.int32),
@@ -649,8 +619,11 @@ def export_hdf5_to_soma_payload(
     if missing_joint_names:
         raise ValueError(f"Selected joints missing from SOMA skeleton: {missing_joint_names}")
 
-    global_pos, global_quat = compute_global_joint_transforms(human_local_transforms, parent_indices)
-    global_pos, global_quat = apply_visualization_frame(global_pos, global_quat)
+    reference_local_transforms = convert_root_to_pre_visualization_frame_xyzw(reference_local_transforms[None])[0]
+    human_local_transforms = convert_root_to_pre_visualization_frame_xyzw(human_local_transforms)
+    global_pos, global_quat = apply_visualization_frame(
+        *compute_global_joint_transforms(human_local_transforms, parent_indices)
+    )
     human_local_transforms, global_pos, global_quat = mask_joint_data(
         joint_names=joint_names,
         human_local_transforms=human_local_transforms,

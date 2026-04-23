@@ -108,6 +108,13 @@ class RobotKinematics:
             return positions[self.anchor_body_id]
         return positions[1:].mean(axis=0)
 
+    def offset_root_translation(self, qpos: np.ndarray, offset_xyz: np.ndarray) -> np.ndarray:
+        shifted = np.asarray(qpos, dtype=np.float32).copy()
+        if self.free_qposadr is None:
+            return shifted
+        shifted[self.free_qposadr : self.free_qposadr + 3] += np.asarray(offset_xyz, dtype=np.float32)
+        return shifted
+
 
 def play_reconstruction(
     *,
@@ -123,8 +130,8 @@ def play_reconstruction(
     mujoco = _import_mujoco()
     viewer_module = _import_mujoco_viewer()
     robot = _load_robot_kinematics(xml_path, result.robot_anchor_body)
-    scene_model = mujoco.MjModel.from_xml_string(EMPTY_SCENE_XML)
-    scene_data = mujoco.MjData(scene_model)
+    scene_model = robot.model if pair == "human" else mujoco.MjModel.from_xml_string(EMPTY_SCENE_XML)
+    scene_data = robot.data if pair == "human" else mujoco.MjData(scene_model)
     playback_fps = int(fps or result.fps or 30)
     frame_dt = 1.0 / max(playback_fps, 1)
 
@@ -175,6 +182,27 @@ def _draw_frame(
     pair: str,
     keep_world: bool,
 ) -> None:
+    if pair == "human":
+        y_offset = 0.0
+        human_positions, human_body_names = _select_human_positions(result, frame_index)
+        human_center = _human_center(human_positions, human_body_names, result.human_anchor_body)
+        _apply_robot_xml_pose(
+            robot,
+            result.recon_from_human_feature[frame_index],
+            result.robot_anchor_pos_w[frame_index],
+            offset=np.array([0.9, y_offset, 0.0], dtype=np.float32),
+            keep_world=keep_world,
+        )
+        _draw_human_skeleton(
+            scene,
+            human_positions,
+            human_body_names,
+            human_center=human_center,
+            y_offset=y_offset,
+            keep_world=keep_world,
+        )
+        return
+
     if pair in {"robot", "both"}:
         y_offset = 0.85 if pair == "both" else 0.0
         original_positions, original_center = _robot_positions(
@@ -217,6 +245,43 @@ def _draw_frame(
             y_offset=y_offset,
             keep_world=keep_world,
         )
+
+
+def _apply_robot_xml_pose(
+    robot: RobotKinematics,
+    feature: np.ndarray,
+    anchor_pos_w: np.ndarray,
+    *,
+    offset: np.ndarray,
+    keep_world: bool,
+) -> np.ndarray:
+    qpos = robot.qpos_from_anchor_feature(feature, anchor_pos_w)
+    positions = robot.body_positions(qpos)
+    if not keep_world:
+        qpos = robot.offset_root_translation(qpos, -robot.center_from(positions))
+    qpos = robot.offset_root_translation(qpos, offset)
+    return robot.body_positions(qpos)
+
+
+def _draw_human_skeleton(
+    scene,
+    human_positions: np.ndarray,
+    human_body_names: list[str],
+    *,
+    human_center: np.ndarray,
+    y_offset: float,
+    keep_world: bool,
+) -> None:
+    human_offset = np.array([-0.9, y_offset, 0.0], dtype=np.float32)
+    human_base = np.zeros(3, dtype=np.float32) if keep_world else human_center
+    _draw_skeleton(
+        scene,
+        human_positions - human_base + human_offset,
+        human_skeleton_edges(human_body_names),
+        (0.15, 0.95, 0.65, 1.0),
+        point_radius=0.035,
+        line_radius=0.012,
+    )
 
 
 def _draw_robot_pair(

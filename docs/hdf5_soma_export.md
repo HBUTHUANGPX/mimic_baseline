@@ -179,6 +179,22 @@ HDF5 的 `betas` 是 `16` 维，但具体 `SMPL` 模型支持多少维，要看�
 - `human_global_pos`
 - `human_global_quat`
 
+这里有一个很重要的约定：
+
+- `human_local_transforms`
+  - 按 `soma-retargeter` / `play_npz_mujoco.py` / `play_npz_newton.py` 的语义保存
+  - 也就是先处在“visualization frame 之前”的 skeleton frame
+- `human_global_pos / human_global_quat`
+  - 按参考链路
+    `human_local_transforms -> FK -> visualization frame`
+    计算后保存
+
+这样做有两个目的：
+
+- 用 `play_npz_*` 播放当前导出的 `.npz` 时，人体显示流程和参考工程一致
+- `motion_reconstruction` 的 `hdf5-human source` 可以按同一套 local->global 语义构造
+  human feature，避免训练和推理坐标系漂移
+
 ### 追踪与调试字段
 
 - `timeline_frame_indices`
@@ -231,6 +247,9 @@ python hdf5_parse/export_hdf5_to_soma_npz.py \
 并且已经确认：
 
 - `Hips / Spine / 四肢` 等关注 joint 保留真实动态值
+- 对这些关注 joint，`play_npz_*` 使用的
+  `human_local_transforms -> FK -> visualization frame`
+  与文件里的 `human_global_pos / human_global_quat` 数值一致
 - 像 `Jaw` 这种不在 `human_body_names` 里的 joint，在动态数组中全零
 
 ## 测试

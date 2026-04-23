@@ -187,6 +187,11 @@ python3 -m motion_reconstruction.cli.visualize \
   - 读取 `hdf5_parse` 导出的 human-only `.npz`
   - 只允许 `--inference-path human`
   - 推荐搭配 `--pair human`
+  - 会优先使用 `human_local_transforms + human_parent_indices`
+    按 `soma-retargeter` 参考播放器同款的
+    `FK -> visualization frame`
+    链路恢复人体全局姿态；只有缺少 local transforms 时，才回退到文件里显式保存的
+    `human_global_pos / human_global_quat`
 
 human-only 来源的常用命令：
 
@@ -211,6 +216,10 @@ python3 -m motion_reconstruction.cli.visualize \
 直接把 anchor body 当作根节点。人体骨架显示时，只显示
 `features.human_anchor_body` 和 `features.human_body_names` 指定的必要节点，
 不会把原始 human 全量 body 一股脑全部画出来。
+
+`--pair human` 下，机器人会直接使用 `--xml-path` 对应的 MuJoCo XML 作为 viewer
+主模型。decoder 输出的关节角直接写入 `qpos[7:]`，然后结合 anchor body 的世界
+位姿反解 XML 根节点的 world pose，再调用 `mj_forward` 更新整机显示。
 
 需要注意：
 
