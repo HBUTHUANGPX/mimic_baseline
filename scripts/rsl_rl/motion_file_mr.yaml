@@ -3,6 +3,7 @@ motion_group:
   motion_reconstruction:
     file_name: []
     folder_name: [
+      # "soma-retargeter/assets/motions/soma_uniform_bvh_export/240918"
       "soma-retargeter/assets/motions/soma_uniform_bvh_export"
     ]
     wo_file_name: []

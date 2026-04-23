@@ -70,3 +70,27 @@ def test_raw_loader_rejects_inconsistent_schema(tmp_path: Path):
 
     with pytest.raises(ValueError, match="robot_joint_names"):
         RawMotionLoader([first, second]).load(device="cpu")
+
+
+def test_raw_loader_wraps_file_iteration_with_tqdm_when_progress_enabled(tmp_path: Path, monkeypatch):
+    first = tmp_path / "a.npz"
+    second = tmp_path / "b.npz"
+    _write_npz(first)
+    _write_npz(second)
+    calls: list[dict] = []
+
+    def fake_tqdm(iterable, **kwargs):
+        items = list(iterable)
+        calls.append({"items": items, **kwargs})
+        return items
+
+    monkeypatch.setattr("motion_reconstruction.data.raw_motion.tqdm", fake_tqdm, raising=False)
+
+    dataset = RawMotionLoader([first, second]).load(device="cpu", progress=True)
+
+    assert dataset.num_frames == 8
+    assert len(calls) == 1
+    assert calls[0]["items"] == [first, second]
+    assert calls[0]["total"] == 2
+    assert calls[0]["desc"] == "加载 raw motion"
+    assert calls[0]["unit"] == "file"

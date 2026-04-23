@@ -12,6 +12,7 @@ from typing import Sequence
 
 import numpy as np
 import torch
+from tqdm.auto import tqdm
 
 
 # 中文：兼容参考工程和新导出文件的字段命名差异，输出字段名固定为参考
@@ -76,7 +77,12 @@ class RawMotionLoader:
                 raise ValueError("groups length must match files length.")
             self.groups = list(groups)
 
-    def load(self, device: str | torch.device = "cpu") -> RawMotionDataset:
+    def load(
+        self,
+        device: str | torch.device = "cpu",
+        *,
+        progress: bool = True,
+    ) -> RawMotionDataset:
         """加载全部文件，并将 tensor 放到指定 device。
 
         可以直接加载到 GPU，后续 window 采样和训练都在同一 device 上完成。
@@ -88,7 +94,14 @@ class RawMotionLoader:
         human_body_names: list[str] | None = None
         lengths: list[int] = []
 
-        for path in self.files:
+        file_iter = _make_progress(
+            self.files,
+            progress=progress,
+            total=len(self.files),
+            desc="加载 raw motion",
+            unit="file",
+        )
+        for path in file_iter:
             if not path.is_file():
                 raise FileNotFoundError(f"Invalid motion file: {path}")
             with np.load(path, allow_pickle=True) as data:
@@ -179,3 +192,9 @@ def _to_wxyz(quat: np.ndarray, scalar_first: bool) -> np.ndarray:
     if scalar_first:
         return quat
     return quat[..., [3, 0, 1, 2]]
+
+
+def _make_progress(iterable, *, progress: bool, **kwargs):
+    if not progress:
+        return iterable
+    return tqdm(iterable, disable=False, dynamic_ncols=True, **kwargs)

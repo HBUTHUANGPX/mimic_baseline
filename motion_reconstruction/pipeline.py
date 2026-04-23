@@ -73,7 +73,10 @@ def build_motion_runtime(
     resolved = resolve_motion_files(config)
     _emit(emit, f"解析到 motion 文件: {len(resolved.paths)}")
 
-    raw = RawMotionLoader(resolved.paths, groups=resolved.groups).load(device=device)
+    raw = RawMotionLoader(resolved.paths, groups=resolved.groups).load(
+        device=device,
+        progress=config.train.progress,
+    )
     _emit(emit, f"加载完成: frames={raw.num_frames}, clips={len(resolved.paths)}, fps={raw.fps}")
 
     features = FeatureBuilder(
