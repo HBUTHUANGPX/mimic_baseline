@@ -7,9 +7,17 @@
 
 当前和 `Xperience-10M` 相关的入口脚本如下：
 
+- `full_body_mocap_mujoco_viewer.py`
+  - 直接读取 `annotation.hdf5/full_body_mocap/keypoints`
+  - 这是当前用来核对原始 HDF5 人体骨架是否正常的基线查看器
 - `smpl_body_mujoco_viewer.py`
   - 读取 `full_body_mocap`
   - 以 `SMPL-H` 或转换后的 `SMPL` 在 MuJoCo 中做轻量骨架可视化
+- `annotation_soma_mujoco_viewer.py`
+  - 直接读取 `annotation_soma.npz`
+  - 严格按 `soma-retargeter/app/play_npz_mujoco.py` 的人体链路
+    `human_local_transforms -> FK -> apply_visualization_frame -> draw_animation_frame`
+    来画骨架和 joint 坐标轴
 - `export_hdf5_to_soma_npz.py`
   - 读取 `full_body_mocap + video + caption`
   - 调用 `SOMA-X` 的 `SMPL -> SOMA` 求逆
@@ -25,6 +33,8 @@
   - HDF5 解析、文本对齐、SOMA 求逆、人体骨架导出主逻辑
 - `export_hdf5_to_soma_npz.py`
   - 命令行入口
+- `annotation_soma_mujoco_viewer.py`
+  - `annotation_soma.npz` 的 human-only MuJoCo 骨架/坐标轴播放器
 - `smpl_motion_tools.py`
   - `SMPL-H / SMPL` 可视化用的姿态整理工具
 - `smpl_visualization_notes.md`
@@ -58,6 +68,16 @@
 - `human_global_pos / human_global_quat` 保存的是
   `human_local_transforms -> FK -> visualization frame`
   之后的结果
+
+导出时还会做一步自动归一化：
+
+- 如果 `SOMA-X` 返回的 local skeleton 主干方向已经是 `Z-up`
+- 会自动把 root 旋回到参考播放器期望的 pre-visualization frame
+
+这样 `annotation_soma_mujoco_viewer.py` 和 `soma-retargeter/app/play_npz_mujoco.py`
+都只需要执行同一套
+`human_local_transforms -> FK -> apply_visualization_frame`
+就能看到站立的人体。
 
 这样 `play_npz_mujoco.py / play_npz_newton.py` 和 `motion_reconstruction` 读取当前导出的
 `.npz` 时，看到的是同一套人体骨架语义。
@@ -148,6 +168,37 @@ python hdf5_parse/export_hdf5_to_soma_npz.py \
 
 - 输入：`hdf5_parse/hdf5/annotation.hdf5`
 - 输出：`hdf5_parse/out/annotation_soma.npz`
+
+## 用参考播放器语义检查 annotation_soma.npz
+
+如果你想先独立验证 `SMPL -> SOMA -> annotation_soma.npz` 这一步，而不引入
+`motion_reconstruction` 的 encoder/decoder 和机器人 XML，可直接使用：
+
+```bash
+python hdf5_parse/annotation_soma_mujoco_viewer.py \
+  --npz hdf5_parse/out/annotation_soma.npz
+```
+
+这条查看链只做两件事：
+
+- 读取 `human_local_transforms / human_parent_indices / human_joint_names / fps`
+- 严格按 `soma-retargeter/app/play_npz_mujoco.py` 的同款流程算出人体每个 joint 的
+  world-frame 位置与姿态后画骨架和坐标轴
+
+默认会显示每个 joint 的局部坐标轴；如果临时只想看骨架，可以加：
+
+```bash
+python hdf5_parse/annotation_soma_mujoco_viewer.py \
+  --npz hdf5_parse/out/annotation_soma.npz \
+  --hide-axes
+```
+
+也就是说，这个查看器的目标是单独回答一个问题：
+
+- `annotation_soma.npz` 的人体骨架语义本身对不对
+
+如果这条链看起来正常，再去看 `visualize_hdf5_soma_npz.py` 里的
+human encoder / decoder / robot XML，就能把问题范围收得很小。
 
 ## 复用 motion_reconstruction 可视化
 

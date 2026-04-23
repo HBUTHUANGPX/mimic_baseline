@@ -12,8 +12,11 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 
 MODULE_DIR = Path(__file__).resolve().parent
+REPO_ROOT = MODULE_DIR.parent
 if str(MODULE_DIR) not in sys.path:
     sys.path.insert(0, str(MODULE_DIR))
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from smpl_motion_tools import (
     DEFAULT_HDF5_PATH,
@@ -268,6 +271,30 @@ def apply_visualization_frame(
     return apply_visualization_frame_xyzw(positions, rotations)
 
 
+def convert_root_to_pre_visualization_frame(local_transforms: np.ndarray) -> np.ndarray:
+    return convert_root_to_pre_visualization_frame_xyzw(local_transforms)
+
+
+def ensure_local_transforms_pre_visualization_frame(
+    *,
+    local_transforms: np.ndarray,
+    parent_indices: np.ndarray,
+    joint_names: list[str],
+) -> np.ndarray:
+    local_transforms = np.asarray(local_transforms, dtype=np.float32)
+    if "Hips" not in joint_names or "Head" not in joint_names:
+        return local_transforms
+
+    hips_idx = joint_names.index("Hips")
+    head_idx = joint_names.index("Head")
+    global_positions, _ = compute_global_joint_transforms(local_transforms, parent_indices)
+    spine_vector = np.asarray(global_positions[:, head_idx] - global_positions[:, hips_idx], dtype=np.float32)
+    mean_abs = np.mean(np.abs(spine_vector), axis=0)
+    if mean_abs[2] > mean_abs[1]:
+        return convert_root_to_pre_visualization_frame(local_transforms)
+    return local_transforms
+
+
 def drop_soma_virtual_root(
     *,
     joint_names: list[str],
@@ -350,6 +377,13 @@ def build_human_export_payload(
         else:
             payload[key] = np.asarray(value)
     return payload
+
+
+def normalize_root_parent_index(parent_indices: np.ndarray) -> np.ndarray:
+    normalized = np.asarray(parent_indices, dtype=np.int32).copy()
+    if normalized.size > 0 and normalized[0] == 0:
+        normalized[0] = -1
+    return normalized
 
 
 def load_selected_joint_names(config_path: str | Path = DEFAULT_DUAL_FSQ_PATH) -> set[str]:
@@ -601,26 +635,23 @@ def export_hdf5_to_soma_payload(
         smpl_model_path=smpl_model_path,
     )
 
-    (
-        joint_names,
-        parent_indices,
-        reference_local_transforms,
-        human_local_transforms,
-        _,
-    ) = drop_soma_virtual_root(
-        joint_names=soma_output["joint_names"],
-        parent_indices=soma_output["parent_indices"],
-        reference_local_transforms=soma_output["reference_local_transforms"],
-        local_transforms=soma_output["local_transforms"],
-        global_transforms=soma_output["world_transforms"][None] if soma_output["world_transforms"].ndim == 2 else soma_output["world_transforms"],
+    joint_names = list(soma_output["joint_names"])
+    parent_indices = normalize_root_parent_index(soma_output["parent_indices"])
+    reference_local_transforms = ensure_local_transforms_pre_visualization_frame(
+        local_transforms=np.asarray(soma_output["reference_local_transforms"], dtype=np.float32)[None, ...],
+        parent_indices=parent_indices,
+        joint_names=joint_names,
+    )[0]
+    human_local_transforms = ensure_local_transforms_pre_visualization_frame(
+        local_transforms=np.asarray(soma_output["local_transforms"], dtype=np.float32),
+        parent_indices=parent_indices,
+        joint_names=joint_names,
     )
 
     missing_joint_names = sorted(selected_joint_names.difference(joint_names))
     if missing_joint_names:
         raise ValueError(f"Selected joints missing from SOMA skeleton: {missing_joint_names}")
 
-    reference_local_transforms = convert_root_to_pre_visualization_frame_xyzw(reference_local_transforms[None])[0]
-    human_local_transforms = convert_root_to_pre_visualization_frame_xyzw(human_local_transforms)
     global_pos, global_quat = apply_visualization_frame(
         *compute_global_joint_transforms(human_local_transforms, parent_indices)
     )
@@ -629,7 +660,7 @@ def export_hdf5_to_soma_payload(
         human_local_transforms=human_local_transforms,
         human_global_pos=global_pos,
         human_global_quat=global_quat,
-        selected_joint_names=selected_joint_names,
+        selected_joint_names=set(selected_joint_names) | {"Root"},
     )
 
     payload = build_human_export_payload(
@@ -646,9 +677,9 @@ def export_hdf5_to_soma_payload(
             "smpl_body_pose": motion.body_pose.astype(np.float32),
             "smpl_transl": motion.transl.astype(np.float32),
             "smpl_betas": motion.betas.astype(np.float32),
-            "soma_poses": np.asarray(soma_output["soma_poses"][:, 1:], dtype=np.float32),
+            "soma_poses": np.asarray(soma_output["soma_poses"], dtype=np.float32),
             "soma_transl": np.asarray(soma_output["soma_transl"], dtype=np.float32),
-            "soma_joint_orient": np.asarray(soma_output["soma_joint_orient"][1:], dtype=np.float32),
+            "soma_joint_orient": np.asarray(soma_output["soma_joint_orient"], dtype=np.float32),
             "per_vertex_error": np.asarray(soma_output["per_vertex_error"], dtype=np.float32),
             **text_payload,
         },

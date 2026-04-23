@@ -104,6 +104,17 @@ HDF5 的 `betas` 是 `16` 维，但具体 `SMPL` 模型支持多少维，要看�
 7. 叠加文本池、文本索引和追踪字段
 8. 保存为 `npz`
 
+在第 6 步里，当前实现会额外检查 `SOMA-X` 返回的 local skeleton 主朝向：
+
+- 如果它已经是 `Y-up` 的 pre-visualization 语义，就原样保留
+- 如果它已经落在 `Z-up` 的 visualization 语义，就自动把 root 旋回去
+
+这样导出的 `human_local_transforms` 始终满足参考播放器约定：
+
+`human_local_transforms -> FK -> apply_visualization_frame`
+
+之后得到的才是最终在 MuJoCo / Newton 里显示的 world-frame 人体骨架。
+
 ## 文本对齐规则
 
 ### 文本池
@@ -194,6 +205,41 @@ HDF5 的 `betas` 是 `16` 维，但具体 `SMPL` 模型支持多少维，要看�
 - 用 `play_npz_*` 播放当前导出的 `.npz` 时，人体显示流程和参考工程一致
 - `motion_reconstruction` 的 `hdf5-human source` 可以按同一套 local->global 语义构造
   human feature，避免训练和推理坐标系漂移
+
+## 独立可视化核对
+
+为了把问题拆开定位，当前工程里另外补了一个只看人体骨架的查看器：
+
+- `hdf5_parse/annotation_soma_mujoco_viewer.py`
+
+它不走 `motion_reconstruction`，也不显示机器人，只复刻参考播放器的人体部分：
+
+1. 读取 `human_local_transforms`
+2. 调用 `compute_global_joint_transforms`
+3. 调用 `apply_visualization_frame`
+4. 在 MuJoCo 中用 sphere + capsule 画 joint、bone 和 joint 坐标轴
+
+快速命令：
+
+```bash
+conda activate mimic_baseline
+python hdf5_parse/annotation_soma_mujoco_viewer.py \
+  --npz hdf5_parse/out/annotation_soma.npz
+```
+
+如果临时只想看骨架，不看坐标轴：
+
+```bash
+python hdf5_parse/annotation_soma_mujoco_viewer.py \
+  --npz hdf5_parse/out/annotation_soma.npz \
+  --hide-axes
+```
+
+这一步的判断标准很简单：
+
+- 如果这个查看器里的骨架正常，说明 `annotation_soma.npz` 的人体侧语义是自洽的
+- 如果这里就不正常，问题就收敛到 `SMPL -> SOMA -> export_hdf5_to_soma_npz.py`
+  这一段，而不是后面的 `motion_reconstruction`
 
 ### 追踪与调试字段
 

@@ -14,6 +14,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from motion_reconstruction.evaluation.reconstruct import ReconstructionResult
 from motion_reconstruction.inference.sources import InferenceSourceBundle
+from motion_reconstruction.config.schema import MotionReconstructionConfig
 
 
 class IdentityNormalizer:
@@ -45,6 +46,21 @@ class FakeModel:
                 dtype=human_window.dtype,
                 device=human_window.device,
             ),
+        )
+
+
+class ProjectHumanModel:
+    def __call__(self, robot_window: torch.Tensor, human_window: torch.Tensor) -> FakeModelOutput:
+        batch = human_window.shape[0]
+        projected = human_window[:, :9]
+        robot_base = robot_window if robot_window.numel() else torch.zeros(
+            (batch, projected.shape[-1]),
+            dtype=human_window.dtype,
+            device=human_window.device,
+        )
+        return FakeModelOutput(
+            recon_from_robot=robot_base,
+            recon_from_human=projected,
         )
 
 
@@ -80,6 +96,26 @@ def _make_source_bundle() -> InferenceSourceBundle:
         human_anchor_body="Hips",
         display_human_body_names=["Hips", "Spine1"],
     )
+
+
+def _make_human_only_npz_from_raw_sample(raw_path: Path, output_path: Path) -> Path:
+    with np.load(raw_path, allow_pickle=True) as data:
+        payload = {
+            "fps": np.asarray(data["fps"]).copy(),
+            "scalar_first": np.asarray(False),
+            "human_joint_names": np.asarray(data["human_joint_names"], dtype=object),
+            "human_parent_indices": np.asarray(data["human_parent_indices"], dtype=np.int32),
+            "human_reference_local_transforms": np.asarray(data["human_reference_local_transforms"], dtype=np.float32),
+            "human_local_transforms": np.asarray(data["human_local_transforms"], dtype=np.float32),
+            "human_global_pos": np.asarray(data["human_global_pos"], dtype=np.float32),
+            "human_global_quat": np.asarray(data["human_global_quat"], dtype=np.float32),
+            "timeline_frame_indices": np.arange(
+                np.asarray(data["human_local_transforms"]).shape[0],
+                dtype=np.int32,
+            ),
+        }
+    np.savez(output_path, **payload)
+    return output_path
 
 
 def test_reconstruct_from_source_human_path_supports_human_only_bundle() -> None:
@@ -261,6 +297,73 @@ def test_visualize_hdf5_human_npz_forwards_shared_package_api(monkeypatch: pytes
     assert calls["reconstruct"]["inference_path"] == "human"
     assert calls["reconstruct"]["motion_npz"] == "annotation_soma.npz"
     assert calls["play"]["pair"] == "human"
+
+
+def test_reconstruct_from_hdf5_human_matches_raw_human_path_for_stripped_raw_npz(tmp_path: Path) -> None:
+    from motion_reconstruction.evaluation.reconstruct import reconstruct_from_source_bundle
+    from motion_reconstruction.inference.sources import build_hdf5_human_source, build_raw_source
+    from motion_reconstruction.pipeline import ResolvedMotionFiles
+
+    raw_sample = (
+        REPO_ROOT
+        / "soma-retargeter"
+        / "assets"
+        / "motions"
+        / "soma_uniform_bvh_export"
+        / "240918"
+        / "body_check_001__A548.npz"
+    )
+    assert raw_sample.is_file()
+    human_only_sample = _make_human_only_npz_from_raw_sample(raw_sample, tmp_path / "human_only_from_raw.npz")
+
+    config = MotionReconstructionConfig()
+    config.train.history = 0
+    config.train.future = 0
+
+    raw_bundle = build_raw_source(
+        config=config,
+        device="cpu",
+        resolved=ResolvedMotionFiles(paths=[raw_sample], groups=["test"]),
+        progress=False,
+    )
+    hdf_bundle = build_hdf5_human_source(
+        motion_npz=human_only_sample,
+        config=config,
+        feature_schema={
+            "robot_joint_names": raw_bundle.robot_joint_names,
+            "robot_body_names": raw_bundle.robot_body_names,
+        },
+        device="cpu",
+    )
+
+    np.testing.assert_allclose(
+        hdf_bundle.human_features.cpu().numpy(),
+        raw_bundle.human_features.cpu().numpy(),
+        atol=1e-6,
+    )
+
+    result_raw = reconstruct_from_source_bundle(
+        source=raw_bundle,
+        model=ProjectHumanModel(),
+        normalizers={"robot": IdentityNormalizer(), "human": IdentityNormalizer()},
+        history_index=0,
+        robot_dim=9,
+        inference_path="human",
+        batch_size=512,
+    )
+    result_hdf = reconstruct_from_source_bundle(
+        source=hdf_bundle,
+        model=ProjectHumanModel(),
+        normalizers={"robot": IdentityNormalizer(), "human": IdentityNormalizer()},
+        history_index=0,
+        robot_dim=9,
+        inference_path="human",
+        batch_size=512,
+    )
+
+    np.testing.assert_array_equal(result_hdf.center_indices, result_raw.center_indices)
+    np.testing.assert_allclose(result_hdf.human_body_pos_w, result_raw.human_body_pos_w, atol=1e-6)
+    np.testing.assert_allclose(result_hdf.recon_from_human_feature, result_raw.recon_from_human_feature, atol=1e-6)
 
 
 def test_build_inference_config_prefers_checkpoint_model_and_window_settings() -> None:

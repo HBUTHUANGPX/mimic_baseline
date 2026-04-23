@@ -120,6 +120,16 @@ python hdf5_parse/visualize_hdf5_soma_npz.py \
   --xml-path assets/unitree_g1/g1_29dof_rev_1_0.xml
   ```
 
+如果想先把问题收敛到“`annotation_soma.npz` 本身的人体骨架是否正确”，可以先只用参考
+`soma-retargeter` 语义的人体播放器，不引入 `motion_reconstruction` 和机器人：
+  ```
+python hdf5_parse/annotation_soma_mujoco_viewer.py \
+  --npz hdf5_parse/out/annotation_soma.npz
+  ```
+
+这个查看器默认会同时画出骨架和 joint 坐标轴；如果临时只想看骨架，可以再加
+`--hide-axes`。
+
 这条 viewer 链路只跑 `human encoder -> decoder`，显示的是：
 
 - 原始 human skeleton
