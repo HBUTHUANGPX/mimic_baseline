@@ -269,7 +269,11 @@ def main(
     # export policy to onnx/jit
     export_model_dir = os.path.join(os.path.dirname(resume_path), "exported")
 
-    if runner.alg.policy.__class__.__name__ == 'ActorCriticSingleFSQ' or runner.alg.policy.__class__.__name__ == 'ActorCriticSingleFSQDistillation':
+    if (
+        runner.alg.policy.__class__.__name__ == "ActorCriticSingleFSQ"
+        or runner.alg.policy.__class__.__name__ == "ActorCriticSingleFSQDistillation"
+        or runner.alg.policy.__class__.__name__ == "ActorCriticDualFSQ"
+    ):
         _policy = runner.alg.policy
         _policy.export_policy_as_onnx(
             env,

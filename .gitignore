@@ -31,4 +31,5 @@ xsens_mvn_refactor_build/build/
 GMR/assets
 .codex
 assets/**
-hdf5_parse/hdf5/annotation.hdf5
+hdf5_parse/hdf5/*
+hdf5_parse/data_download.py
