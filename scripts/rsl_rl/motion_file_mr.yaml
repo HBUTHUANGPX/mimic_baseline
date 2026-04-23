@@ -1,0 +1,9 @@
+motion_group:
+  # ========================== G1 ======================
+  motion_reconstruction:
+    file_name: []
+    folder_name: [
+      "soma-retargeter/assets/motions/soma_uniform_bvh_export"
+    ]
+    wo_file_name: []
+    wo_folder_name: []

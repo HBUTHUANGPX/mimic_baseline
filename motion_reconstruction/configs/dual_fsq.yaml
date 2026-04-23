@@ -1,7 +1,7 @@
 # 中文：默认示例配置。命令行入口只读取该 YAML 并启动训练器。
 data:
   # 中文：兼容旧工程 motion_file.yaml；groups 为空时训练全部 motion_group。
-  motion_yaml: scripts/rsl_rl/motion_file.yaml
+  motion_yaml: scripts/rsl_rl/motion_file_mr.yaml
   groups: []
 
 features:
@@ -59,13 +59,13 @@ loss:
 train:
   # 中文：每个 epoch 使用全量合法中心帧池，无放回随机打乱。
   device: cuda
-  epochs: 1000
+  epochs: 10000
   batch_size: 8192
   learning_rate: 0.0003
   weight_decay: 0.0001
-  history: 5
-  future: 5
-  seed: 1
+  history: 0
+  future: 9
+  seed: 42
   log_every_steps: 20
   log_histograms: true
   progress: true
