@@ -33,8 +33,9 @@ def save_checkpoint(
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     path = output_path / name
+    stateful_model = model.module if hasattr(model, "module") else model
     payload = {
-        "model": model.state_dict(),
+        "model": stateful_model.state_dict(),
         "optimizer": optimizer.state_dict() if optimizer is not None else None,
         "epoch": int(epoch),
         "global_step": int(global_step),

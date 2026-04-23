@@ -66,11 +66,18 @@ class MotionWindowBuffer:
         batch_size: int,
         *,
         generator: torch.Generator | None = None,
+        num_batches: int | None = None,
     ):
         if batch_size <= 0:
             raise ValueError("batch_size must be positive.")
+        if num_batches is not None and num_batches <= 0:
+            raise ValueError("num_batches must be positive when provided.")
         order = torch.randperm(self.valid_center_indices.numel(), device=self.device, generator=generator)
         epoch_centers = self.valid_center_indices[order]
+        if num_batches is not None:
+            target_count = int(num_batches) * int(batch_size)
+            repeats = (target_count + epoch_centers.numel() - 1) // epoch_centers.numel()
+            epoch_centers = epoch_centers.repeat(repeats)[:target_count]
         for start in range(0, epoch_centers.numel(), batch_size):
             centers = epoch_centers[start : start + batch_size]
             # 中文：最后不足 batch_size 的 batch 会保留；索引构造完全发生在 device 上。
@@ -103,3 +110,9 @@ class MotionWindowBuffer:
         if not centers:
             return torch.empty(0, device=self.device, dtype=torch.long)
         return torch.cat(centers, dim=0)
+
+    def num_batches(self, batch_size: int) -> int:
+        if batch_size <= 0:
+            raise ValueError("batch_size must be positive.")
+        centers = int(self.valid_center_indices.numel())
+        return max((centers + batch_size - 1) // batch_size, 1)

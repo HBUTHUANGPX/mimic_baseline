@@ -69,6 +69,17 @@ class LossConfig:
 
 
 @dataclass
+class DistributedConfig:
+    """单节点分布式训练配置。"""
+
+    enabled: bool | str = "auto"
+    backend: str | None = None
+    find_unused_parameters: bool = False
+    shard_strategy: str = "valid_centers_greedy"
+    timeout_minutes: int = 30
+
+
+@dataclass
 class TrainConfig:
     """训练循环、采样、日志和 checkpoint 配置。"""
 
@@ -85,6 +96,7 @@ class TrainConfig:
     progress: bool = True
     checkpoint_interval_epochs: int = 10
     normalizer_eps: float = 1e-2
+    distributed: DistributedConfig = field(default_factory=DistributedConfig)
 
 
 @dataclass

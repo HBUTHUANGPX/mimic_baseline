@@ -59,6 +59,20 @@ class RawMotionDataset:
         return int(self.joint_pos.shape[0])
 
 
+@dataclass
+class RawMotionMetadata:
+    """单个 raw motion 文件的轻量元数据。"""
+
+    path: str
+    group: str
+    fps: int
+    num_frames: int
+    valid_center_count: int
+    robot_joint_names: list[str]
+    robot_body_names: list[str]
+    human_body_names: list[str]
+
+
 class RawMotionLoader:
     """将多个 npz 文件加载为一个严格且名字稳定的 raw dataset。
 
@@ -150,6 +164,62 @@ class RawMotionLoader:
             motion_groups=self.groups,
             motion_paths=[str(path) for path in self.files],
         )
+
+    def scan(
+        self,
+        *,
+        history: int = 0,
+        future: int = 0,
+        progress: bool = True,
+    ) -> list[RawMotionMetadata]:
+        """扫描文件 schema 和 frame 数，不构建大张量。"""
+        if history < 0 or future < 0:
+            raise ValueError("history and future must be non-negative.")
+        fps: int | None = None
+        robot_joint_names: list[str] | None = None
+        robot_body_names: list[str] | None = None
+        human_body_names: list[str] | None = None
+        metadata: list[RawMotionMetadata] = []
+
+        file_iter = _make_progress(
+            zip(self.files, self.groups, strict=True),
+            progress=progress,
+            total=len(self.files),
+            desc="扫描 raw motion",
+            unit="file",
+        )
+        for path, group in file_iter:
+            if not path.is_file():
+                raise FileNotFoundError(f"Invalid motion file: {path}")
+            with np.load(path, allow_pickle=True) as data:
+                file_fps = int(np.asarray(data["fps"]).item())
+                fps = file_fps if fps is None else fps
+                if file_fps != fps:
+                    raise ValueError(f"All motion files must have the same fps. Got {file_fps} for {path}.")
+
+                current_robot_joint_names = _read_names(data, ("robot_joint_names", "joint_names"))
+                current_robot_body_names = _read_names(data, ("robot_body_names", "body_names"))
+                current_human_body_names = _read_names(data, ("human_body_names", "human_joint_names"))
+                robot_joint_names = _check_names(
+                    "robot_joint_names", robot_joint_names, current_robot_joint_names, path
+                )
+                robot_body_names = _check_names("robot_body_names", robot_body_names, current_robot_body_names, path)
+                human_body_names = _check_names("human_body_names", human_body_names, current_human_body_names, path)
+
+                num_frames = int(_read_array(data, FIELD_ALIASES["joint_pos"], path).shape[0])
+                metadata.append(
+                    RawMotionMetadata(
+                        path=str(path),
+                        group=str(group),
+                        fps=file_fps,
+                        num_frames=num_frames,
+                        valid_center_count=max(num_frames - history - future, 0),
+                        robot_joint_names=list(robot_joint_names or []),
+                        robot_body_names=list(robot_body_names or []),
+                        human_body_names=list(human_body_names or []),
+                    )
+                )
+        return metadata
 
 
 def _read_array(data: np.lib.npyio.NpzFile, names: tuple[str, ...], path: Path) -> np.ndarray:

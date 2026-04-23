@@ -38,6 +38,32 @@ class WindowFeatureNormalizer:
         std = frame_features.var(dim=0, unbiased=False).sqrt()
         return cls(mean=mean.repeat(window_size), std=std.repeat(window_size), eps=eps)
 
+    @classmethod
+    def from_statistics(
+        cls,
+        *,
+        count: int,
+        feature_sum: torch.Tensor,
+        feature_sumsq: torch.Tensor,
+        window_size: int,
+        eps: float = 1e-2,
+    ) -> "WindowFeatureNormalizer":
+        if count <= 0:
+            raise ValueError("count must be positive.")
+        mean = feature_sum / float(count)
+        variance = feature_sumsq / float(count) - mean.square()
+        std = variance.clamp_min(0.0).sqrt()
+        return cls(mean=mean.repeat(window_size), std=std.repeat(window_size), eps=eps)
+
+    @staticmethod
+    def compute_statistics(frame_features: torch.Tensor) -> tuple[int, torch.Tensor, torch.Tensor]:
+        if frame_features.ndim != 2:
+            raise ValueError("frame_features must have shape [frames, feature_dim].")
+        count = int(frame_features.shape[0])
+        feature_sum = frame_features.sum(dim=0)
+        feature_sumsq = frame_features.square().sum(dim=0)
+        return count, feature_sum, feature_sumsq
+
     def __call__(self, x: torch.Tensor) -> torch.Tensor:
         return (x - self.mean.to(x.device, x.dtype)) / (self.std.to(x.device, x.dtype) + self.eps)
 

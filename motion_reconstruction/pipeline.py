@@ -67,15 +67,18 @@ def build_motion_runtime(
     *,
     device: str | torch.device,
     emit: EmitFn | None = None,
+    resolved: ResolvedMotionFiles | None = None,
+    progress: bool | None = None,
 ) -> MotionRuntimeBundle:
     """加载 raw motion、构建 feature，并创建 window buffer。"""
     device = torch.device(device)
-    resolved = resolve_motion_files(config)
+    resolved = resolved or resolve_motion_files(config)
+    progress = config.train.progress if progress is None else progress
     _emit(emit, f"解析到 motion 文件: {len(resolved.paths)}")
 
     raw = RawMotionLoader(resolved.paths, groups=resolved.groups).load(
         device=device,
-        progress=config.train.progress,
+        progress=progress,
     )
     _emit(emit, f"加载完成: frames={raw.num_frames}, clips={len(resolved.paths)}, fps={raw.fps}")
 

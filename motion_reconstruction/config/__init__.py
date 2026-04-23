@@ -3,6 +3,7 @@
 from .io import load_config
 from .schema import (
     DataConfig,
+    DistributedConfig,
     FeatureConfig,
     LossConfig,
     ModelConfig,
@@ -14,6 +15,7 @@ from .schema import (
 
 __all__ = [
     "DataConfig",
+    "DistributedConfig",
     "FeatureConfig",
     "LossConfig",
     "ModelConfig",
