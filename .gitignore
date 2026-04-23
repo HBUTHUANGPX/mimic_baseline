@@ -33,3 +33,4 @@ GMR/assets
 assets/**
 hdf5_parse/hdf5/*
 hdf5_parse/data_download.py
+hdf5_parse/out/annotation_soma.npz

@@ -16,6 +16,8 @@ motion 文件中加载数据，构建 robot/human 语义特征，并训练基于
 - 写入 TensorBoard 日志，保存包含 normalizer、schema、quantizer 配置的 checkpoint。
 - 导出 current 帧重构误差和 `reconstruction.npz`。
 - 使用 MuJoCo 播放原始/重构结果。
+- 以模块化 source adapter 读取 `raw` 或 `hdf5-human` 两类 `.npz`。
+- 以模块化方式切换 `robot/human/both` 三种推理路径。
 
 ## 当前边界
 
@@ -38,6 +40,7 @@ motion 文件中加载数据，构建 robot/human 语义特征，并训练基于
 | `data/` | motion 文件解析、raw `.npz` 加载、metadata 扫描、窗口缓冲与分片。 |
 | `features/` | raw motion 到网络输入 feature 的语义转换层。 |
 | `models/` | FSQ/iFSQ quantizer、双编码器、单解码器。 |
+| `inference/` | 推理阶段的 source adapter，把不同 `.npz` 整理成统一输入。 |
 | `training/` | normalizer、loss、checkpoint、distributed runtime、trainer。 |
 | `evaluation/` | 从 checkpoint 生成重构结果和基础误差。 |
 | `visualization/` | MuJoCo 播放原始动作和重构动作。 |
@@ -163,6 +166,8 @@ python3 -m motion_reconstruction.cli.visualize \
   --config motion_reconstruction/configs/dual_fsq.yaml \
   --checkpoint outputs/motion_reconstruction/test_run/checkpoints/latest.pt \
   --xml-path assets/unitree_g1/g1_29dof_rev_1_0.xml \
+  --source raw \
+  --inference-path both \
   --pair both \
   --max-frames 1000 \
   --loop
@@ -174,6 +179,28 @@ python3 -m motion_reconstruction.cli.visualize \
 - `--pair human`：原始 human 骨架与 human encoder 重构出的 robot
 - `--pair both`：同时显示两组对比
 
+现在 `visualize` 支持两类来源：
+
+- `--source raw`
+  - 继续读取训练/评估使用的完整 raw motion `.npz`
+- `--source hdf5-human --motion-npz hdf5_parse/out/annotation_soma.npz`
+  - 读取 `hdf5_parse` 导出的 human-only `.npz`
+  - 只允许 `--inference-path human`
+  - 推荐搭配 `--pair human`
+
+human-only 来源的常用命令：
+
+```bash
+python3 -m motion_reconstruction.cli.visualize \
+  --config motion_reconstruction/configs/dual_fsq.yaml \
+  --checkpoint outputs/motion_reconstruction/test_run/checkpoints/latest.pt \
+  --xml-path assets/unitree_g1/g1_29dof_rev_1_0.xml \
+  --source hdf5-human \
+  --motion-npz hdf5_parse/out/annotation_soma.npz \
+  --inference-path human \
+  --pair human
+```
+
 默认会按 anchor 居中显示，便于观察姿态和关节；如需保留世界坐标轨迹：
 
 ```bash
@@ -184,6 +211,14 @@ python3 -m motion_reconstruction.cli.visualize \
 直接把 anchor body 当作根节点。人体骨架显示时，只显示
 `features.human_anchor_body` 和 `features.human_body_names` 指定的必要节点，
 不会把原始 human 全量 body 一股脑全部画出来。
+
+需要注意：
+
+- `human encoder -> decoder` 的输出仍然是 robot feature，不是重建后的 human feature
+- 因此 `hdf5-human` 可视化显示的是“原始 human skeleton vs decoder 输出的 robot motion”
+- 由于 human-only 数据没有 robot 原始轨迹，viewer 会使用 human anchor body 的世界轨迹来摆放解码后的 robot
+
+更细的说明见 [docs/motion_reconstruction_hdf5_visualization.md](../docs/motion_reconstruction_hdf5_visualization.md)。
 
 ## 原始 `.npz` 语义
 

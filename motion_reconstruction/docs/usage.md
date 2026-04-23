@@ -137,6 +137,8 @@ python3 -m motion_reconstruction.cli.visualize \
   --config motion_reconstruction/configs/dual_fsq.yaml \
   --checkpoint outputs/motion_reconstruction/test_run/checkpoints/latest.pt \
   --xml-path assets/unitree_g1/g1_29dof_rev_1_0.xml \
+  --source raw \
+  --inference-path both \
   --pair both \
   --max-frames 1000 \
   --loop
@@ -147,6 +149,40 @@ python3 -m motion_reconstruction.cli.visualize \
 - `--pair robot`：原始 robot 和 robot encoder 重构出的 robot
 - `--pair human`：原始 human 骨架和 human encoder 重构出的 robot
 - `--pair both`：同时显示两组对比
+
+新增参数：
+
+- `--source {raw,hdf5-human}`
+- `--motion-npz PATH`
+- `--inference-path {robot,human,both}`
+
+其中：
+
+- `source=raw` 时保持旧行为
+- `source=hdf5-human` 时直接读取 `hdf5_parse` 导出的 human-only `.npz`
+- `hdf5-human` 推荐使用 `--inference-path human --pair human`
+
+human-only 可视化示例：
+
+```bash
+python3 -m motion_reconstruction.cli.visualize \
+  --config motion_reconstruction/configs/dual_fsq.yaml \
+  --checkpoint outputs/motion_reconstruction/test_run/checkpoints/latest.pt \
+  --xml-path assets/unitree_g1/g1_29dof_rev_1_0.xml \
+  --source hdf5-human \
+  --motion-npz hdf5_parse/out/annotation_soma.npz \
+  --inference-path human \
+  --pair human
+```
+
+也可以直接走给 `hdf5_parse` 准备的薄封装：
+
+```bash
+python hdf5_parse/visualize_hdf5_soma_npz.py \
+  --config motion_reconstruction/configs/dual_fsq.yaml \
+  --checkpoint outputs/motion_reconstruction/test_run/checkpoints/latest.pt \
+  --xml-path assets/unitree_g1/g1_29dof_rev_1_0.xml
+```
 
 默认会按 anchor 居中显示，便于观察姿态和关节；如需保留世界坐标轨迹：
 
@@ -160,6 +196,8 @@ python3 -m motion_reconstruction.cli.visualize \
 - anchor body 的世界位姿只用来反解 XML 根节点 `qpos`
 - human 骨架只显示 `features.human_anchor_body` 和 `features.human_body_names`
   指定的节点
+- `human encoder -> decoder` 输出的仍然是 robot motion
+- `hdf5-human` 模式下会用 human anchor trajectory 作为解码后 robot 的 anchor 轨迹
 
 ## 配置入口
 

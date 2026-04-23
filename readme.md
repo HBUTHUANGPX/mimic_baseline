@@ -91,6 +91,52 @@ conda install pinocchio -c conda-forge
 
 ---
 
+### HDF5 body export
+
+`hdf5_parse/` 现在补了一条 `annotation.hdf5 -> SOMA-style human npz` 的导出链路，面向 `Xperience-10M` 这类带 `full_body_mocap + caption` 的 HDF5 标注文件。
+
+- 入口脚本：`hdf5_parse/export_hdf5_to_soma_npz.py`
+- 默认输入：`hdf5_parse/hdf5/annotation.hdf5`
+- 默认输出：`hdf5_parse/out/annotation_soma.npz`
+- 运行要求：`cuda` + `SOMA-X` + `SMPL_NEUTRAL.npz/.pkl`
+- 输出内容：
+  - `save_retarget_npz()` 风格的人体骨架字段
+  - 原始 `timeline_frame_indices`
+  - `Main Task / Sub Task / Current Action / Interaction` 四类文本池与逐帧索引
+  - 调试用的 `smpl_*` / `soma_*` 中间结果
+
+快速命令：
+  ```
+conda activate mimic_baseline
+python hdf5_parse/export_hdf5_to_soma_npz.py \
+  --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
+  ```
+
+导出后可直接复用 `motion_reconstruction` 做 human-only 可视化：
+  ```
+python hdf5_parse/visualize_hdf5_soma_npz.py \
+  --config motion_reconstruction/configs/dual_fsq.yaml \
+  --checkpoint outputs/motion_reconstruction/test_run/checkpoints/latest.pt \
+  --xml-path assets/unitree_g1/g1_29dof_rev_1_0.xml
+  ```
+
+这条 viewer 链路只跑 `human encoder -> decoder`，显示的是：
+
+- 原始 human skeleton
+- decoder 输出的 robot motion
+
+也就是说，这里不是“human 重建 human”，而是“human latent 解码成 robot motion”。
+
+相关文档：
+
+- `hdf5_parse/README.md`
+- `docs/hdf5_soma_export.md`
+- `hdf5_parse/smpl_visualization_notes.md`
+- `docs/motion_reconstruction_hdf5_visualization.md`
+
+
+---
+
 ### base mimic train scripts
 
   ```

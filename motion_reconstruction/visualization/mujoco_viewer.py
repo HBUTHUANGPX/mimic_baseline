@@ -119,8 +119,7 @@ def play_reconstruction(
     keep_world: bool = False,
 ) -> None:
     """打开 MuJoCo viewer 播放重构对比。"""
-    if pair not in {"robot", "human", "both"}:
-        raise ValueError("pair 必须是 robot、human 或 both。")
+    validate_reconstruction_for_pair(result=result, pair=pair)
     mujoco = _import_mujoco()
     viewer_module = _import_mujoco_viewer()
     robot = _load_robot_kinematics(xml_path, result.robot_anchor_body)
@@ -151,6 +150,20 @@ def play_reconstruction(
                     time.sleep(sleep_time)
             if not loop:
                 break
+
+
+def validate_reconstruction_for_pair(*, result: ReconstructionResult, pair: str) -> None:
+    if pair not in {"robot", "human", "both"}:
+        raise ValueError("pair 必须是 robot、human 或 both。")
+    if pair == "robot" and (result.original_robot_feature is None or result.recon_from_robot_feature is None):
+        raise ValueError("当前结果不包含 robot 原始/重构分支，无法使用 pair=robot。")
+    if pair == "human" and result.recon_from_human_feature is None:
+        raise ValueError("当前结果不包含 human->decoder 重构分支，无法使用 pair=human。")
+    if pair == "both":
+        if result.original_robot_feature is None or result.recon_from_robot_feature is None:
+            raise ValueError("当前结果不包含 robot 原始/重构分支，无法使用 pair=both。")
+        if result.recon_from_human_feature is None:
+            raise ValueError("当前结果不包含 human->decoder 重构分支，无法使用 pair=both。")
 
 
 def _draw_frame(
