@@ -194,3 +194,11 @@ python hdf5_parse/visualize_hdf5_soma_npz.py \
   --xml-path assets/unitree_g1/g1_29dof_rev_1_0.xml \
   --motion-npz path/to/human_motion.npz
 ```
+例如：
+```bash
+python hdf5_parse/visualize_hdf5_soma_npz.py \
+  --config motion_reconstruction/configs/dual_fsq.yaml \
+  --checkpoint outputs/motion_reconstruction/dual_fsq_ddp/checkpoints/epoch_0320.pt \
+  --xml-path assets/unitree_g1/g1_29dof_rev_1_0.xml \
+  --motion-npz hdf5_parse/out/soma_bvh_export/annotation_83581004785937_83595804786069.npz
+```
