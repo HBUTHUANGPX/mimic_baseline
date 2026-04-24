@@ -57,7 +57,7 @@ def test_compare_annotation_npz_against_bvh_reports_zero_diff_for_matching_expor
         local_transforms=local,
         fps=20.0,
     )
-    _, global_pos, global_quat = diagnostics.load_bvh_visualized_globals(bvh_path)
+    _, global_pos, global_quat, _, _ = diagnostics.load_bvh_visualized_globals(bvh_path)
     npz_path = tmp_path / "sample.npz"
     np.savez(
         npz_path,
@@ -77,6 +77,9 @@ def test_compare_annotation_npz_against_bvh_reports_zero_diff_for_matching_expor
     )
 
     assert report.frame_count == 1
+    assert report.npz_fps == 20.0
+    assert report.bvh_fps == 20.0
+    assert report.bvh_resampled_to_npz_fps is False
     assert report.overall_position_max_abs_diff < 1e-4
     assert report.overall_quaternion_max_abs_diff < 1e-4
     assert report.joint_stats["Hips"].position_max_abs_diff < 1e-4
@@ -96,7 +99,7 @@ def test_compare_annotation_npz_against_bvh_detects_root_basis_mismatch(tmp_path
         local_transforms=local,
         fps=20.0,
     )
-    _, global_pos, global_quat = diagnostics.load_bvh_visualized_globals(good_bvh_path)
+    _, global_pos, global_quat, _, _ = diagnostics.load_bvh_visualized_globals(good_bvh_path)
     npz_path = tmp_path / "sample.npz"
     np.savez(
         npz_path,
@@ -128,6 +131,50 @@ def test_compare_annotation_npz_against_bvh_detects_root_basis_mismatch(tmp_path
 
     assert report.overall_position_max_abs_diff > 1.0
     assert report.overall_quaternion_max_abs_diff > 0.1
+
+
+def test_compare_annotation_npz_against_bvh_resamples_bvh_when_fps_differs(tmp_path: Path, caplog) -> None:
+    diagnostics = load_module("soma_bvh_diagnostics_resample", MODULE_PATH)
+    from hdf5_parse.motion_export.bvh import write_soma_bvh
+
+    joint_names, parent_indices, reference, local = _make_demo_payload()
+    local = np.repeat(local, 3, axis=0)
+    bvh_path = tmp_path / "sample_resample.bvh"
+    write_soma_bvh(
+        output_path=bvh_path,
+        joint_names=joint_names,
+        parent_indices=parent_indices,
+        reference_local_transforms=reference,
+        local_transforms=local,
+        fps=20.0,
+    )
+
+    _, global_pos, global_quat, _, _ = diagnostics.load_bvh_visualized_globals(bvh_path, target_fps=50.0)
+    npz_path = tmp_path / "sample_50fps.npz"
+    np.savez(
+        npz_path,
+        fps=np.asarray(50.0, dtype=np.float32),
+        scalar_first=np.asarray(False),
+        human_joint_names=np.asarray(joint_names, dtype="<U16"),
+        human_parent_indices=parent_indices,
+        human_global_pos=global_pos,
+        human_global_quat=global_quat,
+    )
+
+    with caplog.at_level("INFO"):
+        report = diagnostics.compare_annotation_npz_against_bvh(
+            npz_path=npz_path,
+            bvh_path=bvh_path,
+            focus_joint_names=None,
+        )
+
+    assert report.npz_fps == 50.0
+    assert report.bvh_fps == 20.0
+    assert report.bvh_resampled_to_npz_fps is True
+    assert report.frame_count == global_pos.shape[0]
+    assert report.overall_position_max_abs_diff < 1e-4
+    assert report.overall_quaternion_max_abs_diff < 1e-4
+    assert "resampling BVH to match NPZ fps" in caplog.text
 
 
 def test_build_arg_parser_accepts_npz_and_bvh_paths() -> None:

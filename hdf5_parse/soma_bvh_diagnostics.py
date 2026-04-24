@@ -16,6 +16,7 @@ sources are compared in exactly the same coordinate convention.
 
 import argparse
 import importlib.util
+import logging
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -60,6 +61,8 @@ DEFAULT_FOCUS_JOINTS = (
     "RightToeBase",
 )
 
+LOGGER = logging.getLogger(__name__)
+
 
 @dataclass
 class JointDiffStats:
@@ -75,6 +78,9 @@ class AlignmentReport:
     npz_path: Path
     bvh_path: Path
     frame_count: int
+    npz_fps: float
+    bvh_fps: float
+    bvh_resampled_to_npz_fps: bool
     compared_joint_names: list[str]
     overall_position_max_abs_diff: float
     overall_position_mean_abs_diff: float
@@ -124,6 +130,12 @@ def _read_npz_scalar_first(payload: np.lib.npyio.NpzFile) -> bool:
     return bool(value.item() if value.shape == () else value.reshape(-1)[0])
 
 
+def _read_npz_fps(payload: np.lib.npyio.NpzFile) -> float:
+    if "fps" not in payload:
+        raise KeyError("Missing fps in npz payload.")
+    return float(np.asarray(payload["fps"]).item())
+
+
 def _to_xyzw(quat: np.ndarray, *, scalar_first: bool) -> np.ndarray:
     quat = np.asarray(quat, dtype=np.float32)
     if quat.shape[-1] != 4:
@@ -135,10 +147,11 @@ def _to_xyzw(quat: np.ndarray, *, scalar_first: bool) -> np.ndarray:
 
 def load_npz_visualized_globals(
     npz_path: str | Path,
-) -> tuple[list[str], np.ndarray, np.ndarray]:
+) -> tuple[list[str], np.ndarray, np.ndarray, float]:
     npz_path = Path(npz_path)
     reference = _reference_player_common()
     with np.load(npz_path, allow_pickle=False) as payload:
+        fps = _read_npz_fps(payload)
         scalar_first = _read_npz_scalar_first(payload)
         joint_names = _read_npz_names(payload, "human_joint_names", "human_body_names")
         if "human_global_pos" in payload and "human_global_quat" in payload:
@@ -147,7 +160,7 @@ def load_npz_visualized_globals(
                 np.asarray(payload["human_global_quat"], dtype=np.float32),
                 scalar_first=scalar_first,
             )
-            return joint_names, positions.astype(np.float32), rotations.astype(np.float32)
+            return joint_names, positions.astype(np.float32), rotations.astype(np.float32), fps
 
         parent_indices = np.asarray(payload["human_parent_indices"], dtype=np.int32)
         local_transforms = np.asarray(payload["human_local_transforms"], dtype=np.float32)
@@ -162,24 +175,52 @@ def load_npz_visualized_globals(
         parent_indices,
     )
     positions, rotations = reference.apply_visualization_frame(positions, rotations)
-    return joint_names, positions.astype(np.float32), rotations.astype(np.float32)
+    return joint_names, positions.astype(np.float32), rotations.astype(np.float32), fps
+
+
+def _compute_sample_times(sample_rate: float, num_frames: int, output_fps: float) -> np.ndarray:
+    if num_frames <= 0:
+        return np.zeros((0,), dtype=np.float32)
+    if num_frames == 1:
+        return np.zeros((1,), dtype=np.float32)
+
+    duration = (num_frames - 1) / float(sample_rate)
+    times = np.arange(0.0, duration, 1.0 / float(output_fps), dtype=np.float32)
+    if times.size == 0:
+        return np.zeros((1,), dtype=np.float32)
+    return times
 
 
 def load_bvh_visualized_globals(
     bvh_path: str | Path,
-) -> tuple[list[str], np.ndarray, np.ndarray]:
+    *,
+    target_fps: float | None = None,
+) -> tuple[list[str], np.ndarray, np.ndarray, float, bool]:
     bvh_path = Path(bvh_path)
     bvh_utils = _reference_bvh_utils()
     reference = _reference_player_common()
     skeleton, animation = bvh_utils.load_bvh(str(bvh_path))
-    local_transforms = np.asarray(animation.local_transforms, dtype=np.float32)
+    bvh_fps = float(animation.sample_rate)
+    resampled = False
+    if target_fps is not None and not np.isclose(float(target_fps), bvh_fps):
+        sample_times = _compute_sample_times(bvh_fps, int(animation.num_frames), float(target_fps))
+        local_transforms = np.asarray([animation.sample(float(t)) for t in sample_times], dtype=np.float32)
+        resampled = True
+    else:
+        local_transforms = np.asarray(animation.local_transforms, dtype=np.float32)
     parent_indices = np.asarray(skeleton.parent_indices, dtype=np.int32)
     positions, rotations = reference.compute_global_joint_transforms(
         local_transforms,
         parent_indices,
     )
     positions, rotations = reference.apply_visualization_frame(positions, rotations)
-    return list(skeleton.joint_names), positions.astype(np.float32), rotations.astype(np.float32)
+    return (
+        list(skeleton.joint_names),
+        positions.astype(np.float32),
+        rotations.astype(np.float32),
+        bvh_fps,
+        resampled,
+    )
 
 
 def _aligned_joint_names(
@@ -212,8 +253,17 @@ def compare_annotation_npz_against_bvh(
 ) -> AlignmentReport:
     npz_path = Path(npz_path)
     bvh_path = Path(bvh_path)
-    npz_joint_names, npz_positions, npz_rotations = load_npz_visualized_globals(npz_path)
-    bvh_joint_names, bvh_positions, bvh_rotations = load_bvh_visualized_globals(bvh_path)
+    npz_joint_names, npz_positions, npz_rotations, npz_fps = load_npz_visualized_globals(npz_path)
+    bvh_joint_names, bvh_positions, bvh_rotations, bvh_fps, bvh_resampled = load_bvh_visualized_globals(
+        bvh_path,
+        target_fps=npz_fps,
+    )
+    if bvh_resampled:
+        LOGGER.info(
+            "BVH fps (%.3f) differs from NPZ fps (%.3f); resampling BVH to match NPZ fps before comparison.",
+            bvh_fps,
+            npz_fps,
+        )
 
     compared_joint_names = _aligned_joint_names(
         npz_joint_names,
@@ -263,6 +313,9 @@ def compare_annotation_npz_against_bvh(
         npz_path=npz_path,
         bvh_path=bvh_path,
         frame_count=frame_count,
+        npz_fps=npz_fps,
+        bvh_fps=bvh_fps,
+        bvh_resampled_to_npz_fps=bvh_resampled,
         compared_joint_names=compared_joint_names,
         overall_position_max_abs_diff=float(pos_abs_diff.max()),
         overall_position_mean_abs_diff=float(pos_abs_diff.mean()),
@@ -276,6 +329,10 @@ def format_alignment_report(report: AlignmentReport, *, top_k: int = 10) -> str:
     lines = [
         f"NPZ: {report.npz_path}",
         f"BVH: {report.bvh_path}",
+        (
+            f"FPS: npz={report.npz_fps:.3f}, bvh={report.bvh_fps:.3f}, "
+            f"bvh_resampled_to_npz_fps={report.bvh_resampled_to_npz_fps}"
+        ),
         f"Compared frames: {report.frame_count}",
         f"Compared joints ({len(report.compared_joint_names)}): {', '.join(report.compared_joint_names)}",
         (
@@ -336,6 +393,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
     args = build_arg_parser().parse_args()
     report = compare_annotation_npz_against_bvh(
         npz_path=args.npz,

@@ -165,6 +165,12 @@ python hdf5_parse/export_hdf5_segmented_motion.py \
 python hdf5_parse/annotation_soma_mujoco_viewer.py \
   --npz path/to/human_motion.npz
 ```
+此处的npz是使用soma retargeter重映射后得到含有"human_global_pos","human_global_quat","fps","human_joint_names"等
+例如：
+```bash
+python hdf5_parse/annotation_soma_mujoco_viewer.py \
+  --npz hdf5_parse/out/soma_bvh_export/annotation_83581004785937_83595804786069.npz
+```
 
 对比 BVH 与 human motion npz：
 
@@ -173,7 +179,12 @@ python hdf5_parse/soma_bvh_diagnostics.py \
   --npz path/to/human_motion.npz \
   --bvh hdf5_parse/out/annotation_soma.bvh
 ```
-
+例如：
+```bash
+python hdf5_parse/soma_bvh_diagnostics.py  \
+ --npz hdf5_parse/out/soma_bvh_export/annotation_83581004785937_83595804786069.npz \
+ --bvh hdf5_parse/out/soma_bvh/annotation_83581004785937_83595804786069.bvh
+```
 把 human motion npz 接到 `motion_reconstruction`：
 
 ```bash
