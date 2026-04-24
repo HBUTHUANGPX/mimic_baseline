@@ -25,8 +25,8 @@ from typing import Iterable
 import numpy as np
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-MODULE_DIR = Path(__file__).resolve().parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
+MODULE_DIR = Path(__file__).resolve().parents[1]
 SOMA_RETARGETER_ROOT = REPO_ROOT / "soma-retargeter"
 SOMA_RETARGETER_APP = SOMA_RETARGETER_ROOT / "app"
 REFERENCE_PLAYER_COMMON = SOMA_RETARGETER_APP / "motion_npz_player_common.py"

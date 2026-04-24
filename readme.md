@@ -95,33 +95,32 @@ conda install pinocchio -c conda-forge
 
 `hdf5_parse/` 现在补了两条独立链路，面向 `Xperience-10M` 这类带 `full_body_mocap + caption` 的 HDF5 标注文件。
 
-- 入口脚本：`hdf5_parse/export_hdf5_to_soma_npz.py`
+- 入口脚本：`hdf5_parse/scripts/export_hdf5_to_soma_npz.py`
 - 默认输入：`hdf5_parse/hdf5/annotation.hdf5`
 - 默认输出：`hdf5_parse/out/annotation_soma.npz`
-- BVH 入口：`hdf5_parse/export_hdf5_to_soma_bvh.py`
+- BVH 入口：`hdf5_parse/scripts/export_hdf5_to_soma_bvh.py`
 - BVH 输出：`hdf5_parse/out/annotation_soma.bvh`
-- 分段导出入口：`hdf5_parse/export_hdf5_segmented_motion.py`
+- 分段导出入口：`hdf5_parse/scripts/export_hdf5_segmented_motion.py`
 - 实现目录：`hdf5_parse/motion_export/`
 - 分段输出目录：
   - `hdf5_parse/out/smpl`
   - `hdf5_parse/out/soma_bvh`
 - 运行要求：`cuda` + `SOMA-X` + `SMPL_NEUTRAL.npz/.pkl`
-- `export_hdf5_to_soma_npz.py`
+- `scripts/export_hdf5_to_soma_npz.py`
   - 只输出文本与时间线元数据到 `hdf5_parse/out/annotation_soma.npz`
-- `export_hdf5_to_soma_bvh.py` / `export_hdf5_segmented_motion.py`
+- `scripts/export_hdf5_to_soma_bvh.py` / `scripts/export_hdf5_segmented_motion.py`
   - 负责真正的人体动作导出
   - 输出 `SOMA BVH` 与分段 `SMPL npz`
 
 快速命令：
   ```
 conda activate mimic_baseline
-python hdf5_parse/export_hdf5_to_soma_npz.py \
+python hdf5_parse/scripts/export_hdf5_to_soma_npz.py
+
+python hdf5_parse/scripts/export_hdf5_to_soma_bvh.py \
   --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
 
-python hdf5_parse/export_hdf5_to_soma_bvh.py \
-  --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
-
-python hdf5_parse/export_hdf5_segmented_motion.py \
+python hdf5_parse/scripts/export_hdf5_segmented_motion.py \
   --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
   ```
 
@@ -131,7 +130,7 @@ python hdf5_parse/export_hdf5_segmented_motion.py \
 
 可视化命令：
   ```
-python hdf5_parse/visualize_hdf5_soma_npz.py \
+python hdf5_parse/scripts/visualize_hdf5_soma_npz.py \
   --config motion_reconstruction/configs/dual_fsq.yaml \
   --checkpoint outputs/motion_reconstruction/test_run/checkpoints/latest.pt \
   --xml-path assets/unitree_g1/g1_29dof_rev_1_0.xml \
@@ -140,10 +139,10 @@ python hdf5_parse/visualize_hdf5_soma_npz.py \
 
 相关文档：
 
-- `hdf5_parse/README.md`
-- `docs/hdf5_soma_export.md`
-- `hdf5_parse/smpl_visualization_notes.md`
-- `docs/motion_reconstruction_hdf5_visualization.md`
+- `hdf5_parse/docs/README.md`
+- `hdf5_parse/docs/export.md`
+- `hdf5_parse/docs/smpl_visualization_notes.md`
+- `hdf5_parse/docs/motion_reconstruction.md`
 
 
 ---

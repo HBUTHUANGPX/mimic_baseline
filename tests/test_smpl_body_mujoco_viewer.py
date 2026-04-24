@@ -9,7 +9,7 @@ import numpy as np
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-MODULE_PATH = REPO_ROOT / "hdf5_parse" / "smpl_body_mujoco_viewer.py"
+MODULE_PATH = REPO_ROOT / "hdf5_parse" / "scripts" / "smpl_body_mujoco_viewer.py"
 HDF5_PATH = REPO_ROOT / "hdf5_parse" / "hdf5" / "annotation.hdf5"
 
 

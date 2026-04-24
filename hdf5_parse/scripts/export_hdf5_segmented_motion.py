@@ -4,10 +4,13 @@ import argparse
 import sys
 from pathlib import Path
 
-MODULE_DIR = Path(__file__).resolve().parent
-REPO_ROOT = MODULE_DIR.parent
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from _bootstrap import ensure_repo_root_on_sys_path
+
+ensure_repo_root_on_sys_path(__file__)
 
 from hdf5_parse.motion_export.segmented import (
     DEFAULT_SMPL_OUTPUT_DIR,

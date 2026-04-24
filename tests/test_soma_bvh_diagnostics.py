@@ -7,7 +7,7 @@ import sys
 import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-MODULE_PATH = REPO_ROOT / "hdf5_parse" / "soma_bvh_diagnostics.py"
+MODULE_PATH = REPO_ROOT / "hdf5_parse" / "scripts" / "soma_bvh_diagnostics.py"
 
 
 def load_module(module_name: str, module_path: Path):

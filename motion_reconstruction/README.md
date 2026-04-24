@@ -228,7 +228,7 @@ python3 -m motion_reconstruction.cli.visualize \
 - 因此 `hdf5-human` 可视化显示的是“原始 human skeleton vs decoder 输出的 robot motion”
 - 由于 human-only 数据没有 robot 原始轨迹，viewer 会使用 human anchor body 的世界轨迹来摆放解码后的 robot
 
-更细的说明见 [docs/motion_reconstruction_hdf5_visualization.md](../docs/motion_reconstruction_hdf5_visualization.md)。
+更细的说明见 [../hdf5_parse/docs/motion_reconstruction.md](../hdf5_parse/docs/motion_reconstruction.md)。
 
 ## 原始 `.npz` 语义
 

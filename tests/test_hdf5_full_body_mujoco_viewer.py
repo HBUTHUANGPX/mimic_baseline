@@ -9,7 +9,7 @@ import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-MODULE_PATH = REPO_ROOT / "hdf5_parse" / "full_body_mocap_mujoco_viewer.py"
+MODULE_PATH = REPO_ROOT / "hdf5_parse" / "scripts" / "full_body_mocap_mujoco_viewer.py"
 HDF5_PATH = REPO_ROOT / "hdf5_parse" / "hdf5" / "annotation.hdf5"
 
 

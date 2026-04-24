@@ -233,7 +233,7 @@ def test_hdf5_parse_wrapper_parser_requires_motion_npz() -> None:
     import importlib.util
     import sys
 
-    wrapper_path = REPO_ROOT / "hdf5_parse" / "visualize_hdf5_soma_npz.py"
+    wrapper_path = REPO_ROOT / "hdf5_parse" / "scripts" / "visualize_hdf5_soma_npz.py"
     spec = importlib.util.spec_from_file_location("visualize_hdf5_soma_npz", wrapper_path)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None

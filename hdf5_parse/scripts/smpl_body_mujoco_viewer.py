@@ -11,15 +11,18 @@ import numpy as np
 import torch
 from scipy.spatial.transform import Rotation
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
 
-MODULE_DIR = Path(__file__).resolve().parent
-if str(MODULE_DIR) not in sys.path:
-    sys.path.insert(0, str(MODULE_DIR))
+from _bootstrap import ensure_repo_root_on_sys_path
+
+ensure_repo_root_on_sys_path(__file__)
 
 import smplx
 from smplx.body_models import Struct
 
-from smpl_motion_tools import (
+from hdf5_parse.utils.smpl_motion_tools import (
     DEFAULT_HDF5_PATH,
     SMPLMotionClip,
     convert_smplh_motion_clip_to_smpl,

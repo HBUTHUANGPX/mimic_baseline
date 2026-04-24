@@ -9,7 +9,7 @@ import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-MODULE_PATH = REPO_ROOT / "hdf5_parse" / "smpl_motion_tools.py"
+MODULE_PATH = REPO_ROOT / "hdf5_parse" / "utils" / "smpl_motion_tools.py"
 HDF5_PATH = REPO_ROOT / "hdf5_parse" / "hdf5" / "annotation.hdf5"
 
 

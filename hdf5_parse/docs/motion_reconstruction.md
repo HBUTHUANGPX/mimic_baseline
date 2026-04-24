@@ -13,7 +13,7 @@
 它不再保存任何 `human_*` 骨架字段，因此不能再直接喂给：
 
 - `motion_reconstruction --source hdf5-human`
-- `hdf5_parse/visualize_hdf5_soma_npz.py`
+- `hdf5_parse/scripts/visualize_hdf5_soma_npz.py`
 
 ## 正确数据来源
 
@@ -31,7 +31,7 @@
 
 ## 可视化链
 
-1. `hdf5_parse/export_hdf5_to_soma_bvh.py`
+1. `hdf5_parse/scripts/export_hdf5_to_soma_bvh.py`
    - 从 HDF5 导出 `SOMA BVH`
 2. `soma-retargeter/app/bvh_to_csv_converter.py`
    - 从 `SOMA BVH` 生成 human motion npz
@@ -46,7 +46,7 @@
 先生成 `SOMA BVH`：
 
 ```bash
-python hdf5_parse/export_hdf5_to_soma_bvh.py \
+python hdf5_parse/scripts/export_hdf5_to_soma_bvh.py \
   --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
 ```
 
@@ -60,7 +60,7 @@ python soma-retargeter/app/bvh_to_csv_converter.py \
 最后可视化：
 
 ```bash
-python hdf5_parse/visualize_hdf5_soma_npz.py \
+python hdf5_parse/scripts/visualize_hdf5_soma_npz.py \
   --config motion_reconstruction/configs/dual_fsq.yaml \
   --checkpoint outputs/motion_reconstruction/test_run/checkpoints/latest.pt \
   --xml-path assets/unitree_g1/g1_29dof_rev_1_0.xml \

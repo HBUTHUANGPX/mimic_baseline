@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-VIEWER_MODULE_PATH = REPO_ROOT / "hdf5_parse" / "annotation_soma_mujoco_viewer.py"
+VIEWER_MODULE_PATH = REPO_ROOT / "hdf5_parse" / "scripts" / "annotation_soma_mujoco_viewer.py"
 REFERENCE_MODULE_PATH = REPO_ROOT / "soma-retargeter" / "app" / "motion_npz_player_common.py"
 
 

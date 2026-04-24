@@ -8,7 +8,7 @@ from pathlib import Path
 import h5py
 import numpy as np
 
-from ..smpl_motion_tools import (
+from ..utils.smpl_motion_tools import (
     DEFAULT_HDF5_PATH,
     compute_fps,
     quat_wxyz_to_rotvec,

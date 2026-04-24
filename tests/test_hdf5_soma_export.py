@@ -14,7 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 HDF5_PATH = REPO_ROOT / "hdf5_parse" / "hdf5" / "annotation.hdf5"
 EXPORT_MODULE_PATH = REPO_ROOT / "hdf5_parse" / "motion_export" / "core.py"
 SMPL_SOMA_MODULE_PATH = REPO_ROOT / "hdf5_parse" / "motion_export" / "smpl_soma.py"
-CLI_MODULE_PATH = REPO_ROOT / "hdf5_parse" / "export_hdf5_to_soma_npz.py"
+CLI_MODULE_PATH = REPO_ROOT / "hdf5_parse" / "scripts" / "export_hdf5_to_soma_npz.py"
 
 
 def load_module(module_name: str, module_path: Path):

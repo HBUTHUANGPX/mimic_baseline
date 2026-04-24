@@ -9,7 +9,7 @@ import numpy as np
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-CLI_MODULE_PATH = REPO_ROOT / "hdf5_parse" / "export_hdf5_segmented_motion.py"
+CLI_MODULE_PATH = REPO_ROOT / "hdf5_parse" / "scripts" / "export_hdf5_segmented_motion.py"
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 

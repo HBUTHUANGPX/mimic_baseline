@@ -184,7 +184,7 @@ python3 -m motion_reconstruction.cli.visualize \
 也可以直接走给 `hdf5_parse` 准备的薄封装：
 
 ```bash
-python hdf5_parse/visualize_hdf5_soma_npz.py \
+python hdf5_parse/scripts/visualize_hdf5_soma_npz.py \
   --config motion_reconstruction/configs/dual_fsq.yaml \
   --checkpoint outputs/motion_reconstruction/test_run/checkpoints/latest.pt \
   --xml-path assets/unitree_g1/g1_29dof_rev_1_0.xml \

@@ -71,7 +71,7 @@ SMPL_H_BODY_PARENT_INDICES = np.array(
     dtype=np.int32,
 )
 
-DEFAULT_HDF5_PATH = Path(__file__).resolve().parent / "hdf5" / "annotation.hdf5"
+DEFAULT_HDF5_PATH = Path(__file__).resolve().parents[1] / "hdf5" / "annotation.hdf5"
 FULL_BODY_KEYPOINT_COUNT = 52
 BODY_VISUAL_KEYPOINT_INDICES = np.arange(20, dtype=np.int32)
 LEFT_HAND_KEYPOINT_INDICES = np.array([20, *range(22, 37)], dtype=np.int32)
@@ -656,7 +656,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Visualize Xperience-10M full_body_mocap keypoints as a skeleton in MuJoCo.",
         epilog=(
-            "Example: python hdf5_parse/full_body_mocap_mujoco_viewer.py "
+            "Example: python hdf5_parse/scripts/full_body_mocap_mujoco_viewer.py "
             "--hands --root-frame --slam-points 300"
         ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,

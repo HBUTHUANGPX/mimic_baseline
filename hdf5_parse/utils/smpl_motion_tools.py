@@ -8,7 +8,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 
 
-DEFAULT_HDF5_PATH = Path(__file__).resolve().parent / "hdf5" / "annotation.hdf5"
+DEFAULT_HDF5_PATH = Path(__file__).resolve().parents[1] / "hdf5" / "annotation.hdf5"
 DEFAULT_SMPLH_MODEL_CANDIDATES = (
     Path("/home/hpx/HPX_Loco/loco-mujoco/datasets/smplh/SMPLH_NEUTRAL.pkl"),
     Path("/home/hpx/2025_5_24/loco-mujoco/datasets/smpl/SMPLH_NEUTRAL.pkl"),

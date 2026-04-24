@@ -7,7 +7,7 @@ from typing import Any
 import h5py
 import numpy as np
 
-from ..smpl_motion_tools import DEFAULT_HDF5_PATH
+from ..utils.smpl_motion_tools import DEFAULT_HDF5_PATH
 from .smpl_soma import (
     BodyFrameSelection,
     DEFAULT_SOMA_X_ROOT,

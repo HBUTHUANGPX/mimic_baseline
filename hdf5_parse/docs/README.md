@@ -1,0 +1,123 @@
+# hdf5_parse Docs
+
+`hdf5_parse/` 现在按“库模块”和“可执行脚本”分开：
+
+- `hdf5_parse/motion_export/`
+  - 负责元数据、`SOMA BVH`、分段 `SMPL/BVH` 导出
+- `hdf5_parse/utils/human_motion.py`
+  - 负责 human motion npz 解析和 FK 工具
+- `hdf5_parse/utils/smpl_motion_tools.py`
+  - 负责 `SMPL-H / SMPL` 轻量解析工具
+- `hdf5_parse/scripts/`
+  - 放所有命令行入口
+- `hdf5_parse/docs/`
+  - 放说明文档
+
+## 脚本索引
+
+- `scripts/full_body_mocap_mujoco_viewer.py`
+  - 直接看原始 HDF5 keypoints
+- `scripts/smpl_body_mujoco_viewer.py`
+  - 以 `SMPL-H / SMPL` 轻量查看原始 body motion
+- `scripts/export_hdf5_to_soma_npz.py`
+  - 只导出文本与时间线元数据
+- `scripts/export_hdf5_to_soma_bvh.py`
+  - 导出完整 `SOMA BVH`
+- `scripts/export_hdf5_segmented_motion.py`
+  - 导出分段 `SMPL npz + SOMA BVH`
+- `scripts/annotation_soma_mujoco_viewer.py`
+  - 查看 human motion npz
+- `scripts/soma_bvh_diagnostics.py`
+  - 对比 `SOMA BVH` 与 human motion npz 是否一致
+- `scripts/visualize_hdf5_soma_npz.py`
+  - 把 human motion npz 接到 `motion_reconstruction`
+
+## 文件边界
+
+### `annotation_soma.npz`
+
+现在只保存：
+
+- `fps`
+- `num_frames`
+- `timeline_frame_indices`
+- `frame_timestamps`
+- `source_caption`
+- 四类文本池与逐帧索引
+
+它是元数据文件，不再保存人体骨架。
+
+### human motion npz
+
+如果你要：
+
+- 看人体骨架
+- 做 BVH/npz 一致性诊断
+- 接到 `motion_reconstruction --source hdf5-human`
+
+那应该使用：
+
+`HDF5 -> SOMA BVH -> soma-retargeter/app/bvh_to_csv_converter.py -> human motion npz`
+
+## 常用命令
+
+导出文本与时间线：
+
+```bash
+python hdf5_parse/scripts/export_hdf5_to_soma_npz.py
+```
+
+导出 `SOMA BVH`：
+
+```bash
+python hdf5_parse/scripts/export_hdf5_to_soma_bvh.py \
+  --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
+```
+
+导出分段 `SMPL + SOMA BVH`：
+
+```bash
+python hdf5_parse/scripts/export_hdf5_segmented_motion.py \
+  --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
+```
+
+看原始 HDF5 keypoints：
+
+```bash
+python hdf5_parse/scripts/full_body_mocap_mujoco_viewer.py --root-frame --slam-points 3000
+```
+使用soma-retargeter重映射，并将需要的数据保存为npz：
+```bash
+python soma-retargeter/app/bvh_to_csv_converter.py --config hdf5_parse/default_bvh_to_csv_converter_config.json
+```
+看使用soma-retargeter重映射保存的 human motion npz：
+
+```bash
+python hdf5_parse/scripts/annotation_soma_mujoco_viewer.py \
+  --npz hdf5_parse/out/soma_bvh_export/annotation_83581004785937_83595804786069.npz
+```
+
+诊断 BVH 与 human motion npz：
+
+```bash
+python hdf5_parse/scripts/soma_bvh_diagnostics.py \
+  --npz hdf5_parse/out/soma_bvh_export/annotation_83581004785937_83595804786069.npz \
+  --bvh hdf5_parse/out/soma_bvh/annotation_83581004785937_83595804786069.bvh
+```
+
+接入 `motion_reconstruction`：
+
+```bash
+python hdf5_parse/scripts/visualize_hdf5_soma_npz.py \
+  --config motion_reconstruction/configs/dual_fsq.yaml \
+  --checkpoint outputs/motion_reconstruction/dual_fsq_ddp/checkpoints/epoch_0320.pt \
+  --xml-path assets/unitree_g1/g1_29dof_rev_1_0.xml \
+  --motion-npz hdf5_parse/out/soma_bvh_export/annotation_83581004785937_83595804786069.npz
+```
+
+## 详细文档
+
+- [visualization.md](/home/hpx/HPX_LOCO_2/mimic_baseline/hdf5_parse/docs/visualization_notes.md)
+- [smpl.md](/home/hpx/HPX_LOCO_2/mimic_baseline/hdf5_parse/docs/smpl_visualization_notes.md)
+- [export.md](/home/hpx/HPX_LOCO_2/mimic_baseline/hdf5_parse/docs/export.md)
+- [motion_reconstruction.md](/home/hpx/HPX_LOCO_2/mimic_baseline/hdf5_parse/docs/motion_reconstruction.md)

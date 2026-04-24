@@ -14,7 +14,7 @@ if str(REPO_ROOT) not in sys.path:
 from soma_retargeter.assets.bvh import load_bvh
 
 
-CLI_MODULE_PATH = REPO_ROOT / "hdf5_parse" / "export_hdf5_to_soma_bvh.py"
+CLI_MODULE_PATH = REPO_ROOT / "hdf5_parse" / "scripts" / "export_hdf5_to_soma_bvh.py"
 
 
 def load_bvh_module():

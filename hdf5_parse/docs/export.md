@@ -104,10 +104,10 @@
 ```bash
 conda activate mimic_baseline
 
-python hdf5_parse/export_hdf5_to_soma_bvh.py \
+python hdf5_parse/scripts/export_hdf5_to_soma_bvh.py \
   --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
 
-python hdf5_parse/export_hdf5_segmented_motion.py \
+python hdf5_parse/scripts/export_hdf5_segmented_motion.py \
   --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
 ```
 
