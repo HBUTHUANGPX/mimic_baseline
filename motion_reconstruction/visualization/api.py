@@ -61,7 +61,7 @@ def visualize_hdf5_human_npz(
     loop: bool = False,
     keep_world: bool = False,
 ) -> ReconstructionResult:
-    """专门给 `hdf5_parse` 导出的 human-only npz 使用的可视化入口。"""
+    """专门给 human motion npz 使用的可视化入口。"""
     return visualize_reconstruction_from_source(
         config=config,
         checkpoint_path=checkpoint_path,

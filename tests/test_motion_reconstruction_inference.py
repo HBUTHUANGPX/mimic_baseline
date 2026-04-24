@@ -229,7 +229,7 @@ def test_validate_visualization_pair_rejects_robot_only_views_for_human_only_res
     validate_reconstruction_for_pair(result=result, pair="human")
 
 
-def test_hdf5_parse_wrapper_parser_exposes_motion_npz_and_checkpoint() -> None:
+def test_hdf5_parse_wrapper_parser_requires_motion_npz() -> None:
     import importlib.util
     import sys
 
@@ -240,6 +240,18 @@ def test_hdf5_parse_wrapper_parser_exposes_motion_npz_and_checkpoint() -> None:
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
 
+    with pytest.raises(SystemExit):
+        module.build_arg_parser().parse_args(
+            [
+                "--config",
+                "cfg.yaml",
+                "--checkpoint",
+                "latest.pt",
+                "--xml-path",
+                "robot.xml",
+            ]
+        )
+
     args = module.build_arg_parser().parse_args(
         [
             "--config",
@@ -248,10 +260,11 @@ def test_hdf5_parse_wrapper_parser_exposes_motion_npz_and_checkpoint() -> None:
             "latest.pt",
             "--xml-path",
             "robot.xml",
+            "--motion-npz",
+            "human_motion.npz",
         ]
     )
-
-    assert args.motion_npz == Path("hdf5_parse/out/annotation_soma.npz")
+    assert args.motion_npz == Path("human_motion.npz")
 
 
 def test_visualize_hdf5_human_npz_forwards_shared_package_api(monkeypatch: pytest.MonkeyPatch) -> None:

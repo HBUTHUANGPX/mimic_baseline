@@ -1,4 +1,4 @@
-"""复用 motion_reconstruction 可视化 hdf5_parse 导出的 human-only npz。"""
+"""复用 motion_reconstruction 可视化由 SOMA BVH 转出的 human motion npz。"""
 
 from __future__ import annotations
 
@@ -15,15 +15,15 @@ from motion_reconstruction.visualization import visualize_hdf5_human_npz
 
 
 def build_arg_parser() -> ChineseArgumentParser:
-    parser = ChineseArgumentParser(description="可视化 hdf5_parse 导出的 human-only SOMA npz。")
+    parser = ChineseArgumentParser(description="可视化 human motion npz，并走 human encoder -> decoder。")
     parser.add_argument("--config", required=True, help="motion_reconstruction 使用的 YAML 配置文件路径。")
     parser.add_argument("--checkpoint", required=True, help="motion_reconstruction checkpoint 路径。")
     parser.add_argument("--xml-path", required=True, help="机器人 MuJoCo XML 路径。")
     parser.add_argument(
         "--motion-npz",
         type=Path,
-        default=Path("hdf5_parse/out/annotation_soma.npz"),
-        help="hdf5_parse 导出的 human-only npz 路径。",
+        required=True,
+        help="human motion npz 路径，通常来自 SOMA BVH 经过 bvh_to_csv_converter.py 的输出。",
     )
     parser.add_argument("--device", default="cpu", help="重构推理设备。")
     parser.add_argument("--batch-size", type=int, default=4096, help="重构推理 batch 大小。")

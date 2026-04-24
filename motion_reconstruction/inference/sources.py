@@ -114,7 +114,7 @@ def build_hdf5_human_source(
 ) -> InferenceSourceBundle:
     motion_path = Path(motion_npz)
     if not motion_path.is_file():
-        raise FileNotFoundError(f"找不到 human-only npz: {motion_path}")
+        raise FileNotFoundError(f"找不到 human motion npz: {motion_path}")
     with np.load(motion_path, allow_pickle=True) as data:
         fps = int(np.asarray(data["fps"]).item())
         scalar_first = _read_scalar_first(data)
@@ -135,7 +135,7 @@ def build_hdf5_human_source(
             )
         else:
             raise KeyError(
-                "human-only npz 必须提供 human_local_transforms/human_parent_indices，"
+                "human motion npz 必须提供 human_local_transforms/human_parent_indices，"
                 "或提供 human_global_pos/human_global_quat 作为回退。"
             )
 

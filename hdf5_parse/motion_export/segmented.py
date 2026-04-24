@@ -4,7 +4,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .core import (
+from .smpl_soma import (
     DEFAULT_HDF5_PATH,
     DEFAULT_SOMA_X_ROOT,
     BodyFrameSelection,

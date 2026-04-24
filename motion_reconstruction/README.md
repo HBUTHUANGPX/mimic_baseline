@@ -183,8 +183,9 @@ python3 -m motion_reconstruction.cli.visualize \
 
 - `--source raw`
   - 继续读取训练/评估使用的完整 raw motion `.npz`
-- `--source hdf5-human --motion-npz hdf5_parse/out/annotation_soma.npz`
-  - 读取 `hdf5_parse` 导出的 human-only `.npz`
+- `--source hdf5-human --motion-npz PATH`
+  - 读取 human motion `.npz`
+  - 这个文件通常来自 `SOMA BVH -> soma-retargeter/app/bvh_to_csv_converter.py`
   - 只允许 `--inference-path human`
   - 推荐搭配 `--pair human`
   - 会优先使用 `human_local_transforms + human_parent_indices`
@@ -201,7 +202,7 @@ python3 -m motion_reconstruction.cli.visualize \
   --checkpoint outputs/motion_reconstruction/test_run/checkpoints/latest.pt \
   --xml-path assets/unitree_g1/g1_29dof_rev_1_0.xml \
   --source hdf5-human \
-  --motion-npz hdf5_parse/out/annotation_soma.npz \
+  --motion-npz path/to/human_motion.npz \
   --inference-path human \
   --pair human
 ```

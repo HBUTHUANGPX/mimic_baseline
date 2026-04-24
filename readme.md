@@ -93,7 +93,7 @@ conda install pinocchio -c conda-forge
 
 ### HDF5 body export
 
-`hdf5_parse/` 现在补了一条 `annotation.hdf5 -> SOMA-style human npz` 的导出链路，面向 `Xperience-10M` 这类带 `full_body_mocap + caption` 的 HDF5 标注文件。
+`hdf5_parse/` 现在补了两条独立链路，面向 `Xperience-10M` 这类带 `full_body_mocap + caption` 的 HDF5 标注文件。
 
 - 入口脚本：`hdf5_parse/export_hdf5_to_soma_npz.py`
 - 默认输入：`hdf5_parse/hdf5/annotation.hdf5`
@@ -106,11 +106,11 @@ conda install pinocchio -c conda-forge
   - `hdf5_parse/out/smpl`
   - `hdf5_parse/out/soma_bvh`
 - 运行要求：`cuda` + `SOMA-X` + `SMPL_NEUTRAL.npz/.pkl`
-- 输出内容：
-  - `save_retarget_npz()` 风格的人体骨架字段
-  - 原始 `timeline_frame_indices`
-  - `Main Task / Sub Task / Current Action / Interaction` 四类文本池与逐帧索引
-  - 调试用的 `smpl_*` / `soma_*` 中间结果
+- `export_hdf5_to_soma_npz.py`
+  - 只输出文本与时间线元数据到 `hdf5_parse/out/annotation_soma.npz`
+- `export_hdf5_to_soma_bvh.py` / `export_hdf5_segmented_motion.py`
+  - 负责真正的人体动作导出
+  - 输出 `SOMA BVH` 与分段 `SMPL npz`
 
 快速命令：
   ```
@@ -125,30 +125,18 @@ python hdf5_parse/export_hdf5_segmented_motion.py \
   --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
   ```
 
-导出后可直接复用 `motion_reconstruction` 做 human-only 可视化：
+如果后面要做 human-only 可视化，正确链路是先把导出的 `SOMA BVH` 交给
+`soma-retargeter/app/bvh_to_csv_converter.py` 转成 human motion npz，再接到
+`motion_reconstruction`。也就是说，这里不再直接使用 `annotation_soma.npz` 做人体可视化。
+
+可视化命令：
   ```
 python hdf5_parse/visualize_hdf5_soma_npz.py \
   --config motion_reconstruction/configs/dual_fsq.yaml \
   --checkpoint outputs/motion_reconstruction/test_run/checkpoints/latest.pt \
-  --xml-path assets/unitree_g1/g1_29dof_rev_1_0.xml
+  --xml-path assets/unitree_g1/g1_29dof_rev_1_0.xml \
+  --motion-npz path/to/human_motion.npz
   ```
-
-如果想先把问题收敛到“`annotation_soma.npz` 本身的人体骨架是否正确”，可以先只用参考
-`soma-retargeter` 语义的人体播放器，不引入 `motion_reconstruction` 和机器人：
-  ```
-python hdf5_parse/annotation_soma_mujoco_viewer.py \
-  --npz hdf5_parse/out/annotation_soma.npz
-  ```
-
-这个查看器默认会同时画出骨架和 joint 坐标轴；如果临时只想看骨架，可以再加
-`--hide-axes`。
-
-这条 viewer 链路只跑 `human encoder -> decoder`，显示的是：
-
-- 原始 human skeleton
-- decoder 输出的 robot motion
-
-也就是说，这里不是“human 重建 human”，而是“human latent 解码成 robot motion”。
 
 相关文档：
 

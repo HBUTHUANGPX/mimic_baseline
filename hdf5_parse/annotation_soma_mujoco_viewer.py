@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Play annotation_soma human skeletons in MuJoCo.
+"""Play human motion npz skeletons in MuJoCo.
 
 This viewer intentionally follows the same human parsing pipeline as
 `soma-retargeter/app/play_npz_mujoco.py`:
@@ -138,7 +138,7 @@ def load_human_motion_npz(npz_path: str | Path) -> HumanMotionNPZ:
     payload = np.load(npz_path, allow_pickle=False)
     scalar_first = bool(payload["scalar_first"].item()) if "scalar_first" in payload.files else False
     if scalar_first:
-        raise ValueError("annotation_soma.npz 的 human quaternion 期望是 XYZW，当前 viewer 不支持 scalar_first=True。")
+        raise ValueError("human motion npz 的 human quaternion 期望是 XYZW，当前 viewer 不支持 scalar_first=True。")
     return HumanMotionNPZ(
         local_transforms=np.asarray(payload["human_local_transforms"], dtype=np.float32),
         parent_indices=np.asarray(payload["human_parent_indices"], dtype=np.int32),
@@ -319,13 +319,13 @@ def play_human_motion(
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="用 soma-retargeter 同语义的人体解析流程，可视化 annotation_soma.npz。"
+        description="用 soma-retargeter 同语义的人体解析流程，可视化 human motion npz。"
     )
     parser.add_argument(
         "--npz",
         type=Path,
-        default=Path("hdf5_parse/out/annotation_soma.npz"),
-        help="hdf5_parse 导出的 human-only annotation_soma.npz 路径。",
+        required=True,
+        help="human motion npz 路径，通常来自 SOMA BVH 经过 bvh_to_csv_converter.py 的输出。",
     )
     parser.add_argument("--loop", action="store_true", help="循环播放。")
     parser.add_argument(

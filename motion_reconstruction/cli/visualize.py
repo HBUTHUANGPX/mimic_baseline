@@ -18,13 +18,13 @@ def build_arg_parser() -> ChineseArgumentParser:
         "--source",
         choices=["raw", "hdf5-human"],
         default="raw",
-        help="输入 motion 的来源类型。raw 走训练原始格式，hdf5-human 走 hdf5_parse 导出的 human-only npz。",
+        help="输入 motion 的来源类型。raw 走训练原始格式，hdf5-human 走 human motion npz。",
     )
     parser.add_argument(
         "--motion-npz",
         type=Path,
         default=None,
-        help="当 --source=hdf5-human 时，指定要读取的 human-only npz 路径。",
+        help="当 --source=hdf5-human 时，指定要读取的 human motion npz 路径。",
     )
     parser.add_argument(
         "--inference-path",

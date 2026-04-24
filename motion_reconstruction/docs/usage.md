@@ -159,7 +159,8 @@ python3 -m motion_reconstruction.cli.visualize \
 其中：
 
 - `source=raw` 时保持旧行为
-- `source=hdf5-human` 时直接读取 `hdf5_parse` 导出的 human-only `.npz`
+- `source=hdf5-human` 时直接读取 human motion `.npz`
+- 这个文件通常来自 `SOMA BVH -> soma-retargeter/app/bvh_to_csv_converter.py`
 - `hdf5-human` 推荐使用 `--inference-path human --pair human`
 - `hdf5-human` 会优先使用 `human_local_transforms + human_parent_indices`
   按 `soma-retargeter` 参考播放器一致的
@@ -175,7 +176,7 @@ python3 -m motion_reconstruction.cli.visualize \
   --checkpoint outputs/motion_reconstruction/test_run/checkpoints/latest.pt \
   --xml-path assets/unitree_g1/g1_29dof_rev_1_0.xml \
   --source hdf5-human \
-  --motion-npz hdf5_parse/out/annotation_soma.npz \
+  --motion-npz path/to/human_motion.npz \
   --inference-path human \
   --pair human
 ```
@@ -186,7 +187,8 @@ python3 -m motion_reconstruction.cli.visualize \
 python hdf5_parse/visualize_hdf5_soma_npz.py \
   --config motion_reconstruction/configs/dual_fsq.yaml \
   --checkpoint outputs/motion_reconstruction/test_run/checkpoints/latest.pt \
-  --xml-path assets/unitree_g1/g1_29dof_rev_1_0.xml
+  --xml-path assets/unitree_g1/g1_29dof_rev_1_0.xml \
+  --motion-npz path/to/human_motion.npz
 ```
 
 默认会按 anchor 居中显示，便于观察姿态和关节；如需保留世界坐标轨迹：

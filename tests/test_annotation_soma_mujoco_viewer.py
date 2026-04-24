@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 
 import numpy as np
+import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 VIEWER_MODULE_PATH = REPO_ROOT / "hdf5_parse" / "annotation_soma_mujoco_viewer.py"
@@ -92,8 +93,11 @@ def test_compute_visualized_global_transforms_matches_saved_globals_shape() -> N
 def test_build_arg_parser_shows_axes_by_default() -> None:
     viewer = load_module("annotation_soma_mujoco_viewer_parser", VIEWER_MODULE_PATH)
 
-    args = viewer.build_arg_parser().parse_args([])
+    with pytest.raises(SystemExit):
+        viewer.build_arg_parser().parse_args([])
+
+    args = viewer.build_arg_parser().parse_args(["--npz", "sample.npz"])
     assert args.hide_axes is False
 
-    args = viewer.build_arg_parser().parse_args(["--hide-axes"])
+    args = viewer.build_arg_parser().parse_args(["--npz", "sample.npz", "--hide-axes"])
     assert args.hide_axes is True

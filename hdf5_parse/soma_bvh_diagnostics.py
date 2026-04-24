@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Compare exported SOMA BVH against annotation_soma.npz human motion semantics.
+"""Compare exported SOMA BVH against a human motion npz.
 
 This script intentionally follows the same human parsing flow as
 `soma-retargeter/app/play_npz_mujoco.py` for BVH:
@@ -30,7 +30,6 @@ SOMA_RETARGETER_ROOT = REPO_ROOT / "soma-retargeter"
 SOMA_RETARGETER_APP = SOMA_RETARGETER_ROOT / "app"
 REFERENCE_PLAYER_COMMON = SOMA_RETARGETER_APP / "motion_npz_player_common.py"
 
-DEFAULT_INPUT_NPZ = Path("hdf5_parse/out/annotation_soma.npz")
 DEFAULT_INPUT_BVH = Path(
     "hdf5_parse/out/soma_bvh/annotation_83581004785937_83582554784896.bvh"
 )
@@ -308,13 +307,13 @@ def format_alignment_report(report: AlignmentReport, *, top_k: int = 10) -> str:
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Compare exported SOMA BVH against annotation_soma.npz human semantics."
+        description="Compare exported SOMA BVH against a human motion npz that follows soma-retargeter semantics."
     )
     parser.add_argument(
         "--npz",
         type=Path,
-        default=DEFAULT_INPUT_NPZ,
-        help="Path to annotation_soma.npz or another human-only SOMA npz.",
+        required=True,
+        help="Path to a human motion npz, typically produced by bvh_to_csv_converter.py.",
     )
     parser.add_argument(
         "--bvh",

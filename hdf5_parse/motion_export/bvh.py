@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-from .core import (
+from .smpl_soma import (
     DEFAULT_HDF5_PATH,
     DEFAULT_SOMA_X_ROOT,
     ensure_local_transforms_pre_visualization_frame,
