@@ -28,6 +28,8 @@ class HumanMotionNPZ:
     joint_names: list[str]
     fps: float
     scalar_first: bool
+    global_positions: np.ndarray
+    global_rotations: np.ndarray
 
 
 def quat_mul_batch(q1: np.ndarray, q2: np.ndarray) -> np.ndarray:
@@ -145,6 +147,8 @@ def load_human_motion_npz(npz_path: str | Path) -> HumanMotionNPZ:
         joint_names=payload["human_joint_names"].tolist(),
         fps=float(payload["fps"]),
         scalar_first=scalar_first,
+        global_positions = np.asarray(payload['human_global_pos']),
+        global_rotations = np.asarray(payload['human_global_quat']),
     )
 
 
@@ -279,13 +283,9 @@ def play_human_motion(
     show_axes: bool,
     fps_override: float | None,
 ) -> None:
-    payload,motion = load_human_motion_npz(npz_path)
-    # global_positions, global_rotations = compute_visualized_global_transforms(
-    #     motion.local_transforms,
-    #     motion.parent_indices,
-    # )
-    global_positions = payload['human_global_pos']
-    global_rotations = payload['human_global_quat']
+    motion = load_human_motion_npz(npz_path)
+    global_positions = motion.global_positions
+    global_rotations = motion.global_rotations
     model = mujoco.MjModel.from_xml_string(build_empty_scene_xml())
     data = mujoco.MjData(model)
     fps = float(fps_override) if fps_override is not None else motion.fps
