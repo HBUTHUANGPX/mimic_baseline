@@ -1,6 +1,13 @@
 # HDF5 to SOMA Export
 
-本文档说明 `hdf5_parse/export_hdf5_to_soma_npz.py` 是怎么把 `annotation.hdf5` 中的人体动作和文本描述导出成训练友好的 `.npz` 的。
+本文档说明：
+
+- `hdf5_parse/export_hdf5_to_soma_npz.py`
+- `hdf5_parse/export_hdf5_to_soma_bvh.py`
+- `hdf5_parse/export_hdf5_segmented_motion.py`
+- `hdf5_parse/soma_bvh_diagnostics.py`
+
+是怎么把 `annotation.hdf5` 中的人体动作分别导出成训练友好的 `.npz`、标准 `SOMA BVH`，以及按连续有效动作段切开的 `SMPL + SOMA BVH` 文件集合的。
 
 ## 目标
 
@@ -11,6 +18,20 @@
 - 保留四类文本描述和逐帧文本索引
 - 用 `SOMA-X` 把 `SMPL` 风格 body motion 转成 `SOMA skeleton`
 - 不输出任何 `robot_*` 字段
+
+同时也支持输出一份 `SOMA BVH`，便于直接和参考 `BVH` 工具链对照。
+
+如果原始 `HDF5` 中人体骨骼会间断消失，还支持按连续有效帧分段导出：
+
+- 每段一份 `SMPL npz`
+- 每段一份 `SOMA BVH`
+
+另外提供了一个只读诊断脚本：
+
+- `soma_bvh_diagnostics.py`
+
+它会把导出的 `SOMA BVH` 重新交给 `soma-retargeter` 官方解析器读取，再和
+`annotation_soma.npz` 里的人体 `global pos/global quat` 语义做逐帧比较。
 
 ## 输入字段
 
@@ -104,6 +125,27 @@ HDF5 的 `betas` 是 `16` 维，但具体 `SMPL` 模型支持多少维，要看�
 7. 叠加文本池、文本索引和追踪字段
 8. 保存为 `npz`
 
+如果走 `BVH` 导出，则第 6 到 8 步变成：
+
+6. 保留完整 `SOMA` skeleton，不做 `dual_fsq` joint mask
+7. 将 local transforms 写成 `BVH HIERARCHY + MOTION`
+8. 保存为 `annotation_soma.bvh`
+
+如果走分段导出，则会在第 2 步之后额外做一次：
+
+- 按过滤后的 `frame_nums` 连续性切段
+
+然后对每个 segment 分别保存：
+
+- `hdf5_parse/out/smpl/<timestamp_range>.npz`
+- `hdf5_parse/out/soma_bvh/<timestamp_range>.bvh`
+
+这里每个 segment 的 `SOMA BVH` 会复用单文件 BVH 导出同一套规范化逻辑：
+
+- `reference_local_transforms` 保持 `SOMA-X` 原始静态 skeleton
+- 动态 `local_transforms` 先转到 pre-visualization frame
+- 再把固定 root 运动吸收到 `Hips`，让 `Root` 的 6 通道保持为全 0
+
 在第 6 步里，当前实现会额外检查 `SOMA-X` 返回的 local skeleton 主朝向：
 
 - 如果它已经是 `Y-up` 的 pre-visualization 语义，就原样保留
@@ -169,7 +211,10 @@ HDF5 的 `betas` 是 `16` 维，但具体 `SMPL` 模型支持多少维，要看�
 
 - `human_reference_local_transforms`
 
-此外，导出时会去掉 `SOMA` 虚拟根节点 `Root`，让输出 skeleton 直接以 `Hips` 作为根。
+当前 `.npz` 和 `.bvh` 都保留 `SOMA` 虚拟根节点 `Root`，因为参考 `SOMA BVH` 本来就是：
+
+- `ROOT Root`
+- 子节点 `JOINT Hips`
 
 ## 输出字段
 
@@ -264,6 +309,39 @@ python hdf5_parse/annotation_soma_mujoco_viewer.py \
 - `current_action_text_indices`
 - `interaction_text_indices`
 
+## BVH 输出格式
+
+`export_hdf5_to_soma_bvh.py` 会写出和参考 `SOMA BVH` 一致的结构：
+
+- `Root` 和 `Hips` 都带 6 通道
+- 其他 joints 只带旋转通道
+- 旋转顺序固定为 `Zrotation Yrotation Xrotation`
+- `OFFSET` 和每帧平移都写成厘米
+- `Root` 的 motion channels 保持为全 0
+- 为了和官方 SOMA BVH 的 root 语义一致，pre-visualization frame 的固定 root 旋转会吸收到 `Hips` motion channels
+
+这和 `soma_retargeter.assets.bvh.load_bvh()` 的读取约定是配套的：
+
+- 读回时会把位置从厘米还原成米
+- 旋转会按 `ZYX` Euler 恢复为局部四元数
+
+## 分段 SMPL 输出格式
+
+`export_hdf5_segmented_motion.py` 里的每个 `SMPL npz` 会保存：
+
+- `fps`
+- `num_frames`
+- `frame_nums`
+- `frame_timestamps`
+- `smpl_global_orient`
+- `smpl_body_pose`
+- `smpl_transl`
+- `smpl_betas`
+
+文件名使用该段首尾时间戳：
+
+- `annotation_<start_timestamp>_<end_timestamp>.npz`
+
 ## 本地烟雾测试结果
 
 以下命令已实际跑通：
@@ -274,11 +352,22 @@ python hdf5_parse/export_hdf5_to_soma_npz.py \
   --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz \
   --end-frame 8 \
   --batch-size 2
+python hdf5_parse/export_hdf5_to_soma_bvh.py \
+  --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz \
+  --end-frame 8 \
+  --batch-size 2
+python hdf5_parse/export_hdf5_segmented_motion.py \
+  --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz \
+  --end-frame 32 \
+  --batch-size 4
 ```
 
 输出：
 
 - `hdf5_parse/out/annotation_soma.npz`
+- `hdf5_parse/out/annotation_soma.bvh`
+- `hdf5_parse/out/smpl/*.npz`
+- `hdf5_parse/out/soma_bvh/*.bvh`
 
 关键信息：
 
@@ -305,11 +394,14 @@ python hdf5_parse/export_hdf5_to_soma_npz.py \
 ```bash
 conda activate mimic_baseline
 pytest tests/test_hdf5_soma_export.py tests/test_hdf5_soma_payload.py -q
+pytest tests/test_hdf5_soma_bvh_export.py -q
+pytest tests/test_hdf5_segmented_export.py -q
 ```
 
 当前通过结果：
 
-- `10 passed`
+- `19 passed`
+- `6 passed`
 
 ## 已知约束
 

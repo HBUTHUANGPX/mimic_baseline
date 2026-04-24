@@ -18,10 +18,22 @@
   - 严格按 `soma-retargeter/app/play_npz_mujoco.py` 的人体链路
     `human_local_transforms -> FK -> apply_visualization_frame -> draw_animation_frame`
     来画骨架和 joint 坐标轴
+- `soma_bvh_diagnostics.py`
+  - 读取 `annotation_soma.npz` 和导出的 `SOMA BVH`
+  - 严格复用 `soma-retargeter` 官方 BVH 解析链路
+  - 比较两边得到的人体 `global pos/global quat` 是否一致
 - `export_hdf5_to_soma_npz.py`
   - 读取 `full_body_mocap + video + caption`
   - 调用 `SOMA-X` 的 `SMPL -> SOMA` 求逆
   - 输出 `save_retarget_npz()` 风格的人体 `.npz`
+- `export_hdf5_to_soma_bvh.py`
+  - 读取 `full_body_mocap`
+  - 调用 `SOMA-X` 的 `SMPL -> SOMA` 求逆
+  - 输出完整 SOMA skeleton 的 `.bvh`
+- `export_hdf5_segmented_motion.py`
+  - 读取 `full_body_mocap`
+  - 按原始 HDF5 中有效骨骼帧的连续区间切段
+  - 每段同时输出一个 `SMPL npz` 和一个 `SOMA BVH`
 - `visualize_hdf5_soma_npz.py`
   - 不自己维护 viewer
   - 直接调用 `motion_reconstruction` 的包级可视化 API
@@ -33,8 +45,18 @@
   - HDF5 解析、文本对齐、SOMA 求逆、人体骨架导出主逻辑
 - `export_hdf5_to_soma_npz.py`
   - 命令行入口
+- `soma_bvh_export.py`
+  - `HDF5 -> SOMA -> BVH` 主逻辑
+- `export_hdf5_to_soma_bvh.py`
+  - BVH 导出命令行入口
+- `segmented_motion_export.py`
+  - 连续有效帧切段、分段 `SMPL`/`SOMA BVH` 导出主逻辑
+- `export_hdf5_segmented_motion.py`
+  - 分段导出命令行入口
 - `annotation_soma_mujoco_viewer.py`
   - `annotation_soma.npz` 的 human-only MuJoCo 骨架/坐标轴播放器
+- `soma_bvh_diagnostics.py`
+  - `annotation_soma.npz` 与 `SOMA BVH` 对齐诊断脚本
 - `smpl_motion_tools.py`
   - `SMPL-H / SMPL` 可视化用的姿态整理工具
 - `smpl_visualization_notes.md`
@@ -62,6 +84,30 @@
 - `soma_*` 中间结果
 - `per_vertex_error`
 
+如果你想直接得到可以被 `soma-retargeter/assets/bvh.py` 或其他 BVH 工具读取的动作文件，也可以使用：
+
+- `export_hdf5_to_soma_bvh.py`
+
+这条链会保留完整 `SOMA` skeleton，不按 `dual_fsq` 做 joint 清零。
+同时会把 `Root/Hips` 的通道语义对齐到官方 SOMA BVH：
+
+- `Root` 的 6 通道保持零姿态
+- 用于 pre-visualization frame 的固定 root 旋转会吸收到 `Hips` 运动通道
+- 因此回读到 `bvh_to_csv_converter.py` 或 `play_npz_mujoco.py` 时，人体会保持直立，而不是沿 `-Y` 横卧
+
+如果你想处理 `HDF5` 里“骨骼有时消失”的情况，并按有效动作段分文件保存，可以使用：
+
+- `export_hdf5_segmented_motion.py`
+
+这条链会：
+
+- 先过滤掉非有限值人体帧
+- 再按原始 `frame_nums` 的连续性切段
+- 每段保存一份 `SMPL npz`
+- 每段保存一份 `SOMA BVH`
+- 文件名使用该段在原始 HDF5 中覆盖的时间戳范围
+- 其中每段 `SOMA BVH` 和 `export_hdf5_to_soma_bvh.py` 使用同一套 `Root/Hips` 规范化逻辑
+
 这里的语义约定和 `soma-retargeter` 参考播放器保持一致：
 
 - `human_local_transforms` 保存的是 visualization frame 之前的 local skeleton
@@ -81,6 +127,28 @@
 
 这样 `play_npz_mujoco.py / play_npz_newton.py` 和 `motion_reconstruction` 读取当前导出的
 `.npz` 时，看到的是同一套人体骨架语义。
+
+## BVH 诊断
+
+如果你怀疑导出的 `SOMA BVH` 在 `Root/Hips` 通道语义上和 `annotation_soma.npz`
+不一致，可以直接运行：
+
+```bash
+python hdf5_parse/soma_bvh_diagnostics.py \
+  --npz hdf5_parse/out/annotation_soma.npz \
+  --bvh hdf5_parse/out/soma_bvh/annotation_83581004785937_83582554784896.bvh
+```
+
+这个脚本会：
+
+- 用 `soma-retargeter/assets/bvh.py` 官方解析器读取 `.bvh`
+- 用 `play_npz_mujoco.py` 同款
+  `compute_global_joint_transforms -> apply_visualization_frame`
+  计算人体全局骨架
+- 和 `.npz` 中的 `human_global_pos / human_global_quat` 逐帧逐关节比较
+
+如果 `quat diff` 很小而 `pos diff` 明显偏大，通常说明问题更像是
+`Hips` 平移通道或局部位移语义不一致，而不是单纯的欧拉角显示看起来“像 -90 度”。
 
 ## 使用的数据字段
 
@@ -146,6 +214,8 @@ conda activate mimic_baseline
 
 ```bash
 python hdf5_parse/export_hdf5_to_soma_npz.py --help
+python hdf5_parse/export_hdf5_to_soma_bvh.py --help
+python hdf5_parse/export_hdf5_segmented_motion.py --help
 ```
 
 使用默认输入导出：
@@ -168,6 +238,34 @@ python hdf5_parse/export_hdf5_to_soma_npz.py \
 
 - 输入：`hdf5_parse/hdf5/annotation.hdf5`
 - 输出：`hdf5_parse/out/annotation_soma.npz`
+
+直接导出 BVH：
+
+```bash
+python hdf5_parse/export_hdf5_to_soma_bvh.py \
+  --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
+```
+
+默认 BVH 输出：
+
+- `hdf5_parse/out/annotation_soma.bvh`
+
+按连续有效动作段导出 `SMPL + SOMA BVH`：
+
+```bash
+python hdf5_parse/export_hdf5_segmented_motion.py \
+  --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
+```
+
+默认分段输出目录：
+
+- `hdf5_parse/out/smpl`
+- `hdf5_parse/out/soma_bvh`
+
+文件名示例：
+
+- `annotation_1740000010000_1740000010100.npz`
+- `annotation_1740000010000_1740000010100.bvh`
 
 ## 用参考播放器语义检查 annotation_soma.npz
 
@@ -245,8 +343,14 @@ python hdf5_parse/visualize_hdf5_soma_npz.py \
 
 - `pytest tests/test_hdf5_soma_export.py tests/test_hdf5_soma_payload.py -q`
 - `python hdf5_parse/export_hdf5_to_soma_npz.py --help`
+- `python hdf5_parse/export_hdf5_to_soma_bvh.py --help`
+- `python hdf5_parse/export_hdf5_segmented_motion.py --help`
 - 真实烟雾测试：
   - `python hdf5_parse/export_hdf5_to_soma_npz.py --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz --end-frame 8 --batch-size 2`
   - 成功输出 `hdf5_parse/out/annotation_soma.npz`
+  - `python hdf5_parse/export_hdf5_to_soma_bvh.py --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz --end-frame 8 --batch-size 2`
+  - 成功输出 `hdf5_parse/out/annotation_soma.bvh`
+  - `python hdf5_parse/export_hdf5_segmented_motion.py --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz --end-frame 32 --batch-size 4`
+  - 成功输出 `hdf5_parse/out/smpl/*.npz` 和 `hdf5_parse/out/soma_bvh/*.bvh`
 
 如果你要看字段语义、数组形状和设计细节，请继续看 `docs/hdf5_soma_export.md`。

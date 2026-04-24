@@ -139,7 +139,7 @@ def load_human_motion_npz(npz_path: str | Path) -> HumanMotionNPZ:
     scalar_first = bool(payload["scalar_first"].item()) if "scalar_first" in payload.files else False
     if scalar_first:
         raise ValueError("annotation_soma.npz 的 human quaternion 期望是 XYZW，当前 viewer 不支持 scalar_first=True。")
-    return payload,HumanMotionNPZ(
+    return HumanMotionNPZ(
         local_transforms=np.asarray(payload["human_local_transforms"], dtype=np.float32),
         parent_indices=np.asarray(payload["human_parent_indices"], dtype=np.int32),
         joint_names=payload["human_joint_names"].tolist(),

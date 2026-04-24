@@ -98,6 +98,12 @@ conda install pinocchio -c conda-forge
 - 入口脚本：`hdf5_parse/export_hdf5_to_soma_npz.py`
 - 默认输入：`hdf5_parse/hdf5/annotation.hdf5`
 - 默认输出：`hdf5_parse/out/annotation_soma.npz`
+- BVH 入口：`hdf5_parse/export_hdf5_to_soma_bvh.py`
+- BVH 输出：`hdf5_parse/out/annotation_soma.bvh`
+- 分段导出入口：`hdf5_parse/export_hdf5_segmented_motion.py`
+- 分段输出目录：
+  - `hdf5_parse/out/smpl`
+  - `hdf5_parse/out/soma_bvh`
 - 运行要求：`cuda` + `SOMA-X` + `SMPL_NEUTRAL.npz/.pkl`
 - 输出内容：
   - `save_retarget_npz()` 风格的人体骨架字段
@@ -109,6 +115,12 @@ conda install pinocchio -c conda-forge
   ```
 conda activate mimic_baseline
 python hdf5_parse/export_hdf5_to_soma_npz.py \
+  --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
+
+python hdf5_parse/export_hdf5_to_soma_bvh.py \
+  --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
+
+python hdf5_parse/export_hdf5_segmented_motion.py \
   --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
   ```
 
