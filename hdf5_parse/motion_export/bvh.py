@@ -1,19 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-import sys
 
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-MODULE_DIR = Path(__file__).resolve().parent
-REPO_ROOT = MODULE_DIR.parent
-if str(MODULE_DIR) not in sys.path:
-    sys.path.insert(0, str(MODULE_DIR))
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
-from hdf5_soma_export import (
+from .core import (
     DEFAULT_HDF5_PATH,
     DEFAULT_SOMA_X_ROOT,
     ensure_local_transforms_pre_visualization_frame,

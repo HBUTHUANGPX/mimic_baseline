@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import importlib.util
 from pathlib import Path
 import os
@@ -11,11 +12,14 @@ import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HDF5_PATH = REPO_ROOT / "hdf5_parse" / "hdf5" / "annotation.hdf5"
-EXPORT_MODULE_PATH = REPO_ROOT / "hdf5_parse" / "hdf5_soma_export.py"
+EXPORT_MODULE_PATH = REPO_ROOT / "hdf5_parse" / "motion_export" / "core.py"
 CLI_MODULE_PATH = REPO_ROOT / "hdf5_parse" / "export_hdf5_to_soma_npz.py"
 
 
 def load_module(module_name: str, module_path: Path):
+    if module_path == EXPORT_MODULE_PATH:
+        module = importlib.import_module("hdf5_parse.motion_export.core")
+        return importlib.reload(module)
     spec = importlib.util.spec_from_file_location(module_name, module_path)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None

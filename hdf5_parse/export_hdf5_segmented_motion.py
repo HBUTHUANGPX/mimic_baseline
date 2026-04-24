@@ -6,12 +6,10 @@ from pathlib import Path
 
 MODULE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = MODULE_DIR.parent
-if str(MODULE_DIR) not in sys.path:
-    sys.path.insert(0, str(MODULE_DIR))
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from segmented_motion_export import (
+from hdf5_parse.motion_export.segmented import (
     DEFAULT_SMPL_OUTPUT_DIR,
     DEFAULT_SOMA_BVH_OUTPUT_DIR,
     export_segmented_smpl_and_soma_bvh,

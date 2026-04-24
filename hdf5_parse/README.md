@@ -41,16 +41,15 @@
 
 ## 目录里的关键文件
 
-- `hdf5_soma_export.py`
-  - HDF5 解析、文本对齐、SOMA 求逆、人体骨架导出主逻辑
+- `motion_export/`
+  - 当前所有 motion 导出实现的统一目录
+  - `core.py` 负责 `HDF5 -> SOMA-style npz` 与共享 HDF5/SMPL/SOMA 逻辑
+  - `bvh.py` 负责 `HDF5 -> SOMA BVH`
+  - `segmented.py` 负责连续有效帧切段后的 `SMPL/BVH` 分段导出
 - `export_hdf5_to_soma_npz.py`
   - 命令行入口
-- `soma_bvh_export.py`
-  - `HDF5 -> SOMA -> BVH` 主逻辑
 - `export_hdf5_to_soma_bvh.py`
   - BVH 导出命令行入口
-- `segmented_motion_export.py`
-  - 连续有效帧切段、分段 `SMPL`/`SOMA BVH` 导出主逻辑
 - `export_hdf5_segmented_motion.py`
   - 分段导出命令行入口
 - `annotation_soma_mujoco_viewer.py`

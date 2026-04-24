@@ -11,14 +11,7 @@ import h5py
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-MODULE_DIR = Path(__file__).resolve().parent
-REPO_ROOT = MODULE_DIR.parent
-if str(MODULE_DIR) not in sys.path:
-    sys.path.insert(0, str(MODULE_DIR))
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
-from smpl_motion_tools import (
+from ..smpl_motion_tools import (
     DEFAULT_HDF5_PATH,
     compute_fps,
     quat_wxyz_to_rotvec,

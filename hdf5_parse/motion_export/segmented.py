@@ -1,19 +1,10 @@
 from __future__ import annotations
 
-import importlib.util
 from pathlib import Path
-import sys
 
 import numpy as np
 
-MODULE_DIR = Path(__file__).resolve().parent
-REPO_ROOT = MODULE_DIR.parent
-if str(MODULE_DIR) not in sys.path:
-    sys.path.insert(0, str(MODULE_DIR))
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
-from hdf5_soma_export import (
+from .core import (
     DEFAULT_HDF5_PATH,
     DEFAULT_SOMA_X_ROOT,
     BodyFrameSelection,
@@ -24,7 +15,7 @@ from hdf5_soma_export import (
     run_soma_inversion,
     selection_to_smpl_body_motion,
 )
-from soma_bvh_export import (
+from .bvh import (
     canonicalize_motion_local_transforms_for_bvh,
     write_soma_bvh,
 )
@@ -33,20 +24,6 @@ from soma_bvh_export import (
 DEFAULT_SOMA_BVH_OUTPUT_DIR = Path("hdf5_parse/out/soma_bvh")
 DEFAULT_SMPL_OUTPUT_DIR = Path("hdf5_parse/out/smpl")
 DEFAULT_FILENAME_PREFIX = "annotation"
-
-
-def _load_hdf5_soma_export_module():
-    module_name = "hdf5_soma_export"
-    if module_name in sys.modules:
-        return sys.modules[module_name]
-    module_path = MODULE_DIR / "hdf5_soma_export.py"
-    spec = importlib.util.spec_from_file_location(module_name, module_path)
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
-
 
 def split_contiguous_frame_ranges(frame_nums: np.ndarray, *, expected_step: int = 1) -> list[tuple[int, int]]:
     frame_nums = np.asarray(frame_nums, dtype=np.int64).reshape(-1)

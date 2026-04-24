@@ -1,22 +1,16 @@
 from __future__ import annotations
 
-import importlib.util
+import importlib
 from pathlib import Path
-import sys
 
 import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-MODULE_PATH = REPO_ROOT / "hdf5_parse" / "hdf5_soma_export.py"
 
 
 def load_module():
-    spec = importlib.util.spec_from_file_location("hdf5_soma_export", MODULE_PATH)
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+    module = importlib.import_module("hdf5_parse.motion_export.core")
+    return importlib.reload(module)
 
 
 def test_drop_soma_virtual_root_reparents_hips() -> None:

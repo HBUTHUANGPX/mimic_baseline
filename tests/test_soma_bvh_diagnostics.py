@@ -45,7 +45,7 @@ def _make_demo_payload():
 
 def test_compare_annotation_npz_against_bvh_reports_zero_diff_for_matching_export(tmp_path: Path) -> None:
     diagnostics = load_module("soma_bvh_diagnostics_match", MODULE_PATH)
-    from hdf5_parse.soma_bvh_export import write_soma_bvh
+    from hdf5_parse.motion_export.bvh import write_soma_bvh
 
     joint_names, parent_indices, reference, local = _make_demo_payload()
     bvh_path = tmp_path / "sample.bvh"
@@ -84,7 +84,7 @@ def test_compare_annotation_npz_against_bvh_reports_zero_diff_for_matching_expor
 
 def test_compare_annotation_npz_against_bvh_detects_root_basis_mismatch(tmp_path: Path) -> None:
     diagnostics = load_module("soma_bvh_diagnostics_mismatch", MODULE_PATH)
-    from hdf5_parse.soma_bvh_export import write_soma_bvh
+    from hdf5_parse.motion_export.bvh import write_soma_bvh
 
     joint_names, parent_indices, reference, local = _make_demo_payload()
     good_bvh_path = tmp_path / "sample_good.bvh"

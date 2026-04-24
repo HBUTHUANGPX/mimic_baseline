@@ -101,6 +101,7 @@ conda install pinocchio -c conda-forge
 - BVH 入口：`hdf5_parse/export_hdf5_to_soma_bvh.py`
 - BVH 输出：`hdf5_parse/out/annotation_soma.bvh`
 - 分段导出入口：`hdf5_parse/export_hdf5_segmented_motion.py`
+- 实现目录：`hdf5_parse/motion_export/`
 - 分段输出目录：
   - `hdf5_parse/out/smpl`
   - `hdf5_parse/out/soma_bvh`

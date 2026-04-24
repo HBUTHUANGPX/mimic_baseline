@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 from pathlib import Path
 import sys
 
@@ -14,6 +15,11 @@ from soma_retargeter.assets.bvh import load_bvh
 
 
 CLI_MODULE_PATH = REPO_ROOT / "hdf5_parse" / "export_hdf5_to_soma_bvh.py"
+
+
+def load_bvh_module():
+    module = importlib.import_module("hdf5_parse.motion_export.bvh")
+    return importlib.reload(module)
 
 
 def _pose7(position: list[float], euler_zyx_deg: list[float]) -> np.ndarray:
@@ -51,7 +57,7 @@ def _assert_quat_allclose(actual: np.ndarray, expected: np.ndarray, atol: float 
 
 
 def test_write_soma_bvh_round_trips_with_soma_loader(tmp_path: Path) -> None:
-    from hdf5_parse.soma_bvh_export import write_soma_bvh
+    write_soma_bvh = load_bvh_module().write_soma_bvh
 
     joint_names = ["Root", "Hips", "Head"]
     parent_indices = np.asarray([-1, 0, 1], dtype=np.int32)
@@ -152,7 +158,7 @@ def test_cli_script_help_runs_without_repo_pythonpath() -> None:
 
 
 def test_export_hdf5_to_soma_bvh_data_keeps_identity_root_rotation(monkeypatch) -> None:
-    from hdf5_parse.soma_bvh_export import export_hdf5_to_soma_bvh_data
+    module = load_bvh_module()
 
     class DummySelection:
         frame_nums = np.asarray([10, 11], dtype=np.int32)
@@ -166,15 +172,15 @@ def test_export_hdf5_to_soma_bvh_data_keeps_identity_root_rotation(monkeypatch) 
     reference_local_transforms = np.asarray([root_identity, _pose7([0.0, 1.0, 0.0], [0.0, 0.0, 0.0])], dtype=np.float32)
 
     monkeypatch.setattr(
-        "hdf5_parse.soma_bvh_export.load_body_frame_selection",
+        "hdf5_parse.motion_export.bvh.load_body_frame_selection",
         lambda *args, **kwargs: DummySelection(),
     )
     monkeypatch.setattr(
-        "hdf5_parse.soma_bvh_export.selection_to_smpl_body_motion",
+        "hdf5_parse.motion_export.bvh.selection_to_smpl_body_motion",
         lambda selection: DummyMotion(),
     )
     monkeypatch.setattr(
-        "hdf5_parse.soma_bvh_export.run_soma_inversion",
+        "hdf5_parse.motion_export.bvh.run_soma_inversion",
         lambda *args, **kwargs: {
             "joint_names": ["Root", "Hips"],
             "parent_indices": np.asarray([-1, 0], dtype=np.int32),
@@ -183,14 +189,14 @@ def test_export_hdf5_to_soma_bvh_data_keeps_identity_root_rotation(monkeypatch) 
         },
     )
 
-    payload = export_hdf5_to_soma_bvh_data()
+    payload = module.export_hdf5_to_soma_bvh_data()
 
     np.testing.assert_allclose(payload["reference_local_transforms"][0, 3:7], np.asarray([0.0, 0.0, 0.0, 1.0], dtype=np.float32))
     np.testing.assert_allclose(payload["human_local_transforms"][0, 0, 3:7], np.asarray([0.0, 0.0, 0.0, 1.0], dtype=np.float32))
 
 
 def test_canonicalize_motion_local_transforms_for_bvh_preserves_visualized_pose() -> None:
-    from hdf5_parse.soma_bvh_export import canonicalize_motion_local_transforms_for_bvh
+    canonicalize_motion_local_transforms_for_bvh = load_bvh_module().canonicalize_motion_local_transforms_for_bvh
     from motion_reconstruction.human_pose import (
         apply_visualization_frame_xyzw,
         compute_global_joint_transforms_xyzw,

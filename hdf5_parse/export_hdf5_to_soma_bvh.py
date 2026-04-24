@@ -6,12 +6,10 @@ from pathlib import Path
 
 MODULE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = MODULE_DIR.parent
-if str(MODULE_DIR) not in sys.path:
-    sys.path.insert(0, str(MODULE_DIR))
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from soma_bvh_export import DEFAULT_OUTPUT_BVH_PATH, save_hdf5_soma_bvh
+from hdf5_parse.motion_export.bvh import DEFAULT_OUTPUT_BVH_PATH, save_hdf5_soma_bvh
 
 
 def build_arg_parser() -> argparse.ArgumentParser:

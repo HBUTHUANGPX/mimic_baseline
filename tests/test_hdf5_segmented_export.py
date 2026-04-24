@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import importlib.util
 from pathlib import Path
 import sys
@@ -8,19 +9,14 @@ import numpy as np
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-MODULE_PATH = REPO_ROOT / "hdf5_parse" / "segmented_motion_export.py"
 CLI_MODULE_PATH = REPO_ROOT / "hdf5_parse" / "export_hdf5_segmented_motion.py"
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
 def load_module():
-    spec = importlib.util.spec_from_file_location("segmented_motion_export", MODULE_PATH)
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+    module = importlib.import_module("hdf5_parse.motion_export.segmented")
+    return importlib.reload(module)
 
 
 def test_split_frame_sequences_by_gap_uses_frame_nums() -> None:
@@ -41,7 +37,7 @@ def test_build_segment_file_stem_uses_timestamp_range() -> None:
 
 def test_save_smpl_motion_npz_writes_expected_fields(tmp_path: Path) -> None:
     module = load_module()
-    hdf5_module = module._load_hdf5_soma_export_module()
+    hdf5_module = importlib.reload(importlib.import_module("hdf5_parse.motion_export.core"))
     motion = hdf5_module.SMPLBodyMotion(
         global_orient=np.zeros((2, 3), dtype=np.float32),
         body_pose=np.ones((2, 69), dtype=np.float32),
@@ -65,7 +61,7 @@ def test_save_smpl_motion_npz_writes_expected_fields(tmp_path: Path) -> None:
 
 def test_export_segmented_motion_saves_smpl_and_bvh_files(tmp_path: Path, monkeypatch) -> None:
     module = load_module()
-    hdf5_module = module._load_hdf5_soma_export_module()
+    hdf5_module = importlib.reload(importlib.import_module("hdf5_parse.motion_export.core"))
 
     selection = hdf5_module.BodyFrameSelection(
         root_pose7=np.zeros((4, 7), dtype=np.float32),

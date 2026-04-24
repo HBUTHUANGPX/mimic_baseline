@@ -9,6 +9,12 @@
 
 是怎么把 `annotation.hdf5` 中的人体动作分别导出成训练友好的 `.npz`、标准 `SOMA BVH`，以及按连续有效动作段切开的 `SMPL + SOMA BVH` 文件集合的。
 
+当前实现已经整理到：
+
+- `hdf5_parse/motion_export/core.py`
+- `hdf5_parse/motion_export/bvh.py`
+- `hdf5_parse/motion_export/segmented.py`
+
 ## 目标
 
 输出一个“人体侧 `save_retarget_npz()` 风格”的数据包，满足下面几点：
