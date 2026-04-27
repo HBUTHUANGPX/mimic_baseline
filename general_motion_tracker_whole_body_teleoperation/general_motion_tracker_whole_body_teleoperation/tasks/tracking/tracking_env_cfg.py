@@ -236,6 +236,12 @@ class ObservationsCfg:
     class ProprioceptionAllCfg(ObsGroup):  # 有噪 特权 本体
         """Observations for proprioception group with noise."""
 
+        root_pos_w = ObsTerm(
+            func=mdp.root_pos_w, noise=Unoise(n_min=-0.05, n_max=0.05)
+        )
+        robot_anchor_ori_w = ObsTerm(
+            func=mdp.robot_anchor_ori_w, noise=Unoise(n_min=-0.05, n_max=0.05)
+        )
         base_lin_vel = ObsTerm(
             func=mdp.base_lin_vel, noise=Unoise(n_min=-0.25, n_max=0.25)
         )
@@ -308,6 +314,7 @@ class ObservationsCfg:
         ProprioceptionAllCfg()
     )  # 有噪 无特权 本体
     proprioception_with_noise_wo_privilege.base_lin_vel = None
+    proprioception_with_noise_wo_privilege.root_pos_w = None
 
     command_window: CommandAllCfg = CommandAllCfg(enable_corruption = False)  # 无噪 特权 cmd 
     command_window.joint_pos_delta = None
