@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import tomllib
+import configparser
 from pathlib import Path
 
 
@@ -74,11 +75,37 @@ def test_pyproject_exposes_dataset_converter_console_scripts() -> None:
     assert not (REPO_ROOT / "pyproject.toml").exists()
     pyproject = tomllib.loads((PACKAGE_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
-    assert pyproject["project"]["name"] == "dataset-converter"
-    scripts = pyproject["project"]["scripts"]
-    assert scripts["dataset-converter-hdf5-batch"] == "dataset_converter.hdf5.cli.batch_export:main"
-    assert scripts["dataset-converter-nymeria-batch"] == "dataset_converter.nymeria.cli.batch_export:main"
-    assert "soma*" in pyproject["tool"]["setuptools"]["packages"]["find"]["include"]
+    assert pyproject["build-system"]["build-backend"] == "setuptools.build_meta"
+    assert "project" not in pyproject
+
+
+def test_setup_cfg_declares_package_metadata_entry_points_and_extras() -> None:
+    parser = configparser.ConfigParser()
+    parser.read(PACKAGE_ROOT / "setup.cfg", encoding="utf-8")
+
+    assert parser["metadata"]["name"] == "dataset-converter"
+    assert parser["options"]["python_requires"] == ">=3.11"
+    assert "dataset_converter*" in parser["options.packages.find"]["include"]
+    assert "soma*" in parser["options.packages.find"]["include"]
+
+    entry_points = parser["options.entry_points"]["console_scripts"]
+    assert "dataset-converter-hdf5-batch = dataset_converter.hdf5.cli.batch_export:main" in entry_points
+    assert "dataset-converter-nymeria-batch = dataset_converter.nymeria.cli.batch_export:main" in entry_points
+
+    extras = parser["options.extras_require"]
+    assert "torch" in extras["soma"]
+    assert "smplx" in extras["soma"]
+    assert "warp-lang" in extras["soma"]
+    assert "trimesh" in extras["soma"]
+    assert "torch" in extras["gpu"]
+    assert "smplx" in extras["gpu"]
+    assert "pytest" in extras["dev"]
+
+
+def test_requirements_txt_contains_cpu_base_dependencies_only() -> None:
+    requirements = (PACKAGE_ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
+
+    assert requirements == ["h5py", "numpy", "scipy", "tqdm"]
 
 
 def test_vendored_soma_runtime_imports_from_dataset_converter_src() -> None:
