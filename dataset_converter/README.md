@@ -2,7 +2,7 @@
 
 `dataset_converter` is the new unified package for converting motion datasets in this repository.
 
-It currently owns the CPU/IO-friendly annotation and SMPL export stages, and keeps SOMA BVH export behind a temporary legacy bridge while that CUDA-heavy path is migrated carefully:
+It currently owns the CPU/IO-friendly annotation and SMPL export stages, plus the shared SOMA BVH writing/orchestration code used by CUDA export:
 
 - `dataset_converter.hdf5`: Xperience/HDF5 `annotation.hdf5` data.
 - `dataset_converter.nymeria`: Nymeria MVNX body motion data.
@@ -44,18 +44,22 @@ python -m dataset_converter.nymeria.cli.batch_export --help
 The package does not hard-code machine-specific paths. For SOMA/SMPL export, provide paths with CLI arguments or environment variables:
 
 ```bash
-export SOMA_X_ROOT=/path/to/SOMA-X
-export SMPL_MODEL_PATH=/path/to/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
+export SOMA_ASSETS_ROOT=/path/to/soma/assets
+export SMPL_MODEL_PATH=/path/to/soma/assets/SMPL/SMPL_NEUTRAL.npz
 ```
 
 Equivalent CLI arguments:
 
 ```bash
---soma-x-root /path/to/SOMA-X
+--soma-assets-root /path/to/soma/assets
 --smpl-model-path /path/to/SMPL_NEUTRAL.npz
 ```
 
-`annotation` and `smpl` export stages do not require SOMA-X and no longer import implementation code from `hdf5_parse` or `nymeria_parse`. `soma-bvh` still uses those legacy modules through explicit bridge modules because it depends on the existing SOMA-X/CUDA calibration path.
+`annotation` and `smpl` export stages do not require SOMA assets and no longer import implementation code from `hdf5_parse` or `nymeria_parse`. `soma-bvh` requires the SOMA Python runtime to be importable in the active environment.
+
+## Environment Direction
+
+The package is structured so it can later own an independent `uv` environment. That work has not started yet. For now, use the existing `mimic_baseline` environment and install this package editable with `pip install -e dataset_converter`.
 
 ## Data Layout
 
@@ -114,7 +118,7 @@ Batch SOMA BVH export is intentionally sequential because it uses CUDA:
 ```bash
 dataset-converter-hdf5-batch \
   --exports soma-bvh \
-  --soma-x-root "$SOMA_X_ROOT" \
+  --soma-assets-root "$SOMA_ASSETS_ROOT" \
   --smpl-model-path "$SMPL_MODEL_PATH" \
   --batch-size 128 \
   --skip-existing

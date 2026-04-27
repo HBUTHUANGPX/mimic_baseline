@@ -9,8 +9,8 @@ from typing import Iterable
 from dataset_converter.common.batch import BatchExportResult, run_multiprocess_tasks, run_sequential_tasks
 from dataset_converter.common.paths import default_nymeria_output_root, default_nymeria_test_data_root
 from dataset_converter.nymeria.annotation import build_annotation_payload, save_annotation_payload
-from dataset_converter.nymeria.soma_bridge import export_nymeria_to_soma_bvh_bridge
 from dataset_converter.nymeria.smpl import build_smpl_motion_payload, save_smpl_motion_npz
+from dataset_converter.nymeria.soma_bvh import export_nymeria_to_soma_bvh
 
 
 DEFAULT_SOMA_BATCH_SIZE = 256
@@ -85,7 +85,7 @@ def _export_soma_bvh_task(
     stride: int,
     device: str,
     batch_size: int | None,
-    soma_x_root: str | Path,
+    soma_assets_root: str | Path,
     smpl_model_path: str | Path | None,
     skip_existing: bool,
 ) -> BatchExportResult:
@@ -93,7 +93,7 @@ def _export_soma_bvh_task(
     if skip_existing and output_path.is_file():
         return BatchExportResult(task.task_id, True, (output_path,))
     try:
-        output = export_nymeria_to_soma_bvh_bridge(
+        output = export_nymeria_to_soma_bvh(
             task.sequence_dir,
             output_path=output_path,
             start_frame=start_frame,
@@ -101,7 +101,7 @@ def _export_soma_bvh_task(
             stride=stride,
             device=device,
             batch_size=batch_size,
-            soma_x_root=soma_x_root,
+            soma_assets_root=soma_assets_root,
             smpl_model_path=smpl_model_path,
         )
         return BatchExportResult(task.task_id, True, (output,))
@@ -145,7 +145,7 @@ def export_batch_soma_bvh(
     stride: int = 1,
     device: str = "cuda",
     batch_size: int | None = DEFAULT_SOMA_BATCH_SIZE,
-    soma_x_root: str | Path,
+    soma_assets_root: str | Path,
     smpl_model_path: str | Path | None = None,
     skip_existing: bool = False,
 ) -> list[BatchExportResult]:
@@ -156,7 +156,7 @@ def export_batch_soma_bvh(
         stride=stride,
         device=device,
         batch_size=batch_size,
-        soma_x_root=soma_x_root,
+        soma_assets_root=soma_assets_root,
         smpl_model_path=smpl_model_path,
         skip_existing=skip_existing,
     )

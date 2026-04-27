@@ -9,8 +9,8 @@ from typing import Iterable
 from dataset_converter.common.batch import BatchExportResult, run_multiprocess_tasks, run_sequential_tasks
 from dataset_converter.common.paths import default_hdf5_output_root, default_hdf5_test_data_root
 from dataset_converter.hdf5.annotation import export_hdf5_to_annotation_payload, save_annotation_payload
-from dataset_converter.hdf5.soma_bridge import export_segmented_soma_bvh_bridge
 from dataset_converter.hdf5.smpl import export_segmented_smpl_npz
+from dataset_converter.hdf5.soma_bvh import export_segmented_soma_bvh
 
 
 DEFAULT_FILENAME_PREFIX = "annotation"
@@ -108,7 +108,7 @@ def _export_soma_bvh_task(
     stride: int,
     device: str,
     batch_size: int | None,
-    soma_x_root: str | Path,
+    soma_assets_root: str | Path,
     smpl_model_path: str | Path | None,
     filename_prefix: str,
     skip_existing: bool,
@@ -117,7 +117,7 @@ def _export_soma_bvh_task(
     if _should_skip(output_dir, "*.bvh", skip_existing=skip_existing):
         return BatchExportResult(task.task_id, True, tuple(sorted(output_dir.glob("*.bvh"))))
     try:
-        outputs = export_segmented_soma_bvh_bridge(
+        outputs = export_segmented_soma_bvh(
             hdf5_path=task.hdf5_path,
             soma_bvh_output_dir=output_dir,
             start_frame=start_frame,
@@ -125,7 +125,7 @@ def _export_soma_bvh_task(
             stride=stride,
             device=device,
             batch_size=batch_size,
-            soma_x_root=soma_x_root,
+            soma_assets_root=soma_assets_root,
             smpl_model_path=smpl_model_path,
             filename_prefix=filename_prefix,
         )
@@ -180,7 +180,7 @@ def export_batch_soma_bvh(
     stride: int = 1,
     device: str = "cuda",
     batch_size: int | None = None,
-    soma_x_root: str | Path,
+    soma_assets_root: str | Path,
     smpl_model_path: str | Path | None = None,
     filename_prefix: str = DEFAULT_FILENAME_PREFIX,
     skip_existing: bool = False,
@@ -192,7 +192,7 @@ def export_batch_soma_bvh(
         stride=stride,
         device=device,
         batch_size=batch_size,
-        soma_x_root=soma_x_root,
+        soma_assets_root=soma_assets_root,
         smpl_model_path=smpl_model_path,
         filename_prefix=filename_prefix,
         skip_existing=skip_existing,

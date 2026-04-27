@@ -18,12 +18,14 @@ Do not edit source files to change local paths. Use environment variables or CLI
 Recommended environment variables:
 
 ```bash
-export SOMA_X_ROOT=/path/to/SOMA-X
-export SMPL_MODEL_PATH=/path/to/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
+export SOMA_ASSETS_ROOT=/path/to/soma/assets
+export SMPL_MODEL_PATH=/path/to/soma/assets/SMPL/SMPL_NEUTRAL.npz
 export SMPLH_MODEL_PATH=/path/to/SMPLH_NEUTRAL.pkl
 ```
 
-Only `SOMA_X_ROOT` and `SMPL_MODEL_PATH` are needed for `soma-bvh` export. Basic annotation and SMPL extraction do not need SOMA-X.
+Only `SOMA_ASSETS_ROOT` and `SMPL_MODEL_PATH` are needed for `soma-bvh` export. Basic annotation and SMPL extraction do not need SOMA assets.
+
+The package is being prepared for a future standalone `uv` environment, but that environment is not created yet. Keep using the current `mimic_baseline` environment until the dependency set is frozen.
 
 ## Validate Installation
 
@@ -50,9 +52,13 @@ dataset-converter-nymeria-batch \
 
 ## Common Problems
 
-`SOMA-X root was not found`
+`SOMA assets root was not found`
 
-Set `SOMA_X_ROOT` or pass `--soma-x-root`.
+Set `SOMA_ASSETS_ROOT` or pass `--soma-assets-root`.
+
+`The SOMA runtime package is not importable`
+
+Install or expose the `soma` Python package in the active environment. The converter no longer modifies `sys.path` to discover an external source tree.
 
 `SMPL model was not found`
 

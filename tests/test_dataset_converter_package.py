@@ -25,15 +25,15 @@ def test_dataset_converter_imports_common_hdf5_and_nymeria_modules() -> None:
 def test_path_resolver_uses_environment_before_candidates(tmp_path: Path, monkeypatch) -> None:
     from dataset_converter.common.paths import resolve_optional_path
 
-    env_path = tmp_path / "external_soma"
+    env_path = tmp_path / "external_soma_assets"
     env_path.mkdir()
     fallback = tmp_path / "fallback"
     fallback.mkdir()
-    monkeypatch.setenv("SOMA_X_ROOT", str(env_path))
+    monkeypatch.setenv("SOMA_ASSETS_ROOT", str(env_path))
 
     resolved = resolve_optional_path(
         explicit=None,
-        env_var="SOMA_X_ROOT",
+        env_var="SOMA_ASSETS_ROOT",
         candidates=[fallback],
     )
 
@@ -90,7 +90,7 @@ def test_dataset_converter_source_does_not_lock_to_local_home_paths() -> None:
     assert "HPX_LOCO_2" not in source_text
 
 
-def test_dataset_converter_only_soma_bridge_imports_legacy_packages() -> None:
+def test_dataset_converter_does_not_import_legacy_parse_packages() -> None:
     source_paths = sorted((PACKAGE_ROOT / "src" / "dataset_converter").rglob("*.py"))
     legacy_import_lines = []
     for path in source_paths:
@@ -98,13 +98,16 @@ def test_dataset_converter_only_soma_bridge_imports_legacy_packages() -> None:
             if "hdf5_parse." in line or "nymeria_parse." in line:
                 legacy_import_lines.append((path.relative_to(PACKAGE_ROOT), line.strip()))
 
-    assert legacy_import_lines == [
-        (
-            Path("src/dataset_converter/hdf5/soma_bridge.py"),
-            "from hdf5_parse.motion_export.segmented import export_segmented_soma_bvh",
-        ),
-        (
-            Path("src/dataset_converter/nymeria/soma_bridge.py"),
-            "from nymeria_parse.motion_export.soma_bvh import export_nymeria_to_soma_bvh",
-        ),
+    assert legacy_import_lines == []
+
+
+def test_dataset_converter_soma_cli_uses_assets_root_not_soma_x_root() -> None:
+    commands = [
+        [sys.executable, "-m", "dataset_converter.hdf5.cli.batch_export", "--help"],
+        [sys.executable, "-m", "dataset_converter.nymeria.cli.batch_export", "--help"],
     ]
+    for command in commands:
+        result = subprocess.run(command, cwd=REPO_ROOT, check=False, capture_output=True, text=True)
+        assert result.returncode == 0, result.stderr
+        assert "--soma-assets-root" in result.stdout
+        assert "--soma-x-root" not in result.stdout

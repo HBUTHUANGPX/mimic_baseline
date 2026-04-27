@@ -17,17 +17,21 @@ dataset_converter/
 │   ├── annotation.py
 │   ├── batch.py
 │   ├── io.py
-│   ├── soma_bridge.py
+│   ├── soma_bvh.py
 │   ├── smpl.py
 │   └── cli/
 └── nymeria/
     ├── annotation.py
     ├── batch.py
     ├── mvnx.py
-    ├── soma_bridge.py
+    ├── soma_bvh.py
     ├── smpl.py
     ├── xsens_smpl.py
     └── cli/
+└── soma/
+    ├── bvh.py
+    ├── inversion.py
+    └── transforms.py
 ```
 
 ## Shared Semantics
@@ -66,7 +70,7 @@ Current stage ownership:
 
 - `annotation`: native `dataset_converter.hdf5.annotation`.
 - `smpl`: native `dataset_converter.hdf5.smpl`.
-- `soma-bvh`: temporary bridge in `dataset_converter.hdf5.soma_bridge` to the existing `hdf5_parse.motion_export` CUDA/SOMA path.
+- `soma-bvh`: native `dataset_converter.hdf5.soma_bvh`, using shared `dataset_converter.soma` modules.
 
 ## Nymeria Pipeline
 
@@ -86,7 +90,7 @@ Current stage ownership:
 
 - `annotation`: native `dataset_converter.nymeria.annotation`.
 - `smpl`: native `dataset_converter.nymeria.smpl`.
-- `soma-bvh`: temporary bridge in `dataset_converter.nymeria.soma_bridge` to the existing `nymeria_parse.motion_export` CUDA/SOMA path.
+- `soma-bvh`: native `dataset_converter.nymeria.soma_bvh`, using shared `dataset_converter.soma` modules.
 
 ## Migration Plan
 
@@ -94,5 +98,5 @@ The compatibility direction is:
 
 1. Keep `hdf5_parse` and `nymeria_parse` working while downstream scripts move over.
 2. Route new CPU/IO annotation and SMPL export work through `dataset_converter`.
-3. Keep SOMA BVH export as a compatibility bridge until the SOMA-X runtime path is migrated and revalidated.
+3. Keep the SOMA Python runtime and SOMA assets as explicit environment/runtime dependencies, not source-tree path injections.
 4. Turn old scripts into thin wrappers or retire them once downstream users move to the new package.

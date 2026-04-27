@@ -70,13 +70,13 @@ dataset-converter-nymeria-batch \
 
 ## 4. Export SOMA BVH
 
-SOMA BVH export uses CUDA through SOMA-X. It is intentionally sequential even in batch mode.
+SOMA BVH export uses CUDA and requires the SOMA Python runtime to be importable in the active environment. It is intentionally sequential even in batch mode.
 
 Set paths once:
 
 ```bash
-export SOMA_X_ROOT=/path/to/SOMA-X
-export SMPL_MODEL_PATH=/path/to/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
+export SOMA_ASSETS_ROOT=/path/to/soma/assets
+export SMPL_MODEL_PATH=/path/to/soma/assets/SMPL/SMPL_NEUTRAL.npz
 ```
 
 Then run HDF5 SOMA BVH export:
@@ -84,6 +84,7 @@ Then run HDF5 SOMA BVH export:
 ```bash
 dataset-converter-hdf5-batch \
   --exports soma-bvh \
+  --soma-assets-root "$SOMA_ASSETS_ROOT" \
   --batch-size 128 \
   --skip-existing
 ```
@@ -93,6 +94,7 @@ Or Nymeria SOMA BVH export:
 ```bash
 dataset-converter-nymeria-batch \
   --exports soma-bvh \
+  --soma-assets-root "$SOMA_ASSETS_ROOT" \
   --batch-size 128 \
   --skip-existing
 ```

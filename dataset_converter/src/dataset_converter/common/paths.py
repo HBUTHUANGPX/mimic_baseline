@@ -82,26 +82,31 @@ def default_nymeria_output_root() -> Path:
     return get_repo_root() / "nymeria_parse" / "out" / "batch"
 
 
-def resolve_soma_x_root(explicit: str | Path | None = None) -> Path | None:
+def default_package_assets_root() -> Path:
+    return get_package_root().parents[1] / "assets"
+
+
+def resolve_soma_assets_root(explicit: str | Path | None = None) -> Path | None:
     repo_root = get_repo_root()
     return resolve_optional_path(
         explicit=explicit,
-        env_var="SOMA_X_ROOT",
+        env_var="SOMA_ASSETS_ROOT",
         candidates=[
-            repo_root / "SOMA-X",
-            repo_root.parent / "SOMA-X",
+            default_package_assets_root() / "soma",
+            repo_root / "assets" / "soma",
+            repo_root / "assets",
         ],
     )
 
 
 def resolve_smpl_model_path(explicit: str | Path | None = None) -> Path | None:
-    soma_root = resolve_soma_x_root()
+    soma_assets_root = resolve_soma_assets_root()
     candidates: list[Path] = []
-    if soma_root is not None:
+    if soma_assets_root is not None:
         candidates.extend(
             [
-                soma_root / "assets" / "SMPL" / "SMPL_NEUTRAL.npz",
-                soma_root / "assets" / "SMPL" / "SMPL_NEUTRAL.pkl",
+                soma_assets_root / "SMPL" / "SMPL_NEUTRAL.npz",
+                soma_assets_root / "SMPL" / "SMPL_NEUTRAL.pkl",
             ]
         )
     return resolve_optional_path(explicit=explicit, env_var="SMPL_MODEL_PATH", candidates=candidates)

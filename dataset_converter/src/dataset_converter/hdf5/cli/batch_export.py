@@ -9,7 +9,7 @@ from dataset_converter.common.paths import (
     default_hdf5_test_data_root,
     require_path,
     resolve_smpl_model_path,
-    resolve_soma_x_root,
+    resolve_soma_assets_root,
 )
 from dataset_converter.hdf5.batch import (
     discover_hdf5_episode_tasks,
@@ -37,8 +37,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--smpl-frame", choices=("soma_y_up", "raw"), default="soma_y_up")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--batch-size", type=int, default=None)
-    parser.add_argument("--soma-x-root", type=Path, default=None, help="Optional. Falls back to SOMA_X_ROOT or nearby SOMA-X.")
-    parser.add_argument("--smpl-model-path", type=Path, default=None, help="Optional. Falls back to SMPL_MODEL_PATH or SOMA-X assets.")
+    parser.add_argument("--soma-assets-root", type=Path, default=None, help="Optional. Falls back to SOMA_ASSETS_ROOT or package assets.")
+    parser.add_argument("--smpl-model-path", type=Path, default=None, help="Optional. Falls back to SMPL_MODEL_PATH or SOMA assets.")
     parser.add_argument("--skip-existing", action="store_true")
     parser.add_argument("--summary-path", type=Path, default=None)
     parser.add_argument("--fail-fast", action="store_true")
@@ -90,7 +90,7 @@ def main(argv: list[str] | None = None) -> int:
                 return exit_code
 
     if "soma-bvh" in args.exports:
-        soma_x_root = require_path(resolve_soma_x_root(args.soma_x_root), label="SOMA-X root")
+        soma_assets_root = require_path(resolve_soma_assets_root(args.soma_assets_root), label="SOMA assets root")
         smpl_model_path = require_path(resolve_smpl_model_path(args.smpl_model_path), label="SMPL model")
         results = export_batch_soma_bvh(
             tasks,
@@ -99,7 +99,7 @@ def main(argv: list[str] | None = None) -> int:
             stride=args.stride,
             device=args.device,
             batch_size=args.batch_size,
-            soma_x_root=soma_x_root,
+            soma_assets_root=soma_assets_root,
             smpl_model_path=smpl_model_path,
             filename_prefix=args.filename_prefix,
             skip_existing=args.skip_existing,
