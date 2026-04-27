@@ -8,6 +8,8 @@ from typing import Iterable
 
 from dataset_converter.common.batch import BatchExportResult, run_multiprocess_tasks, run_sequential_tasks
 from dataset_converter.common.paths import default_nymeria_output_root, default_nymeria_test_data_root, ensure_workspace_on_sys_path
+from dataset_converter.nymeria.annotation import build_annotation_payload, save_annotation_payload
+from dataset_converter.nymeria.smpl import build_smpl_motion_payload, save_smpl_motion_npz
 
 
 DEFAULT_SOMA_BATCH_SIZE = 256
@@ -46,9 +48,6 @@ def _export_annotation_task(
     stride: int,
     skip_existing: bool,
 ) -> BatchExportResult:
-    ensure_workspace_on_sys_path()
-    from nymeria_parse.motion_export.core import build_annotation_payload, save_annotation_payload
-
     output_path = task.output_dir / "annotation.npz"
     if skip_existing and output_path.is_file():
         return BatchExportResult(task.task_id, True, (output_path,))
@@ -67,9 +66,6 @@ def _export_smpl_task(
     stride: int,
     skip_existing: bool,
 ) -> BatchExportResult:
-    ensure_workspace_on_sys_path()
-    from nymeria_parse.motion_export.smpl import build_smpl_motion_payload, save_smpl_motion_npz
-
     output_path = task.output_dir / "smpl" / "nymeria_smpl.npz"
     if skip_existing and output_path.is_file():
         return BatchExportResult(task.task_id, True, (output_path,))

@@ -9,12 +9,22 @@ dataset_converter/
 ├── common/
 │   ├── batch.py
 │   ├── cli.py
-│   └── paths.py
+│   ├── paths.py
+│   ├── rotations.py
+│   ├── smpl.py
+│   └── text.py
 ├── hdf5/
+│   ├── annotation.py
 │   ├── batch.py
+│   ├── io.py
+│   ├── smpl.py
 │   └── cli/
 └── nymeria/
+    ├── annotation.py
     ├── batch.py
+    ├── mvnx.py
+    ├── smpl.py
+    ├── xsens_smpl.py
     └── cli/
 ```
 
@@ -34,6 +44,8 @@ dataset_converter/
 
 `dataset_converter.common.cli` owns JSONL summaries and stage printing.
 
+`dataset_converter.common.text`, `rotations`, and `smpl` own the shared text-pool, root-frame conversion, and SMPL motion container semantics used by both datasets.
+
 ## HDF5 Pipeline
 
 HDF5 tasks are discovered from:
@@ -48,7 +60,11 @@ Each task writes under:
 <output-root>/<subset_id>/<episode_id>/
 ```
 
-The package currently calls the stable implementation in `hdf5_parse.motion_export`.
+Current stage ownership:
+
+- `annotation`: native `dataset_converter.hdf5.annotation`.
+- `smpl`: native `dataset_converter.hdf5.smpl`.
+- `soma-bvh`: temporary bridge to the existing `hdf5_parse.motion_export` CUDA/SOMA path.
 
 ## Nymeria Pipeline
 
@@ -64,13 +80,17 @@ Each task writes under:
 <output-root>/<sequence_id>/
 ```
 
-The package currently calls the stable implementation in `nymeria_parse.motion_export`.
+Current stage ownership:
+
+- `annotation`: native `dataset_converter.nymeria.annotation`.
+- `smpl`: native `dataset_converter.nymeria.smpl`.
+- `soma-bvh`: temporary bridge to the existing `nymeria_parse.motion_export` CUDA/SOMA path.
 
 ## Migration Plan
 
 The compatibility direction is:
 
-1. Keep `hdf5_parse` and `nymeria_parse` working.
-2. Add new code through `dataset_converter`.
-3. Move shared behavior into `dataset_converter.common`.
-4. Gradually migrate old scripts to thin wrappers or retire them once downstream users move to the new package.
+1. Keep `hdf5_parse` and `nymeria_parse` working while downstream scripts move over.
+2. Route new CPU/IO annotation and SMPL export work through `dataset_converter`.
+3. Keep SOMA BVH export as a compatibility bridge until the SOMA-X runtime path is migrated and revalidated.
+4. Turn old scripts into thin wrappers or retire them once downstream users move to the new package.

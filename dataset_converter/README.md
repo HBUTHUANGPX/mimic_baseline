@@ -2,12 +2,12 @@
 
 `dataset_converter` is the new unified package for converting motion datasets in this repository.
 
-It currently wraps and organizes two existing pipelines:
+It currently owns the CPU/IO-friendly annotation and SMPL export stages, and keeps SOMA BVH export behind a temporary legacy bridge while that CUDA-heavy path is migrated carefully:
 
 - `dataset_converter.hdf5`: Xperience/HDF5 `annotation.hdf5` data.
 - `dataset_converter.nymeria`: Nymeria MVNX body motion data.
 
-The old `hdf5_parse/` and `nymeria_parse/` folders are still kept for compatibility, but new code and deployment should use this package.
+The old `hdf5_parse/` and `nymeria_parse/` folders are still kept for compatibility. New code and deployment should use this package.
 
 ## Install
 
@@ -55,7 +55,7 @@ Equivalent CLI arguments:
 --smpl-model-path /path/to/SMPL_NEUTRAL.npz
 ```
 
-`annotation` and `smpl` export stages do not require SOMA-X. `soma-bvh` does.
+`annotation` and `smpl` export stages do not require SOMA-X and no longer import implementation code from `hdf5_parse` or `nymeria_parse`. `soma-bvh` still uses those legacy modules as a compatibility bridge because it depends on the existing SOMA-X/CUDA calibration path.
 
 ## Data Layout
 

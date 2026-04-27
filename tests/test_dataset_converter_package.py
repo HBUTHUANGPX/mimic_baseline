@@ -88,3 +88,23 @@ def test_dataset_converter_source_does_not_lock_to_local_home_paths() -> None:
 
     assert "/home/hpx" not in source_text
     assert "HPX_LOCO_2" not in source_text
+
+
+def test_dataset_converter_annotation_and_smpl_stages_do_not_import_legacy_packages() -> None:
+    source_paths = sorted((PACKAGE_ROOT / "src" / "dataset_converter").rglob("*.py"))
+    legacy_import_lines = []
+    for path in source_paths:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if "hdf5_parse." in line or "nymeria_parse." in line:
+                legacy_import_lines.append((path.relative_to(PACKAGE_ROOT), line.strip()))
+
+    assert legacy_import_lines == [
+        (
+            Path("src/dataset_converter/hdf5/batch.py"),
+            "from hdf5_parse.motion_export.segmented import export_segmented_soma_bvh",
+        ),
+        (
+            Path("src/dataset_converter/nymeria/batch.py"),
+            "from nymeria_parse.motion_export.soma_bvh import export_nymeria_to_soma_bvh",
+        ),
+    ]

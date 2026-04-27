@@ -8,6 +8,8 @@ from typing import Iterable
 
 from dataset_converter.common.batch import BatchExportResult, run_multiprocess_tasks, run_sequential_tasks
 from dataset_converter.common.paths import default_hdf5_output_root, default_hdf5_test_data_root, ensure_workspace_on_sys_path
+from dataset_converter.hdf5.annotation import export_hdf5_to_annotation_payload, save_annotation_payload
+from dataset_converter.hdf5.smpl import export_segmented_smpl_npz
 
 
 DEFAULT_FILENAME_PREFIX = "annotation"
@@ -59,15 +61,12 @@ def _export_annotation_task(
     stride: int,
     skip_existing: bool,
 ) -> BatchExportResult:
-    ensure_workspace_on_sys_path()
-    from hdf5_parse.motion_export.core import export_hdf5_to_soma_payload, save_hdf5_soma_payload
-
     output_path = task.output_dir / "annotation_soma.npz"
     if skip_existing and output_path.is_file():
         return BatchExportResult(task.task_id, True, (output_path,))
     try:
-        payload = export_hdf5_to_soma_payload(task.hdf5_path, start_frame=start_frame, end_frame=end_frame, stride=stride)
-        return BatchExportResult(task.task_id, True, (save_hdf5_soma_payload(payload, output_path),))
+        payload = export_hdf5_to_annotation_payload(task.hdf5_path, start_frame=start_frame, end_frame=end_frame, stride=stride)
+        return BatchExportResult(task.task_id, True, (save_annotation_payload(payload, output_path),))
     except Exception as exc:  # pragma: no cover
         return BatchExportResult(task.task_id, False, error=repr(exc))
 
@@ -82,9 +81,6 @@ def _export_smpl_task(
     smpl_frame: str,
     skip_existing: bool,
 ) -> BatchExportResult:
-    ensure_workspace_on_sys_path()
-    from hdf5_parse.motion_export.segmented import export_segmented_smpl_npz
-
     output_dir = task.output_dir / "smpl"
     if _should_skip(output_dir, "*.npz", skip_existing=skip_existing):
         return BatchExportResult(task.task_id, True, tuple(sorted(output_dir.glob("*.npz"))))
