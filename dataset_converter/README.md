@@ -55,7 +55,7 @@ Equivalent CLI arguments:
 --smpl-model-path /path/to/SMPL_NEUTRAL.npz
 ```
 
-`annotation` and `smpl` export stages do not require SOMA-X and no longer import implementation code from `hdf5_parse` or `nymeria_parse`. `soma-bvh` still uses those legacy modules as a compatibility bridge because it depends on the existing SOMA-X/CUDA calibration path.
+`annotation` and `smpl` export stages do not require SOMA-X and no longer import implementation code from `hdf5_parse` or `nymeria_parse`. `soma-bvh` still uses those legacy modules through explicit bridge modules because it depends on the existing SOMA-X/CUDA calibration path.
 
 ## Data Layout
 

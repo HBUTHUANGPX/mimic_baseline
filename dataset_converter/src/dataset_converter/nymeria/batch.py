@@ -7,8 +7,9 @@ from pathlib import Path
 from typing import Iterable
 
 from dataset_converter.common.batch import BatchExportResult, run_multiprocess_tasks, run_sequential_tasks
-from dataset_converter.common.paths import default_nymeria_output_root, default_nymeria_test_data_root, ensure_workspace_on_sys_path
+from dataset_converter.common.paths import default_nymeria_output_root, default_nymeria_test_data_root
 from dataset_converter.nymeria.annotation import build_annotation_payload, save_annotation_payload
+from dataset_converter.nymeria.soma_bridge import export_nymeria_to_soma_bvh_bridge
 from dataset_converter.nymeria.smpl import build_smpl_motion_payload, save_smpl_motion_npz
 
 
@@ -88,14 +89,11 @@ def _export_soma_bvh_task(
     smpl_model_path: str | Path | None,
     skip_existing: bool,
 ) -> BatchExportResult:
-    ensure_workspace_on_sys_path()
-    from nymeria_parse.motion_export.soma_bvh import export_nymeria_to_soma_bvh
-
     output_path = task.output_dir / "soma_bvh" / "nymeria_soma.bvh"
     if skip_existing and output_path.is_file():
         return BatchExportResult(task.task_id, True, (output_path,))
     try:
-        output = export_nymeria_to_soma_bvh(
+        output = export_nymeria_to_soma_bvh_bridge(
             task.sequence_dir,
             output_path=output_path,
             start_frame=start_frame,

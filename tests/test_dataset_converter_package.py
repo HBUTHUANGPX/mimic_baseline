@@ -90,7 +90,7 @@ def test_dataset_converter_source_does_not_lock_to_local_home_paths() -> None:
     assert "HPX_LOCO_2" not in source_text
 
 
-def test_dataset_converter_annotation_and_smpl_stages_do_not_import_legacy_packages() -> None:
+def test_dataset_converter_only_soma_bridge_imports_legacy_packages() -> None:
     source_paths = sorted((PACKAGE_ROOT / "src" / "dataset_converter").rglob("*.py"))
     legacy_import_lines = []
     for path in source_paths:
@@ -100,11 +100,11 @@ def test_dataset_converter_annotation_and_smpl_stages_do_not_import_legacy_packa
 
     assert legacy_import_lines == [
         (
-            Path("src/dataset_converter/hdf5/batch.py"),
+            Path("src/dataset_converter/hdf5/soma_bridge.py"),
             "from hdf5_parse.motion_export.segmented import export_segmented_soma_bvh",
         ),
         (
-            Path("src/dataset_converter/nymeria/batch.py"),
+            Path("src/dataset_converter/nymeria/soma_bridge.py"),
             "from nymeria_parse.motion_export.soma_bvh import export_nymeria_to_soma_bvh",
         ),
     ]

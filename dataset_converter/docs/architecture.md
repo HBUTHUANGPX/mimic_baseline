@@ -17,12 +17,14 @@ dataset_converter/
 │   ├── annotation.py
 │   ├── batch.py
 │   ├── io.py
+│   ├── soma_bridge.py
 │   ├── smpl.py
 │   └── cli/
 └── nymeria/
     ├── annotation.py
     ├── batch.py
     ├── mvnx.py
+    ├── soma_bridge.py
     ├── smpl.py
     ├── xsens_smpl.py
     └── cli/
@@ -64,7 +66,7 @@ Current stage ownership:
 
 - `annotation`: native `dataset_converter.hdf5.annotation`.
 - `smpl`: native `dataset_converter.hdf5.smpl`.
-- `soma-bvh`: temporary bridge to the existing `hdf5_parse.motion_export` CUDA/SOMA path.
+- `soma-bvh`: temporary bridge in `dataset_converter.hdf5.soma_bridge` to the existing `hdf5_parse.motion_export` CUDA/SOMA path.
 
 ## Nymeria Pipeline
 
@@ -84,7 +86,7 @@ Current stage ownership:
 
 - `annotation`: native `dataset_converter.nymeria.annotation`.
 - `smpl`: native `dataset_converter.nymeria.smpl`.
-- `soma-bvh`: temporary bridge to the existing `nymeria_parse.motion_export` CUDA/SOMA path.
+- `soma-bvh`: temporary bridge in `dataset_converter.nymeria.soma_bridge` to the existing `nymeria_parse.motion_export` CUDA/SOMA path.
 
 ## Migration Plan
 

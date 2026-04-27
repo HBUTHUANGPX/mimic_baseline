@@ -7,8 +7,9 @@ from pathlib import Path
 from typing import Iterable
 
 from dataset_converter.common.batch import BatchExportResult, run_multiprocess_tasks, run_sequential_tasks
-from dataset_converter.common.paths import default_hdf5_output_root, default_hdf5_test_data_root, ensure_workspace_on_sys_path
+from dataset_converter.common.paths import default_hdf5_output_root, default_hdf5_test_data_root
 from dataset_converter.hdf5.annotation import export_hdf5_to_annotation_payload, save_annotation_payload
+from dataset_converter.hdf5.soma_bridge import export_segmented_soma_bvh_bridge
 from dataset_converter.hdf5.smpl import export_segmented_smpl_npz
 
 
@@ -112,14 +113,11 @@ def _export_soma_bvh_task(
     filename_prefix: str,
     skip_existing: bool,
 ) -> BatchExportResult:
-    ensure_workspace_on_sys_path()
-    from hdf5_parse.motion_export.segmented import export_segmented_soma_bvh
-
     output_dir = task.output_dir / "soma_bvh"
     if _should_skip(output_dir, "*.bvh", skip_existing=skip_existing):
         return BatchExportResult(task.task_id, True, tuple(sorted(output_dir.glob("*.bvh"))))
     try:
-        outputs = export_segmented_soma_bvh(
+        outputs = export_segmented_soma_bvh_bridge(
             hdf5_path=task.hdf5_path,
             soma_bvh_output_dir=output_dir,
             start_frame=start_frame,
