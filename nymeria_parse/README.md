@@ -1,5 +1,11 @@
 # nymeria_parse
 
+`nymeria_parse` is now a legacy-compatible implementation package. New batch conversion and deployment should use:
+
+- [dataset_converter](../dataset_converter/README.md)
+- `dataset-converter-nymeria-batch`
+- `python -m dataset_converter.nymeria.cli.batch_export`
+
 Utilities for converting Nymeria MVNX body motion into project-compatible motion assets.
 
 The current pipeline uses:
@@ -12,7 +18,7 @@ and exports:
 - `nymeria_parse/out/smpl/nymeria_smpl.npz`: standard SMPL motion arrays.
 - `nymeria_parse/out/soma_bvh/nymeria_soma.bvh`: SOMA BVH for downstream retargeting.
 
-See [docs/design.md](/home/hpx/HPX_LOCO_2/mimic_baseline/nymeria_parse/docs/design.md) for the data semantics and alignment decisions.
+See [docs/design.md](docs/design.md) for the data semantics and alignment decisions.
 
 ## Commands
 
@@ -36,7 +42,7 @@ Export SOMA BVH:
 
 ```bash
 python nymeria_parse/scripts/export_nymeria_to_soma_bvh.py \
-  --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz \
+  --smpl-model-path "$SMPL_MODEL_PATH" \
   --start-frame 0 \
   --end-frame 1000 \
   --batch-size 256
@@ -61,7 +67,7 @@ Batch SOMA BVH export is intentionally sequential, even when `--workers` is set:
 ```bash
 python nymeria_parse/scripts/batch_export_nymeria_motion.py \
   --exports soma-bvh \
-  --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz \
+  --smpl-model-path "$SMPL_MODEL_PATH" \
   --batch-size 128 \
   --skip-existing
 ```

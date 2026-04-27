@@ -1,8 +1,14 @@
 # hdf5_parse
 
+`hdf5_parse` is now a legacy-compatible implementation package. New batch conversion and deployment should use:
+
+- [dataset_converter](../dataset_converter/README.md)
+- `dataset-converter-hdf5-batch`
+- `python -m dataset_converter.hdf5.cli.batch_export`
+
 说明文档已经整理到：
 
-- [docs/README.md](/home/hpx/HPX_LOCO_2/mimic_baseline/hdf5_parse/docs/README.md)
+- [docs/README.md](docs/README.md)
 
 当前目录职责：
 

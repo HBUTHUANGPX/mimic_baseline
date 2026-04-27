@@ -1,0 +1,127 @@
+# dataset_converter
+
+`dataset_converter` is the new unified package for converting motion datasets in this repository.
+
+It currently wraps and organizes two existing pipelines:
+
+- `dataset_converter.hdf5`: Xperience/HDF5 `annotation.hdf5` data.
+- `dataset_converter.nymeria`: Nymeria MVNX body motion data.
+
+The old `hdf5_parse/` and `nymeria_parse/` folders are still kept for compatibility, but new code and deployment should use this package.
+
+## Install
+
+From this package directory:
+
+```bash
+cd dataset_converter
+pip install -e .
+```
+
+This exposes Python imports such as:
+
+```python
+from dataset_converter.hdf5.batch import discover_hdf5_episode_tasks
+from dataset_converter.nymeria.batch import discover_nymeria_sequence_tasks
+```
+
+It also installs command line entry points:
+
+```bash
+dataset-converter-hdf5-batch --help
+dataset-converter-nymeria-batch --help
+```
+
+You can also run the same CLIs without installing console scripts:
+
+```bash
+python -m dataset_converter.hdf5.cli.batch_export --help
+python -m dataset_converter.nymeria.cli.batch_export --help
+```
+
+## External Assets
+
+The package does not hard-code machine-specific paths. For SOMA/SMPL export, provide paths with CLI arguments or environment variables:
+
+```bash
+export SOMA_X_ROOT=/path/to/SOMA-X
+export SMPL_MODEL_PATH=/path/to/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
+```
+
+Equivalent CLI arguments:
+
+```bash
+--soma-x-root /path/to/SOMA-X
+--smpl-model-path /path/to/SMPL_NEUTRAL.npz
+```
+
+`annotation` and `smpl` export stages do not require SOMA-X. `soma-bvh` does.
+
+## Data Layout
+
+HDF5/Xperience:
+
+```text
+hdf5_parse/test_data/
+└── <subset_id>/
+    └── <episode_id>/
+        └── annotation.hdf5
+```
+
+Nymeria:
+
+```text
+nymeria_parse/test_data/
+└── <sequence_id>/
+    └── body_xdata_mvnx
+```
+
+Default outputs are written under:
+
+```text
+hdf5_parse/out/batch/
+nymeria_parse/out/batch/
+```
+
+Use `--output-root` to choose another location.
+
+## Quick Commands
+
+Batch HDF5 annotation and SMPL export:
+
+```bash
+dataset-converter-hdf5-batch \
+  --test-data-root hdf5_parse/test_data \
+  --output-root hdf5_parse/out/batch \
+  --exports annotation smpl \
+  --workers 4 \
+  --skip-existing
+```
+
+Batch Nymeria annotation and SMPL export:
+
+```bash
+dataset-converter-nymeria-batch \
+  --test-data-root nymeria_parse/test_data \
+  --output-root nymeria_parse/out/batch \
+  --exports annotation smpl \
+  --workers 4 \
+  --skip-existing
+```
+
+Batch SOMA BVH export is intentionally sequential because it uses CUDA:
+
+```bash
+dataset-converter-hdf5-batch \
+  --exports soma-bvh \
+  --soma-x-root "$SOMA_X_ROOT" \
+  --smpl-model-path "$SMPL_MODEL_PATH" \
+  --batch-size 128 \
+  --skip-existing
+```
+
+## More Docs
+
+- [Quickstart](docs/quickstart.md)
+- [Deployment](docs/deployment.md)
+- [Architecture](docs/architecture.md)
