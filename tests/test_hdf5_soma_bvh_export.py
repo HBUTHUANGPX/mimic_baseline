@@ -10,6 +10,10 @@ from scipy.spatial.transform import Rotation
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+HDF5_PATH = next(
+    iter(sorted((REPO_ROOT / "hdf5_parse" / "test_data").glob("*/*/annotation.hdf5"))),
+    REPO_ROOT / "hdf5_parse" / "hdf5" / "annotation.hdf5",
+)
 
 from soma_retargeter.assets.bvh import load_bvh
 
@@ -130,7 +134,7 @@ def test_cli_parser_uses_expected_defaults() -> None:
 
     args = module.build_arg_parser().parse_args([])
 
-    assert args.hdf5_path == Path("hdf5_parse/hdf5/annotation.hdf5")
+    assert args.hdf5_path == HDF5_PATH
     assert args.output_path == Path("hdf5_parse/out/annotation_soma.bvh")
     assert args.device == "cuda"
     assert args.end_frame == -1

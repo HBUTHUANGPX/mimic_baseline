@@ -34,6 +34,8 @@ from .segmented import (
     SMPL_EXPORT_FRAMES,
     build_segment_file_stem,
     export_segmented_smpl_and_soma_bvh,
+    export_segmented_smpl_npz,
+    export_segmented_soma_bvh,
     prepare_smpl_motion_for_export,
     save_smpl_motion_npz,
     split_contiguous_frame_ranges,

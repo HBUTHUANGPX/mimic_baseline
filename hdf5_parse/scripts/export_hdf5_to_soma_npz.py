@@ -16,13 +16,14 @@ from hdf5_parse.motion_export.core import (
     export_hdf5_to_soma_payload,
     save_hdf5_soma_payload,
 )
+from hdf5_parse.utils.smpl_motion_tools import DEFAULT_HDF5_PATH
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Export annotation.hdf5 captions and valid frame timeline metadata to annotation_soma.npz."
     )
-    parser.add_argument("--hdf5-path", type=Path, default=Path("hdf5_parse/hdf5/annotation.hdf5"))
+    parser.add_argument("--hdf5-path", type=Path, default=DEFAULT_HDF5_PATH)
     parser.add_argument("--output-path", type=Path, default=Path("hdf5_parse/out/annotation_soma.npz"))
     parser.add_argument("--start-frame", type=int, default=0)
     parser.add_argument("--end-frame", type=int, default=-1)

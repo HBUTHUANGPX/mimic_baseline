@@ -25,6 +25,8 @@
   - 导出完整 `SOMA BVH`
 - `scripts/export_hdf5_segmented_motion.py`
   - 导出分段 `SMPL npz + SOMA BVH`
+- `scripts/batch_export_hdf5_motion.py`
+  - 从 `test_data/<subset>/<ep>/annotation.hdf5` 自动批量导出
 - `scripts/annotation_soma_mujoco_viewer.py`
   - 查看 human motion npz
 - `scripts/soma_bvh_diagnostics.py`
@@ -85,7 +87,38 @@ python hdf5_parse/scripts/export_hdf5_to_soma_bvh.py \
 ```bash
 python hdf5_parse/scripts/export_hdf5_segmented_motion.py \
   --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz \
+  --exports smpl soma-bvh \
   --smpl-frame soma_y_up
+```
+
+只导出分段 `SMPL npz`，不运行 SOMA-X：
+
+```bash
+python hdf5_parse/scripts/export_hdf5_segmented_motion.py \
+  --exports smpl \
+  --smpl-frame soma_y_up
+```
+
+批量导出 `test_data` 下全部 HDF5 episode 的文本与 SMPL：
+
+```bash
+python hdf5_parse/scripts/batch_export_hdf5_motion.py \
+  --test-data-root hdf5_parse/test_data \
+  --output-root hdf5_parse/out/batch \
+  --exports annotation smpl \
+  --workers 4 \
+  --skip-existing \
+  --summary-path hdf5_parse/out/batch/summary.jsonl
+```
+
+批量导出 SOMA BVH 时仍然是单进程顺序处理，即使传入 `--workers` 也不会并行抢 CUDA：
+
+```bash
+python hdf5_parse/scripts/batch_export_hdf5_motion.py \
+  --exports soma-bvh \
+  --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz \
+  --batch-size 128 \
+  --skip-existing
 ```
 
 看原始 HDF5 keypoints：

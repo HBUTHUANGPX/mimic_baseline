@@ -44,6 +44,28 @@ python nymeria_parse/scripts/export_nymeria_to_soma_bvh.py \
 
 Use `--end-frame -1` for full-sequence export. SOMA-X inversion is CUDA-only and can be memory-heavy, so the exporter defaults to chunked processing with `--batch-size 256`. If the full sequence still runs out of memory, lower this value, for example `--batch-size 64` or `--batch-size 32`.
 
+Batch export all sequences under `nymeria_parse/test_data`:
+
+```bash
+python nymeria_parse/scripts/batch_export_nymeria_motion.py \
+  --test-data-root nymeria_parse/test_data \
+  --output-root nymeria_parse/out/batch \
+  --exports annotation smpl \
+  --workers 4 \
+  --skip-existing \
+  --summary-path nymeria_parse/out/batch/summary.jsonl
+```
+
+Batch SOMA BVH export is intentionally sequential, even when `--workers` is set:
+
+```bash
+python nymeria_parse/scripts/batch_export_nymeria_motion.py \
+  --exports soma-bvh \
+  --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz \
+  --batch-size 128 \
+  --skip-existing
+```
+
 ## Notes
 
 `activity_summarization.csv` is exported as `Sub Task`, and `atomic_action.csv` is exported as `Current Action`. `Main Task` and `Interaction` currently have no reliable source in this test sequence and are filled with `UNKNOWN`.

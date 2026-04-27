@@ -104,10 +104,44 @@ def save_smpl_motion_npz(
     return output_path
 
 
-def export_segmented_smpl_and_soma_bvh(
+def export_segmented_smpl_npz(
     hdf5_path: str | Path = DEFAULT_HDF5_PATH,
     *,
     smpl_output_dir: str | Path = DEFAULT_SMPL_OUTPUT_DIR,
+    start_frame: int = 0,
+    end_frame: int = -1,
+    stride: int = 1,
+    filename_prefix: str = DEFAULT_FILENAME_PREFIX,
+    smpl_frame: str = "soma_y_up",
+) -> list[Path]:
+    selection = load_body_frame_selection(
+        hdf5_path=hdf5_path,
+        start_frame=start_frame,
+        end_frame=end_frame,
+        stride=stride,
+    )
+    ranges = split_contiguous_frame_ranges(selection.frame_nums, expected_step=max(1, int(stride)))
+    if not ranges:
+        return []
+
+    motion = selection_to_smpl_body_motion(selection)
+
+    smpl_output_dir = Path(smpl_output_dir)
+    smpl_output_dir.mkdir(parents=True, exist_ok=True)
+
+    smpl_paths: list[Path] = []
+    for start_idx, end_idx in ranges:
+        segment_motion = slice_smpl_body_motion(motion, start_idx, end_idx)
+        stem = build_segment_file_stem(segment_motion.frame_timestamps, prefix=filename_prefix)
+        smpl_path = save_smpl_motion_npz(segment_motion, smpl_output_dir / f"{stem}.npz", smpl_frame=smpl_frame)
+        smpl_paths.append(smpl_path)
+
+    return smpl_paths
+
+
+def export_segmented_soma_bvh(
+    hdf5_path: str | Path = DEFAULT_HDF5_PATH,
+    *,
     soma_bvh_output_dir: str | Path = DEFAULT_SOMA_BVH_OUTPUT_DIR,
     start_frame: int = 0,
     end_frame: int = -1,
@@ -117,8 +151,7 @@ def export_segmented_smpl_and_soma_bvh(
     soma_x_root: str | Path = DEFAULT_SOMA_X_ROOT,
     smpl_model_path: str | Path | None = None,
     filename_prefix: str = DEFAULT_FILENAME_PREFIX,
-    smpl_frame: str = "soma_y_up",
-) -> dict[str, list[Path]]:
+) -> list[Path]:
     selection = load_body_frame_selection(
         hdf5_path=hdf5_path,
         start_frame=start_frame,
@@ -127,7 +160,7 @@ def export_segmented_smpl_and_soma_bvh(
     )
     ranges = split_contiguous_frame_ranges(selection.frame_nums, expected_step=max(1, int(stride)))
     if not ranges:
-        return {"smpl_paths": [], "soma_bvh_paths": []}
+        return []
 
     motion = selection_to_smpl_body_motion(selection)
     soma_output = run_soma_inversion(
@@ -150,17 +183,13 @@ def export_segmented_smpl_and_soma_bvh(
         parent_indices=parent_indices,
     )
 
-    smpl_output_dir = Path(smpl_output_dir)
     soma_bvh_output_dir = Path(soma_bvh_output_dir)
-    smpl_output_dir.mkdir(parents=True, exist_ok=True)
     soma_bvh_output_dir.mkdir(parents=True, exist_ok=True)
 
-    smpl_paths: list[Path] = []
     soma_bvh_paths: list[Path] = []
     for start_idx, end_idx in ranges:
         segment_motion = slice_smpl_body_motion(motion, start_idx, end_idx)
         stem = build_segment_file_stem(segment_motion.frame_timestamps, prefix=filename_prefix)
-        smpl_path = save_smpl_motion_npz(segment_motion, smpl_output_dir / f"{stem}.npz", smpl_frame=smpl_frame)
         bvh_path = write_soma_bvh(
             output_path=soma_bvh_output_dir / f"{stem}.bvh",
             joint_names=joint_names,
@@ -169,9 +198,47 @@ def export_segmented_smpl_and_soma_bvh(
             local_transforms=human_local_transforms[start_idx:end_idx],
             fps=float(motion.fps),
         )
-        smpl_paths.append(smpl_path)
         soma_bvh_paths.append(bvh_path)
 
+    return soma_bvh_paths
+
+
+def export_segmented_smpl_and_soma_bvh(
+    hdf5_path: str | Path = DEFAULT_HDF5_PATH,
+    *,
+    smpl_output_dir: str | Path = DEFAULT_SMPL_OUTPUT_DIR,
+    soma_bvh_output_dir: str | Path = DEFAULT_SOMA_BVH_OUTPUT_DIR,
+    start_frame: int = 0,
+    end_frame: int = -1,
+    stride: int = 1,
+    device: str = "cuda",
+    batch_size: int | None = None,
+    soma_x_root: str | Path = DEFAULT_SOMA_X_ROOT,
+    smpl_model_path: str | Path | None = None,
+    filename_prefix: str = DEFAULT_FILENAME_PREFIX,
+    smpl_frame: str = "soma_y_up",
+) -> dict[str, list[Path]]:
+    smpl_paths = export_segmented_smpl_npz(
+        hdf5_path=hdf5_path,
+        smpl_output_dir=smpl_output_dir,
+        start_frame=start_frame,
+        end_frame=end_frame,
+        stride=stride,
+        filename_prefix=filename_prefix,
+        smpl_frame=smpl_frame,
+    )
+    soma_bvh_paths = export_segmented_soma_bvh(
+        hdf5_path=hdf5_path,
+        soma_bvh_output_dir=soma_bvh_output_dir,
+        start_frame=start_frame,
+        end_frame=end_frame,
+        stride=stride,
+        device=device,
+        batch_size=batch_size,
+        soma_x_root=soma_x_root,
+        smpl_model_path=smpl_model_path,
+        filename_prefix=filename_prefix,
+    )
     return {
         "smpl_paths": smpl_paths,
         "soma_bvh_paths": soma_bvh_paths,

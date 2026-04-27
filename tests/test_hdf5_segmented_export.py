@@ -10,6 +10,10 @@ import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CLI_MODULE_PATH = REPO_ROOT / "hdf5_parse" / "scripts" / "export_hdf5_segmented_motion.py"
+HDF5_PATH = next(
+    iter(sorted((REPO_ROOT / "hdf5_parse" / "test_data").glob("*/*/annotation.hdf5"))),
+    REPO_ROOT / "hdf5_parse" / "hdf5" / "annotation.hdf5",
+)
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -174,6 +178,44 @@ def test_export_segmented_motion_saves_smpl_and_bvh_files(tmp_path: Path, monkey
     assert any(abs(value) > 1e-6 for value in frame_values[6:12])
 
 
+def test_export_segmented_smpl_npz_does_not_run_soma_inversion(tmp_path: Path, monkeypatch) -> None:
+    module = load_module()
+    hdf5_module = importlib.reload(importlib.import_module("hdf5_parse.motion_export.core"))
+
+    selection = hdf5_module.BodyFrameSelection(
+        root_pose7=np.zeros((3, 7), dtype=np.float32),
+        body_quats=np.zeros((3, 21, 4), dtype=np.float32),
+        betas=np.zeros((3, 10), dtype=np.float32),
+        frame_nums=np.array([10, 11, 20], dtype=np.int32),
+        frame_timestamps=np.array([1000, 1050, 2000], dtype=np.int64),
+        fps=20.0,
+    )
+    motion = hdf5_module.SMPLBodyMotion(
+        global_orient=np.zeros((3, 3), dtype=np.float32),
+        body_pose=np.zeros((3, 69), dtype=np.float32),
+        transl=np.zeros((3, 3), dtype=np.float32),
+        betas=np.zeros((3, 10), dtype=np.float32),
+        frame_nums=selection.frame_nums,
+        frame_timestamps=selection.frame_timestamps,
+        fps=20.0,
+    )
+    monkeypatch.setattr(module, "load_body_frame_selection", lambda *args, **kwargs: selection)
+    monkeypatch.setattr(module, "selection_to_smpl_body_motion", lambda current: motion)
+    monkeypatch.setattr(module, "run_soma_inversion", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("SOMA should not run")))
+
+    smpl_paths = module.export_segmented_smpl_npz(
+        hdf5_path="ignored.hdf5",
+        smpl_output_dir=tmp_path / "smpl",
+        smpl_frame="raw",
+    )
+
+    assert [path.name for path in smpl_paths] == [
+        "annotation_1000_1050.npz",
+        "annotation_2000_2000.npz",
+    ]
+    assert all(path.is_file() for path in smpl_paths)
+
+
 def test_segmented_cli_parser_uses_expected_defaults() -> None:
     spec = importlib.util.spec_from_file_location("export_hdf5_segmented_motion", CLI_MODULE_PATH)
     module = importlib.util.module_from_spec(spec)
@@ -182,12 +224,13 @@ def test_segmented_cli_parser_uses_expected_defaults() -> None:
 
     args = module.build_arg_parser().parse_args([])
 
-    assert args.hdf5_path == Path("hdf5_parse/hdf5/annotation.hdf5")
+    assert args.hdf5_path == HDF5_PATH
     assert args.smpl_output_dir == Path("hdf5_parse/out/smpl")
     assert args.soma_bvh_output_dir == Path("hdf5_parse/out/soma_bvh")
     assert args.device == "cuda"
     assert args.end_frame == -1
     assert args.smpl_frame == "soma_y_up"
+    assert args.exports == ["smpl", "soma-bvh"]
 
 
 def test_segmented_cli_script_help_runs_without_repo_pythonpath() -> None:

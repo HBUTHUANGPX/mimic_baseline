@@ -18,4 +18,14 @@
 - `docs/`
   - 本目录相关文档
 
-TODO： 在面对批量的hdf5文件结构，需要将现有的导出能力进行扩展。
+批量入口：
+
+```bash
+python hdf5_parse/scripts/batch_export_hdf5_motion.py \
+  --test-data-root hdf5_parse/test_data \
+  --output-root hdf5_parse/out/batch \
+  --exports annotation smpl \
+  --workers 4
+```
+
+`soma-bvh` 批量导出仍然单进程顺序处理，避免 CUDA 多进程抢卡。

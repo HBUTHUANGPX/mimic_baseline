@@ -11,7 +11,10 @@ import h5py
 import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-HDF5_PATH = REPO_ROOT / "hdf5_parse" / "hdf5" / "annotation.hdf5"
+HDF5_PATH = next(
+    iter(sorted((REPO_ROOT / "hdf5_parse" / "test_data").glob("*/*/annotation.hdf5"))),
+    REPO_ROOT / "hdf5_parse" / "hdf5" / "annotation.hdf5",
+)
 EXPORT_MODULE_PATH = REPO_ROOT / "hdf5_parse" / "motion_export" / "core.py"
 SMPL_SOMA_MODULE_PATH = REPO_ROOT / "hdf5_parse" / "motion_export" / "smpl_soma.py"
 CLI_MODULE_PATH = REPO_ROOT / "hdf5_parse" / "scripts" / "export_hdf5_to_soma_npz.py"
@@ -155,7 +158,7 @@ def test_cli_parser_uses_expected_defaults() -> None:
     module = load_module("export_hdf5_to_soma_npz", CLI_MODULE_PATH)
     args = module.build_arg_parser().parse_args([])
 
-    assert args.hdf5_path == Path("hdf5_parse/hdf5/annotation.hdf5")
+    assert args.hdf5_path == HDF5_PATH
     assert args.output_path == Path("hdf5_parse/out/annotation_soma.npz")
     assert args.end_frame == -1
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,6 +13,16 @@ import h5py
 import mujoco
 import mujoco.viewer
 import numpy as np
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from _bootstrap import ensure_repo_root_on_sys_path
+
+ensure_repo_root_on_sys_path(__file__)
+
+from hdf5_parse.utils.smpl_motion_tools import DEFAULT_HDF5_PATH
 
 # Source: Ropedia/HOMIE-toolkit utils/constants_utils.py
 SMPL_H_BODY_PARENT_INDICES = np.array(
@@ -71,7 +82,6 @@ SMPL_H_BODY_PARENT_INDICES = np.array(
     dtype=np.int32,
 )
 
-DEFAULT_HDF5_PATH = Path(__file__).resolve().parents[1] / "hdf5" / "annotation.hdf5"
 FULL_BODY_KEYPOINT_COUNT = 52
 BODY_VISUAL_KEYPOINT_INDICES = np.arange(20, dtype=np.int32)
 LEFT_HAND_KEYPOINT_INDICES = np.array([20, *range(22, 37)], dtype=np.int32)

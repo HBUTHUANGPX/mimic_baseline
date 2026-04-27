@@ -13,13 +13,14 @@ from _bootstrap import ensure_repo_root_on_sys_path
 ensure_repo_root_on_sys_path(__file__)
 
 from hdf5_parse.motion_export.bvh import DEFAULT_OUTPUT_BVH_PATH, save_hdf5_soma_bvh
+from hdf5_parse.utils.smpl_motion_tools import DEFAULT_HDF5_PATH
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Export annotation.hdf5 full-body mocap to a SOMA-style BVH file."
     )
-    parser.add_argument("--hdf5-path", type=Path, default=Path("hdf5_parse/hdf5/annotation.hdf5"))
+    parser.add_argument("--hdf5-path", type=Path, default=DEFAULT_HDF5_PATH)
     parser.add_argument("--output-path", type=Path, default=DEFAULT_OUTPUT_BVH_PATH)
     parser.add_argument("--soma-x-root", type=Path, default=Path("/home/hpx/HPX_LOCO_2/SOMA-X"))
     parser.add_argument("--smpl-model-path", type=Path, default=None)

@@ -162,6 +162,7 @@ Initial scripts:
 - `nymeria_parse/scripts/export_nymeria_annotation.py`
 - `nymeria_parse/scripts/export_nymeria_to_smpl.py`
 - `nymeria_parse/scripts/export_nymeria_to_soma_bvh.py`
+- `nymeria_parse/scripts/batch_export_nymeria_motion.py`
 
 Shared defaults:
 
@@ -174,6 +175,16 @@ Shared defaults:
 - `--batch-size 256` for SOMA BVH export
 
 Long offline loops should expose progress with `tqdm`. Newton-based applications should keep the standard `newton.examples.create_parser()` setup and default `quiet=True` when running batch/offline conversion, leaving progress bars and error messages readable.
+
+Batch export discovers each sequence as:
+
+`nymeria_parse/test_data/<sequence>/body_xdata_mvnx`
+
+and writes:
+
+`nymeria_parse/out/batch/<sequence>/`
+
+`annotation` and `smpl` stages can use multiprocessing through `--workers`. `soma-bvh` deliberately ignores multiprocessing and processes sequences sequentially because SOMA-X uses CUDA and multiple worker processes on the same GPU are likely to cause OOM or unstable runtime behavior.
 
 ## Validation Plan
 

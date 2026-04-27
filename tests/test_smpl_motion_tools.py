@@ -10,7 +10,10 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = REPO_ROOT / "hdf5_parse" / "utils" / "smpl_motion_tools.py"
-HDF5_PATH = REPO_ROOT / "hdf5_parse" / "hdf5" / "annotation.hdf5"
+HDF5_PATH = next(
+    iter(sorted((REPO_ROOT / "hdf5_parse" / "test_data").glob("*/*/annotation.hdf5"))),
+    REPO_ROOT / "hdf5_parse" / "hdf5" / "annotation.hdf5",
+)
 
 
 def load_module():

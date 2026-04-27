@@ -72,6 +72,29 @@
 
 分段 `SMPL npz` 默认保存为 `soma_y_up` 坐标语义，这一点和 `nymeria_parse` 以及后续 `SOMA BVH / soma-retargeter` 链路保持一致。原始 HDF5 body motion 本身更接近 `Z-up`；如果直接保存并拿到同一套 viewer 或下游链路里看，就会出现人体横卧。需要排查原始 HDF5 坐标时，可以显式传入 `--smpl-frame raw`。
 
+这条链现在已经拆成两个可独立调用的步骤：
+
+- `export_segmented_smpl_npz`
+- `export_segmented_soma_bvh`
+
+CLI 上通过 `--exports smpl`、`--exports soma-bvh` 或默认的 `--exports smpl soma-bvh` 控制。
+
+### 4. `batch_export_hdf5_motion.py`
+
+这条链负责从新的批量数据目录自动发现输入：
+
+`hdf5_parse/test_data/<subset>/<ep>/annotation.hdf5`
+
+默认批量输出：
+
+`hdf5_parse/out/batch/<subset>/<ep>/`
+
+其中：
+
+- `annotation` 与 `smpl` 可以使用 `--workers` 多进程。
+- `soma-bvh` 始终单进程顺序处理，避免多个进程同时抢同一张 CUDA 卡。
+- `--summary-path` 可以保存 JSONL 结果，每行记录一个 stage/task 的输出或错误。
+
 ## 输入字段
 
 三条链共享的原始 HDF5 字段主要是：
@@ -111,6 +134,7 @@ python hdf5_parse/scripts/export_hdf5_to_soma_bvh.py \
 
 python hdf5_parse/scripts/export_hdf5_segmented_motion.py \
   --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz \
+  --exports smpl soma-bvh \
   --smpl-frame soma_y_up
 ```
 
@@ -118,6 +142,28 @@ python hdf5_parse/scripts/export_hdf5_segmented_motion.py \
 
 - `soma_y_up`：默认值，保存出来的 `smpl_global_orient/smpl_transl` 与 Nymeria 和 SOMA-BVH 下游语义一致。
 - `raw`：保留 HDF5 原始 SMPL root 坐标，不做可视化坐标转换，主要用于诊断。
+
+批量导出文本与 SMPL：
+
+```bash
+python hdf5_parse/scripts/batch_export_hdf5_motion.py \
+  --test-data-root hdf5_parse/test_data \
+  --output-root hdf5_parse/out/batch \
+  --exports annotation smpl \
+  --workers 4 \
+  --skip-existing \
+  --summary-path hdf5_parse/out/batch/summary.jsonl
+```
+
+批量导出 SOMA BVH：
+
+```bash
+python hdf5_parse/scripts/batch_export_hdf5_motion.py \
+  --exports soma-bvh \
+  --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz \
+  --batch-size 128 \
+  --skip-existing
+```
 
 ## human motion npz 的正确来源
 
@@ -145,4 +191,6 @@ python hdf5_parse/scripts/export_hdf5_segmented_motion.py \
 - `hdf5_parse/motion_export/bvh.py`
   - BVH 导出
 - `hdf5_parse/motion_export/segmented.py`
-  - 分段导出
+  - 分段 `SMPL npz` 与 `SOMA BVH` 解耦导出
+- `hdf5_parse/motion_export/batch.py`
+  - `test_data/<subset>/<ep>` 自动发现与批量调度
