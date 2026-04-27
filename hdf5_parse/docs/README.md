@@ -59,6 +59,12 @@
 
 `HDF5 -> SOMA BVH -> soma-retargeter/app/bvh_to_csv_converter.py -> human motion npz`
 
+### segmented SMPL npz
+
+`scripts/export_hdf5_segmented_motion.py` 同时会保存每段动作的 `SMPL npz`。这里默认使用 `--smpl-frame soma_y_up`，让 HDF5 导出的 SMPL root 坐标和 Nymeria、SOMA-BVH 下游保持同一套 `Y-up` 语义，避免直接查看时人体横卧。
+
+如果需要保留 HDF5 原始坐标用于诊断，可以加 `--smpl-frame raw`。
+
 ## 常用命令
 
 导出文本与时间线：
@@ -78,7 +84,8 @@ python hdf5_parse/scripts/export_hdf5_to_soma_bvh.py \
 
 ```bash
 python hdf5_parse/scripts/export_hdf5_segmented_motion.py \
-  --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
+  --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz \
+  --smpl-frame soma_y_up
 ```
 
 看原始 HDF5 keypoints：

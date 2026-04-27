@@ -49,7 +49,7 @@ def test_save_smpl_motion_npz_writes_expected_fields(tmp_path: Path) -> None:
     )
 
     output_path = tmp_path / "annotation_1000_1050.npz"
-    module.save_smpl_motion_npz(motion, output_path)
+    module.save_smpl_motion_npz(motion, output_path, smpl_frame="raw")
 
     payload = np.load(output_path, allow_pickle=True)
     assert payload["fps"].item() == 20
@@ -57,6 +57,29 @@ def test_save_smpl_motion_npz_writes_expected_fields(tmp_path: Path) -> None:
     np.testing.assert_array_equal(payload["frame_nums"], np.array([7, 8], dtype=np.int32))
     np.testing.assert_array_equal(payload["frame_timestamps"], np.array([1000, 1050], dtype=np.int64))
     np.testing.assert_allclose(payload["smpl_body_pose"], np.ones((2, 69), dtype=np.float32))
+    np.testing.assert_allclose(payload["smpl_transl"], np.full((2, 3), 2.0, dtype=np.float32))
+
+
+def test_save_smpl_motion_npz_defaults_to_soma_y_up_frame(tmp_path: Path) -> None:
+    module = load_module()
+    hdf5_module = importlib.reload(importlib.import_module("hdf5_parse.motion_export.core"))
+    motion = hdf5_module.SMPLBodyMotion(
+        global_orient=np.zeros((1, 3), dtype=np.float32),
+        body_pose=np.zeros((1, 69), dtype=np.float32),
+        transl=np.array([[1.0, 2.0, 3.0]], dtype=np.float32),
+        betas=np.zeros((1, 10), dtype=np.float32),
+        frame_nums=np.array([7], dtype=np.int32),
+        frame_timestamps=np.array([1000], dtype=np.int64),
+        fps=20.0,
+    )
+
+    output_path = tmp_path / "annotation_1000_1000.npz"
+    module.save_smpl_motion_npz(motion, output_path)
+
+    payload = np.load(output_path, allow_pickle=True)
+    np.testing.assert_allclose(payload["smpl_global_orient"], np.array([[-np.pi / 2.0, 0.0, 0.0]], dtype=np.float32), atol=1e-6)
+    np.testing.assert_allclose(payload["smpl_transl"], np.array([[1.0, 3.0, -2.0]], dtype=np.float32), atol=1e-6)
+    assert payload["smpl_frame"].item() == "soma_y_up"
 
 
 def test_export_segmented_motion_saves_smpl_and_bvh_files(tmp_path: Path, monkeypatch) -> None:
@@ -164,6 +187,7 @@ def test_segmented_cli_parser_uses_expected_defaults() -> None:
     assert args.soma_bvh_output_dir == Path("hdf5_parse/out/soma_bvh")
     assert args.device == "cuda"
     assert args.end_frame == -1
+    assert args.smpl_frame == "soma_y_up"
 
 
 def test_segmented_cli_script_help_runs_without_repo_pythonpath() -> None:

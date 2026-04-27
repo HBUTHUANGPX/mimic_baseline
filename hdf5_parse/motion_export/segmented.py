@@ -9,6 +9,7 @@ from .smpl_soma import (
     DEFAULT_SOMA_X_ROOT,
     BodyFrameSelection,
     SMPLBodyMotion,
+    convert_smpl_motion_to_soma_y_up_frame,
     ensure_local_transforms_pre_visualization_frame,
     load_body_frame_selection,
     normalize_root_parent_index,
@@ -24,6 +25,8 @@ from .bvh import (
 DEFAULT_SOMA_BVH_OUTPUT_DIR = Path("hdf5_parse/out/soma_bvh")
 DEFAULT_SMPL_OUTPUT_DIR = Path("hdf5_parse/out/smpl")
 DEFAULT_FILENAME_PREFIX = "annotation"
+SMPL_EXPORT_FRAMES = ("soma_y_up", "raw")
+
 
 def split_contiguous_frame_ranges(frame_nums: np.ndarray, *, expected_step: int = 1) -> list[tuple[int, int]]:
     frame_nums = np.asarray(frame_nums, dtype=np.int64).reshape(-1)
@@ -68,18 +71,34 @@ def build_segment_file_stem(frame_timestamps: np.ndarray, *, prefix: str = DEFAU
     return f"{prefix}_{int(frame_timestamps[0])}_{int(frame_timestamps[-1])}"
 
 
-def save_smpl_motion_npz(motion: SMPLBodyMotion, output_path: str | Path) -> Path:
+def prepare_smpl_motion_for_export(motion: SMPLBodyMotion, *, smpl_frame: str = "soma_y_up") -> SMPLBodyMotion:
+    smpl_frame = str(smpl_frame)
+    if smpl_frame == "raw":
+        return motion
+    if smpl_frame == "soma_y_up":
+        return convert_smpl_motion_to_soma_y_up_frame(motion)
+    raise ValueError(f"Unsupported smpl_frame {smpl_frame!r}. Expected one of {SMPL_EXPORT_FRAMES}.")
+
+
+def save_smpl_motion_npz(
+    motion: SMPLBodyMotion,
+    output_path: str | Path,
+    *,
+    smpl_frame: str = "soma_y_up",
+) -> Path:
+    export_motion = prepare_smpl_motion_for_export(motion, smpl_frame=smpl_frame)
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-        "fps": np.asarray(int(round(float(motion.fps))), dtype=np.int32),
-        "num_frames": np.asarray(motion.num_frames, dtype=np.int32),
-        "frame_nums": np.asarray(motion.frame_nums, dtype=np.int32),
-        "frame_timestamps": np.asarray(motion.frame_timestamps, dtype=np.int64),
-        "smpl_global_orient": np.asarray(motion.global_orient, dtype=np.float32),
-        "smpl_body_pose": np.asarray(motion.body_pose, dtype=np.float32),
-        "smpl_transl": np.asarray(motion.transl, dtype=np.float32),
-        "smpl_betas": np.asarray(motion.betas, dtype=np.float32),
+        "fps": np.asarray(int(round(float(export_motion.fps))), dtype=np.int32),
+        "num_frames": np.asarray(export_motion.num_frames, dtype=np.int32),
+        "frame_nums": np.asarray(export_motion.frame_nums, dtype=np.int32),
+        "frame_timestamps": np.asarray(export_motion.frame_timestamps, dtype=np.int64),
+        "smpl_frame": np.asarray(str(smpl_frame)),
+        "smpl_global_orient": np.asarray(export_motion.global_orient, dtype=np.float32),
+        "smpl_body_pose": np.asarray(export_motion.body_pose, dtype=np.float32),
+        "smpl_transl": np.asarray(export_motion.transl, dtype=np.float32),
+        "smpl_betas": np.asarray(export_motion.betas, dtype=np.float32),
     }
     np.savez(output_path, **payload)
     return output_path
@@ -98,6 +117,7 @@ def export_segmented_smpl_and_soma_bvh(
     soma_x_root: str | Path = DEFAULT_SOMA_X_ROOT,
     smpl_model_path: str | Path | None = None,
     filename_prefix: str = DEFAULT_FILENAME_PREFIX,
+    smpl_frame: str = "soma_y_up",
 ) -> dict[str, list[Path]]:
     selection = load_body_frame_selection(
         hdf5_path=hdf5_path,
@@ -140,7 +160,7 @@ def export_segmented_smpl_and_soma_bvh(
     for start_idx, end_idx in ranges:
         segment_motion = slice_smpl_body_motion(motion, start_idx, end_idx)
         stem = build_segment_file_stem(segment_motion.frame_timestamps, prefix=filename_prefix)
-        smpl_path = save_smpl_motion_npz(segment_motion, smpl_output_dir / f"{stem}.npz")
+        smpl_path = save_smpl_motion_npz(segment_motion, smpl_output_dir / f"{stem}.npz", smpl_frame=smpl_frame)
         bvh_path = write_soma_bvh(
             output_path=soma_bvh_output_dir / f"{stem}.bvh",
             joint_names=joint_names,

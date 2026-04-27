@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 from scipy.spatial.transform import Rotation
+from tqdm.auto import tqdm
 
 from .smpl_soma import (
     DEFAULT_HDF5_PATH,
@@ -266,7 +267,14 @@ def _build_motion_lines(
     position_channel_set: set[str],
 ) -> list[str]:
     frame_lines: list[str] = []
-    for frame_idx in range(local_transforms.shape[0]):
+    frame_iter = tqdm(
+        range(local_transforms.shape[0]),
+        desc="Writing BVH frames",
+        unit="frame",
+        dynamic_ncols=True,
+        disable=local_transforms.shape[0] <= 1,
+    )
+    for frame_idx in frame_iter:
         frame_values: list[str] = []
         for joint_idx in traversal:
             joint_name = joint_names[joint_idx]

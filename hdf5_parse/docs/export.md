@@ -70,6 +70,8 @@
 - `hdf5_parse/out/smpl`
 - `hdf5_parse/out/soma_bvh`
 
+分段 `SMPL npz` 默认保存为 `soma_y_up` 坐标语义，这一点和 `nymeria_parse` 以及后续 `SOMA BVH / soma-retargeter` 链路保持一致。原始 HDF5 body motion 本身更接近 `Z-up`；如果直接保存并拿到同一套 viewer 或下游链路里看，就会出现人体横卧。需要排查原始 HDF5 坐标时，可以显式传入 `--smpl-frame raw`。
+
 ## 输入字段
 
 三条链共享的原始 HDF5 字段主要是：
@@ -108,8 +110,14 @@ python hdf5_parse/scripts/export_hdf5_to_soma_bvh.py \
   --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
 
 python hdf5_parse/scripts/export_hdf5_segmented_motion.py \
-  --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
+  --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz \
+  --smpl-frame soma_y_up
 ```
+
+其中 `--smpl-frame` 支持：
+
+- `soma_y_up`：默认值，保存出来的 `smpl_global_orient/smpl_transl` 与 Nymeria 和 SOMA-BVH 下游语义一致。
+- `raw`：保留 HDF5 原始 SMPL root 坐标，不做可视化坐标转换，主要用于诊断。
 
 ## human motion npz 的正确来源
 

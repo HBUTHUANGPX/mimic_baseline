@@ -34,6 +34,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--stride", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--filename-prefix", default="annotation")
+    parser.add_argument(
+        "--smpl-frame",
+        choices=("soma_y_up", "raw"),
+        default="soma_y_up",
+        help="Coordinate frame used when saving segmented SMPL npz files. SOMA/BVH downstream uses soma_y_up.",
+    )
     return parser
 
 
@@ -51,6 +57,7 @@ def main(argv: list[str] | None = None) -> int:
         soma_x_root=args.soma_x_root,
         smpl_model_path=args.smpl_model_path,
         filename_prefix=args.filename_prefix,
+        smpl_frame=args.smpl_frame,
     )
     print(
         f"Saved {len(result['smpl_paths'])} SMPL files to {args.smpl_output_dir} "

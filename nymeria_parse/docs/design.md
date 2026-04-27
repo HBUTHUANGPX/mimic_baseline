@@ -113,19 +113,12 @@ Required fields:
 - `transl`: `(F, 3)`.
 - `betas`: `(F, 10)`.
 
-Metadata fields:
-
-- `fps`
-- `num_frames`
-- `frame_nums`
-- `frame_timestamps`
-
 Missing semantic values:
 
 - `betas` has no source in MVNX; fill with zeros.
 - Any SMPL joint not represented by Xsens mapping should use identity rotation.
 
-Do not add duplicated names such as `smpl_body_pose` or debug-only pose arrays in the standard SMPL output file. Debug outputs can be added later as a separate diagnostic artifact if needed.
+Do not add duplicated names such as `smpl_body_pose`, timeline metadata, or debug-only pose arrays in the standard SMPL output file. Timeline metadata belongs in `annotation.npz`. Debug outputs can be added later as a separate diagnostic artifact if needed.
 
 ## Xsens To SMPL
 
@@ -160,6 +153,8 @@ The first implementation should support `--start-frame` and `--end-frame`. The r
 
 Full export should be possible by explicitly passing `--end-frame -1`.
 
+Full-sequence export must not send every frame through CUDA at once. The SOMA-X inversion path should run in chunks, defaulting to `--batch-size 256`, and keep only the current chunk's SMPL tensors, SOMA rotations, and skinning transforms on GPU. Chunk outputs are moved back to CPU before writing BVH. If memory is still insufficient on a target GPU, reduce `--batch-size`.
+
 ## CLI Design
 
 Initial scripts:
@@ -176,6 +171,9 @@ Shared defaults:
 - Device: `cuda`
 - `--start-frame 0`
 - `--end-frame 1000`
+- `--batch-size 256` for SOMA BVH export
+
+Long offline loops should expose progress with `tqdm`. Newton-based applications should keep the standard `newton.examples.create_parser()` setup and default `quiet=True` when running batch/offline conversion, leaving progress bars and error messages readable.
 
 ## Validation Plan
 

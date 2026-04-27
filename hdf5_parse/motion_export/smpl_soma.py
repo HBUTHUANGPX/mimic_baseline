@@ -7,6 +7,8 @@ from pathlib import Path
 
 import h5py
 import numpy as np
+from scipy.spatial.transform import Rotation
+from tqdm.auto import tqdm
 
 from ..utils.smpl_motion_tools import (
     DEFAULT_HDF5_PATH,
@@ -16,6 +18,7 @@ from ..utils.smpl_motion_tools import (
     split_pose7_qwxyz_xyz,
 )
 from motion_reconstruction.human_pose import (
+    VISUALIZATION_FRAME_QUAT_XYZW,
     apply_visualization_frame_xyzw,
     compute_global_joint_transforms_xyzw,
     convert_root_to_pre_visualization_frame_xyzw,
@@ -150,10 +153,48 @@ def normalize_root_parent_index(parent_indices: np.ndarray) -> np.ndarray:
     return normalized
 
 
+def _rotvec_to_quat_xyzw(rotvec: np.ndarray) -> np.ndarray:
+    rotvec = np.asarray(rotvec, dtype=np.float32)
+    rotations = Rotation.from_rotvec(rotvec.reshape(-1, 3))
+    return rotations.as_quat().reshape(rotvec.shape[:-1] + (4,)).astype(np.float32)
+
+
+def _quat_xyzw_to_rotvec(quat_xyzw: np.ndarray) -> np.ndarray:
+    quat_xyzw = np.asarray(quat_xyzw, dtype=np.float32)
+    rotations = Rotation.from_quat(quat_xyzw.reshape(-1, 4))
+    return rotations.as_rotvec().reshape(quat_xyzw.shape[:-1] + (3,)).astype(np.float32)
+
+
+def convert_smpl_motion_to_soma_y_up_frame(motion: SMPLBodyMotion) -> SMPLBodyMotion:
+    """Save-facing frame conversion that matches Nymeria/SOMA-BVH Y-up motion semantics."""
+    root_quat_xyzw = _rotvec_to_quat_xyzw(motion.global_orient)
+    inverse_frame = quat_conjugate_batch_xyzw(VISUALIZATION_FRAME_QUAT_XYZW)
+    converted_root_quat = quat_mul_batch_xyzw(
+        np.broadcast_to(inverse_frame, root_quat_xyzw.shape),
+        root_quat_xyzw,
+    )
+    converted_transl = quat_rotate_batch_xyzw(inverse_frame, np.asarray(motion.transl, dtype=np.float32))
+    return SMPLBodyMotion(
+        global_orient=_quat_xyzw_to_rotvec(converted_root_quat),
+        body_pose=np.asarray(motion.body_pose, dtype=np.float32),
+        transl=np.asarray(converted_transl, dtype=np.float32),
+        betas=np.asarray(motion.betas, dtype=np.float32),
+        frame_nums=np.asarray(motion.frame_nums, dtype=np.int32),
+        frame_timestamps=np.asarray(motion.frame_timestamps, dtype=np.int64),
+        fps=float(motion.fps),
+    )
+
+
 def _ensure_repo_on_sys_path(path: Path) -> None:
     resolved = str(path.resolve())
     if resolved not in sys.path:
         sys.path.insert(0, resolved)
+
+
+def configure_warp_quiet(quiet: bool = True) -> None:
+    import warp as wp
+
+    wp.config.quiet = bool(quiet)
 
 
 def _infer_model_num_betas(model_path: Path, fallback: int) -> int:
@@ -228,10 +269,34 @@ def _import_soma_x_runtime():
     return torch, SOMALayer, PoseInversion, joint_world_to_local, remove_joint_orient_local, matrix_to_rotvec
 
 
-def _rotation_matrices_to_quat_xyzw(rot_mats: np.ndarray) -> np.ndarray:
-    from scipy.spatial.transform import Rotation
+def iter_batch_slices(motion: SMPLBodyMotion, batch_size: int | None) -> list[tuple[int, int]]:
+    if motion.num_frames <= 0:
+        return []
+    active_batch_size = motion.num_frames if batch_size is None else int(batch_size)
+    if active_batch_size <= 0:
+        raise ValueError("batch_size must be positive when provided.")
+    return [
+        (start, min(start + active_batch_size, motion.num_frames))
+        for start in range(0, motion.num_frames, active_batch_size)
+    ]
 
-    rotations = Rotation.from_matrix(np.asarray(rot_mats, dtype=np.float64).reshape(-1, 3, 3))
+
+def project_rotation_matrices(rot_mats: np.ndarray) -> np.ndarray:
+    original = np.asarray(rot_mats, dtype=np.float64)
+    flat = original.reshape(-1, 3, 3)
+    u, _, vh = np.linalg.svd(flat)
+    projected = u @ vh
+    det = np.linalg.det(projected)
+    bad_handedness = det < 0.0
+    if np.any(bad_handedness):
+        u[bad_handedness, :, -1] *= -1.0
+        projected[bad_handedness] = u[bad_handedness] @ vh[bad_handedness]
+    return projected.reshape(original.shape)
+
+
+def _rotation_matrices_to_quat_xyzw(rot_mats: np.ndarray) -> np.ndarray:
+    projected = project_rotation_matrices(rot_mats)
+    rotations = Rotation.from_matrix(projected.reshape(-1, 3, 3))
     return rotations.as_quat().reshape(np.asarray(rot_mats).shape[:-2] + (4,)).astype(np.float32)
 
 
@@ -307,6 +372,7 @@ def run_soma_inversion(
     if not str(device).startswith("cuda"):
         raise ValueError("This exporter only supports CUDA execution.")
 
+    configure_warp_quiet(True)
     torch, SOMALayer, PoseInversion, joint_world_to_local, remove_joint_orient_local, matrix_to_rotvec = _import_soma_x_runtime()
     _ensure_repo_on_sys_path(soma_root)
 
@@ -321,10 +387,9 @@ def run_soma_inversion(
     if motion_betas.shape[0] == 1 and motion.num_frames > 1:
         motion_betas = np.broadcast_to(motion_betas, (motion.num_frames, motion_betas.shape[-1])).copy()
 
-    body_pose = torch.as_tensor(motion.body_pose, dtype=torch.float32, device=device)
-    global_orient = torch.as_tensor(motion.global_orient, dtype=torch.float32, device=device)
-    transl = torch.as_tensor(motion.transl, dtype=torch.float32, device=device)
-    betas = torch.as_tensor(motion_betas, dtype=torch.float32, device=device)
+    body_pose_np = np.asarray(motion.body_pose, dtype=np.float32)
+    global_orient_np = np.asarray(motion.global_orient, dtype=np.float32)
+    transl_np = np.asarray(motion.transl, dtype=np.float32)
 
     soma = SOMALayer(
         soma_root / "assets",
@@ -337,14 +402,15 @@ def run_soma_inversion(
         },
     )
     inv = PoseInversion(soma, low_lod=True)
-    inv.prepare_identity(betas[:1])
+    identity_betas = torch.as_tensor(motion_betas[:1], dtype=torch.float32, device=device)
+    inv.prepare_identity(identity_betas)
 
     with torch.no_grad():
         warmup_out = smpl_model(
-            body_pose=body_pose[:1],
-            global_orient=global_orient[:1],
-            betas=betas[:1],
-            transl=transl[:1],
+            body_pose=torch.as_tensor(body_pose_np[:1], dtype=torch.float32, device=device),
+            global_orient=torch.as_tensor(global_orient_np[:1], dtype=torch.float32, device=device),
+            betas=identity_betas,
+            transl=torch.as_tensor(transl_np[:1], dtype=torch.float32, device=device),
         )
     inv.fit(
         warmup_out.vertices,
@@ -355,18 +421,29 @@ def run_soma_inversion(
         autograd_lr=autograd_lr,
     )
 
-    active_batch_size = batch_size or motion.num_frames
-    all_rotations = []
+    batch_slices = iter_batch_slices(motion, batch_size)
+    all_local_transforms = []
+    all_world_transforms = []
+    all_soma_poses = []
     all_root_transl = []
     all_errors = []
-    for start in range(0, motion.num_frames, active_batch_size):
-        end = min(start + active_batch_size, motion.num_frames)
+    for start, end in tqdm(
+        batch_slices,
+        desc="SOMA inversion",
+        unit="batch",
+        dynamic_ncols=True,
+        disable=len(batch_slices) <= 1,
+    ):
+        body_pose = torch.as_tensor(body_pose_np[start:end], dtype=torch.float32, device=device)
+        global_orient = torch.as_tensor(global_orient_np[start:end], dtype=torch.float32, device=device)
+        transl = torch.as_tensor(transl_np[start:end], dtype=torch.float32, device=device)
+        betas = torch.as_tensor(motion_betas[start:end], dtype=torch.float32, device=device)
         with torch.no_grad():
             smpl_out = smpl_model(
-                body_pose=body_pose[start:end],
-                global_orient=global_orient[start:end],
-                betas=betas[start:end],
-                transl=transl[start:end],
+                body_pose=body_pose,
+                global_orient=global_orient,
+                betas=betas,
+                transl=transl,
             )
         result = inv.fit(
             smpl_out.vertices,
@@ -376,49 +453,57 @@ def run_soma_inversion(
             autograd_iters=autograd_iters,
             autograd_lr=autograd_lr,
         )
-        all_rotations.append(result["rotations"].detach().cpu())
-        all_root_transl.append(result["root_translation"].detach().cpu())
+        rotations = result["rotations"]
+        root_transl = result["root_translation"]
         all_errors.append(result["per_vertex_error"].detach().cpu())
 
-    rotations = torch.cat(all_rotations, dim=0).to(device)
-    root_transl = torch.cat(all_root_transl, dim=0).to(device)
-    per_vertex_error = torch.cat(all_errors, dim=0).cpu().numpy().astype(np.float32)
+        active_soma = inv.soma
+        bind_transforms = active_soma._cached_bind_transforms_world
+        rest_shape = active_soma._cached_rest_shape
+        if bind_transforms.shape[0] == 1 and rotations.shape[0] > 1:
+            bind_transforms = bind_transforms.expand(rotations.shape[0], -1, -1, -1)
+        if rest_shape.shape[0] == 1 and rotations.shape[0] > 1:
+            rest_shape = rest_shape.expand(rotations.shape[0], -1, -1)
+        active_soma.batched_skinning.rebind(bind_transforms, rest_shape)
+        with torch.no_grad():
+            _, world_transforms = active_soma.batched_skinning.pose(
+                rotations,
+                root_transl,
+                absolute_pose=True,
+                return_transforms=True,
+            )
+        local_transforms = joint_world_to_local(world_transforms, active_soma.joint_parent_ids)
+        relative_rotations = remove_joint_orient_local(
+            rotations,
+            active_soma._t_pose_orient,
+            active_soma._t_pose_orient_parent_T,
+        )
+        soma_poses = matrix_to_rotvec(relative_rotations.reshape(-1, 3, 3)).reshape(
+            relative_rotations.shape[0],
+            relative_rotations.shape[1],
+            3,
+        )
+
+        all_local_transforms.append(_pose7_from_transforms(local_transforms.detach().cpu().numpy()))
+        all_world_transforms.append(_pose7_from_transforms(world_transforms.detach().cpu().numpy()))
+        all_soma_poses.append(soma_poses.detach().cpu().numpy().astype(np.float32))
+        all_root_transl.append(root_transl.detach().cpu().numpy())
+
+        del body_pose, global_orient, transl, betas, smpl_out, result, rotations, root_transl
+        del world_transforms, local_transforms, relative_rotations, soma_poses
+        torch.cuda.empty_cache()
 
     active_soma = inv.soma
-    bind_transforms = active_soma._cached_bind_transforms_world
-    rest_shape = active_soma._cached_rest_shape
-    if bind_transforms.shape[0] == 1 and rotations.shape[0] > 1:
-        bind_transforms = bind_transforms.expand(rotations.shape[0], -1, -1, -1)
-    if rest_shape.shape[0] == 1 and rotations.shape[0] > 1:
-        rest_shape = rest_shape.expand(rotations.shape[0], -1, -1)
-    active_soma.batched_skinning.rebind(bind_transforms, rest_shape)
-    with torch.no_grad():
-        _, world_transforms = active_soma.batched_skinning.pose(
-            rotations,
-            root_transl,
-            absolute_pose=True,
-            return_transforms=True,
-        )
-    local_transforms = joint_world_to_local(world_transforms, active_soma.joint_parent_ids)
-    relative_rotations = remove_joint_orient_local(
-        rotations,
-        active_soma._t_pose_orient,
-        active_soma._t_pose_orient_parent_T,
-    )
-    soma_poses = matrix_to_rotvec(relative_rotations.reshape(-1, 3, 3)).reshape(
-        relative_rotations.shape[0],
-        relative_rotations.shape[1],
-        3,
-    )
+    per_vertex_error = torch.cat(all_errors, dim=0).cpu().numpy().astype(np.float32)
 
     return {
         "joint_names": list(active_soma.rig_data["joint_names"]),
         "parent_indices": active_soma.joint_parent_ids.detach().cpu().numpy().astype(np.int32),
         "reference_local_transforms": _pose7_from_transforms(active_soma.t_pose_local.detach().cpu().numpy()),
-        "local_transforms": _pose7_from_transforms(local_transforms.detach().cpu().numpy()),
-        "world_transforms": _pose7_from_transforms(world_transforms.detach().cpu().numpy()),
-        "soma_poses": soma_poses.detach().cpu().numpy().astype(np.float32),
-        "soma_transl": root_transl.detach().cpu().numpy().astype(np.float32),
+        "local_transforms": np.concatenate(all_local_transforms, axis=0).astype(np.float32),
+        "world_transforms": np.concatenate(all_world_transforms, axis=0).astype(np.float32),
+        "soma_poses": np.concatenate(all_soma_poses, axis=0).astype(np.float32),
+        "soma_transl": np.concatenate(all_root_transl, axis=0).astype(np.float32),
         "soma_joint_orient": active_soma._t_pose_orient.detach().cpu().numpy().astype(np.float32),
         "per_vertex_error": per_vertex_error,
     }
