@@ -78,6 +78,28 @@ def test_pyproject_exposes_dataset_converter_console_scripts() -> None:
     scripts = pyproject["project"]["scripts"]
     assert scripts["dataset-converter-hdf5-batch"] == "dataset_converter.hdf5.cli.batch_export:main"
     assert scripts["dataset-converter-nymeria-batch"] == "dataset_converter.nymeria.cli.batch_export:main"
+    assert "soma*" in pyproject["tool"]["setuptools"]["packages"]["find"]["include"]
+
+
+def test_vendored_soma_runtime_imports_from_dataset_converter_src() -> None:
+    env = {"PYTHONPATH": str(PACKAGE_ROOT / "src")}
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import soma; from soma.soma import SOMALayer; from soma.pose_inversion import PoseInversion; "
+            "print(soma.__file__); print(SOMALayer.__name__, PoseInversion.__name__)",
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert str(PACKAGE_ROOT / "src" / "soma") in result.stdout
+    assert "SOMALayer PoseInversion" in result.stdout
 
 
 def test_dataset_converter_source_does_not_lock_to_local_home_paths() -> None:

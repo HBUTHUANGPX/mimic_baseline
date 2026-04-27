@@ -61,6 +61,8 @@ Equivalent CLI arguments:
 
 The package is structured so it can later own an independent `uv` environment. That work has not started yet. For now, use the existing `mimic_baseline` environment and install this package editable with `pip install -e dataset_converter`.
 
+The SOMA Python runtime is vendored in `dataset_converter/src/soma`, so `import soma` comes from this package after installation. Large SOMA assets are still explicit runtime inputs through `SOMA_ASSETS_ROOT`.
+
 ## Data Layout
 
 HDF5/Xperience:
@@ -129,3 +131,4 @@ dataset-converter-hdf5-batch \
 - [Quickstart](docs/quickstart.md)
 - [Deployment](docs/deployment.md)
 - [Architecture](docs/architecture.md)
+- [Vendored SOMA Runtime](docs/vendored_soma.md)

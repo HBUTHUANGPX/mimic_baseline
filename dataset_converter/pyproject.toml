@@ -20,4 +20,4 @@ dataset-converter-nymeria-batch = "dataset_converter.nymeria.cli.batch_export:ma
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["dataset_converter*"]
+include = ["dataset_converter*", "soma*"]

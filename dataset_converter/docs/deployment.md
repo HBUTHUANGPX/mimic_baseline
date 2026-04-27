@@ -27,6 +27,12 @@ Only `SOMA_ASSETS_ROOT` and `SMPL_MODEL_PATH` are needed for `soma-bvh` export. 
 
 The package is being prepared for a future standalone `uv` environment, but that environment is not created yet. Keep using the current `mimic_baseline` environment until the dependency set is frozen.
 
+The SOMA Python runtime is included in this package under `dataset_converter/src/soma`. After editable install, this should work without adding an external source tree to `PYTHONPATH`:
+
+```bash
+python -c "import soma; print(soma.__file__)"
+```
+
 ## Validate Installation
 
 ```bash
