@@ -121,7 +121,7 @@
             "program": "/home/hpx/HPX_LOCO_2/mimic_baseline/scripts/rsl_rl/train.py",
             "console": "integratedTerminal",
             "args": [
-                "--task", "Tracking-Flat-G1-v0",
+                "--task", "Tracking-Flat-G1-v4",
                 // "--headless",
                 "--run_name",  "test",
                 "--num_envs", "128"

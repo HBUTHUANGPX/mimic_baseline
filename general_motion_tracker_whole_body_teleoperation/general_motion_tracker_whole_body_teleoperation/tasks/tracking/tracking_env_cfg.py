@@ -240,7 +240,9 @@ class ObservationsCfg:
             func=mdp.root_pos_w, noise=Unoise(n_min=-0.05, n_max=0.05)
         )
         robot_anchor_ori_w = ObsTerm(
-            func=mdp.robot_anchor_ori_w, noise=Unoise(n_min=-0.05, n_max=0.05)
+            func=mdp.robot_anchor_ori_w,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.05, n_max=0.05),
         )
         base_lin_vel = ObsTerm(
             func=mdp.base_lin_vel, noise=Unoise(n_min=-0.25, n_max=0.25)
