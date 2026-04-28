@@ -2,6 +2,7 @@ motion_group:
   # ========================== G1 ======================
   xsens_bvh:
     file_name: [ 
+      # "dataset_converter/test_out_export/nymeria_batch/20230607_s0_james_johnson_act0_e72nhq/soma_bvh/nymeria_soma.npz"
       # "artifacts/g1/xsens_bvh/251203/dance_01_120Hz.npz", 
       # "artifacts/g1/xsens_bvh/251203/dance_02_120Hz.npz",
       # "artifacts/g1/xsens_bvh/251203/dance_03_120Hz.npz" ,
