@@ -185,51 +185,51 @@ class ObservationsCfg:
     class CommandAllCfg(ObsGroup):  # 有噪 特权 window cmd
         """Observations for command group with noise."""
 
-        joint_pos_delta = ObsTerm(# 
-            func=mdp.joint_pos_delta,
+        ref_robot_minus_sim_joint_angle_rad = ObsTerm(
+            func=mdp.ref_robot_minus_sim_joint_angle_rad,
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.02, n_max=0.02),
         )
-        joint_pos_delta_window = ObsTerm(
-            func=mdp.joint_pos_delta_window,
-            params={"command_name": "motion"},
-            noise=Unoise(n_min=-0.02, n_max=0.02),
-        )
-
-        motion_anchor_pos_b = ObsTerm(# robot motion anchor translation in world frame
-            func=mdp.motion_anchor_pos_b,
-            params={"command_name": "motion"},
-            noise=Unoise(n_min=-0.02, n_max=0.02),
-        )
-        motion_anchor_pos_b_window = ObsTerm(# with future window frame
-            func=mdp.motion_anchor_pos_b_window,
+        ref_robot_minus_sim_joint_angle_rad_window = ObsTerm(
+            func=mdp.ref_robot_minus_sim_joint_angle_rad,
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.02, n_max=0.02),
         )
 
-        motion_anchor_ori_b = ObsTerm(# robot motion anchor orientation in world frame
-            func=mdp.motion_anchor_ori_b,
+        ref_robot_anchor_pos_in_sim_anchor = ObsTerm(
+            func=mdp.ref_robot_anchor_pos_in_sim_anchor,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.02, n_max=0.02),
+        )
+        ref_robot_anchor_pos_in_sim_anchor_window = ObsTerm(
+            func=mdp.ref_robot_anchor_pos_in_sim_anchor,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.02, n_max=0.02),
+        )
+
+        ref_robot_anchor_rot6d_in_sim_anchor = ObsTerm(
+            func=mdp.ref_robot_anchor_rot6d_in_sim_anchor,
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.05, n_max=0.05),
         )
-        motion_anchor_ori_b_window = ObsTerm(# with future window frame
-            func=mdp.motion_anchor_ori_b_window,
+        ref_robot_anchor_rot6d_in_sim_anchor_window = ObsTerm(
+            func=mdp.ref_robot_anchor_rot6d_in_sim_anchor,
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.05, n_max=0.05),
         )
 
-        robot_body_pos = ObsTerm(# robot motion key body's translation in anchor frame
-            func=mdp.robot_body_pos_b, 
+        sim_robot_body_pos_in_sim_anchor = ObsTerm(
+            func=mdp.sim_robot_body_pos_in_sim_anchor,
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.005, n_max=0.005),
         )
-        robot_body_ori = ObsTerm(# robot motion key body's orientation in anchor frame
-            func=mdp.robot_body_ori_b,
+        sim_robot_body_rot6d_in_sim_anchor = ObsTerm(
+            func=mdp.sim_robot_body_rot6d_in_sim_anchor,
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.01, n_max=0.01),
         )
-        human_motion_anchor_ori_b = ObsTerm(
-            func=mdp.human_motion_anchor_ori_b,
+        ref_human_anchor_rot6d_in_sim_anchor = ObsTerm(
+            func=mdp.ref_human_anchor_rot6d_in_sim_anchor,
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.01, n_max=0.01),
         )
@@ -243,8 +243,8 @@ class ObservationsCfg:
         root_pos_w = ObsTerm(
             func=mdp.root_pos_w, noise=Unoise(n_min=-0.05, n_max=0.05)
         )
-        robot_anchor_ori_w = ObsTerm(
-            func=mdp.robot_anchor_ori_w,
+        sim_robot_anchor_rot6d_w = ObsTerm(
+            func=mdp.sim_robot_anchor_rot6d_w,
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.05, n_max=0.05),
         )
@@ -274,52 +274,50 @@ class ObservationsCfg:
     class MotionIdCfg(ObsGroup):  # 不带噪声的上一个动作观测组
         """Observations for last action group."""
 
-        motion_id = ObsTerm(func=mdp.motion_id, params={"command_name": "motion"})
+        ref_motion_id = ObsTerm(func=mdp.ref_motion_id, params={"command_name": "motion"})
 
     @configclass
     class MotionGroupCfg(ObsGroup):  # 不带噪声的上一个动作观测组
         """Observations for last action group."""
 
-        motion_group = ObsTerm(func=mdp.motion_group, params={"command_name": "motion"})
+        ref_motion_group = ObsTerm(func=mdp.ref_motion_group, params={"command_name": "motion"})
 
     @configclass
-    class RobotFSQWindowCfg(ObsGroup):
-        robot_fsq_window = ObsTerm(func=mdp.robot_fsq_window, params={"command_name": "motion"})
+    class ActorRefRobotFSQFeatureWindowCfg(ObsGroup):
+        actor_ref_robot_fsq_feature_window = ObsTerm(
+            func=mdp.actor_ref_robot_fsq_feature_window,
+            params={"command_name": "motion"},
+        )
 
         def __post_init__(self):
             self.enable_corruption = False
 
     @configclass
-    class HumanFSQWindowCfg(ObsGroup):
-        human_fsq_window = ObsTerm(func=mdp.human_fsq_window, params={"command_name": "motion"})
+    class ActorRefHumanFSQFeatureWindowCfg(ObsGroup):
+        actor_ref_human_fsq_feature_window = ObsTerm(
+            func=mdp.actor_ref_human_fsq_feature_window,
+            params={"command_name": "motion"},
+        )
 
         def __post_init__(self):
             self.enable_corruption = False
 
     @configclass
-    class ActorRobotFSQWindowCfg(ObsGroup):
-        actor_robot_fsq_window = ObsTerm(func=mdp.actor_robot_fsq_window, params={"command_name": "motion"})
+    class CriticRefRobotFSQFeatureWindowCfg(ObsGroup):
+        critic_ref_robot_fsq_feature_window = ObsTerm(
+            func=mdp.critic_ref_robot_fsq_feature_window,
+            params={"command_name": "motion"},
+        )
 
         def __post_init__(self):
             self.enable_corruption = False
 
     @configclass
-    class ActorHumanFSQWindowCfg(ObsGroup):
-        actor_human_fsq_window = ObsTerm(func=mdp.actor_human_fsq_window, params={"command_name": "motion"})
-
-        def __post_init__(self):
-            self.enable_corruption = False
-
-    @configclass
-    class CriticRobotFSQWindowCfg(ObsGroup):
-        critic_robot_fsq_window = ObsTerm(func=mdp.critic_robot_fsq_window, params={"command_name": "motion"})
-
-        def __post_init__(self):
-            self.enable_corruption = False
-
-    @configclass
-    class CriticHumanFSQWindowCfg(ObsGroup):
-        critic_human_fsq_window = ObsTerm(func=mdp.critic_human_fsq_window, params={"command_name": "motion"})
+    class CriticRefHumanFSQFeatureWindowCfg(ObsGroup):
+        critic_ref_human_fsq_feature_window = ObsTerm(
+            func=mdp.critic_ref_human_fsq_feature_window,
+            params={"command_name": "motion"},
+        )
 
         def __post_init__(self):
             self.enable_corruption = False
@@ -327,26 +325,26 @@ class ObservationsCfg:
     command_window_with_noise_wo_privilege: CommandAllCfg = (
         CommandAllCfg()
     )  # 有噪 无特权 cmd
-    command_window_with_noise_wo_privilege.joint_pos_delta = None
-    command_window_with_noise_wo_privilege.joint_pos_delta_window = None
-    command_window_with_noise_wo_privilege.motion_anchor_pos_b = None
-    command_window_with_noise_wo_privilege.motion_anchor_pos_b_window = None
-    command_window_with_noise_wo_privilege.motion_anchor_ori_b = None
-    command_window_with_noise_wo_privilege.motion_anchor_ori_b_window = None
-    command_window_with_noise_wo_privilege.robot_body_pos = None
-    command_window_with_noise_wo_privilege.robot_body_ori = None
+    command_window_with_noise_wo_privilege.ref_robot_minus_sim_joint_angle_rad = None
+    command_window_with_noise_wo_privilege.ref_robot_minus_sim_joint_angle_rad_window = None
+    command_window_with_noise_wo_privilege.ref_robot_anchor_pos_in_sim_anchor = None
+    command_window_with_noise_wo_privilege.ref_robot_anchor_pos_in_sim_anchor_window = None
+    command_window_with_noise_wo_privilege.ref_robot_anchor_rot6d_in_sim_anchor = None
+    command_window_with_noise_wo_privilege.ref_robot_anchor_rot6d_in_sim_anchor_window = None
+    command_window_with_noise_wo_privilege.sim_robot_body_pos_in_sim_anchor = None
+    command_window_with_noise_wo_privilege.sim_robot_body_rot6d_in_sim_anchor = None
 
     command_with_noise_wo_privilege: CommandAllCfg = (
         CommandAllCfg()
     )  # 有噪 无特权 cmd
-    command_with_noise_wo_privilege.joint_pos_delta = None
-    command_with_noise_wo_privilege.joint_pos_delta_window = None
-    command_with_noise_wo_privilege.motion_anchor_pos_b = None
-    command_with_noise_wo_privilege.motion_anchor_pos_b_window = None
-    command_with_noise_wo_privilege.motion_anchor_ori_b = None
-    command_with_noise_wo_privilege.motion_anchor_ori_b_window = None
-    command_with_noise_wo_privilege.robot_body_pos = None
-    command_with_noise_wo_privilege.robot_body_ori = None
+    command_with_noise_wo_privilege.ref_robot_minus_sim_joint_angle_rad = None
+    command_with_noise_wo_privilege.ref_robot_anchor_pos_in_sim_anchor = None
+    command_with_noise_wo_privilege.ref_robot_anchor_rot6d_in_sim_anchor = None
+    command_with_noise_wo_privilege.sim_robot_body_pos_in_sim_anchor = None
+    command_with_noise_wo_privilege.sim_robot_body_rot6d_in_sim_anchor = None
+    command_with_noise_wo_privilege.ref_robot_minus_sim_joint_angle_rad_window = None
+    command_with_noise_wo_privilege.ref_robot_anchor_pos_in_sim_anchor_window = None
+    command_with_noise_wo_privilege.ref_robot_anchor_rot6d_in_sim_anchor_window = None
 
     proprioception_with_noise_wo_privilege: ProprioceptionAllCfg = (
         ProprioceptionAllCfg()
@@ -355,26 +353,24 @@ class ObservationsCfg:
     proprioception_with_noise_wo_privilege.root_pos_w = None
 
     command_window: CommandAllCfg = CommandAllCfg(enable_corruption = False)  # 无噪 特权 cmd 
-    command_window.joint_pos_delta = None
-    command_window.motion_anchor_pos_b = None
-    command_window.motion_anchor_ori_b = None
+    command_window.ref_robot_minus_sim_joint_angle_rad = None
+    command_window.ref_robot_anchor_pos_in_sim_anchor = None
+    command_window.ref_robot_anchor_rot6d_in_sim_anchor = None
 
     command: CommandAllCfg = CommandAllCfg(enable_corruption = False)  # 无噪 特权 cmd
-    command.joint_pos_delta_window = None
-    command.motion_anchor_ori_b_window = None
-    command.motion_anchor_pos_b_window = None
+    command.ref_robot_minus_sim_joint_angle_rad_window = None
+    command.ref_robot_anchor_rot6d_in_sim_anchor_window = None
+    command.ref_robot_anchor_pos_in_sim_anchor_window = None
     proprioception: ProprioceptionAllCfg = ProprioceptionAllCfg(enable_corruption = False)  # 无噪 特权 本体
 
     last_action: LastActionCfg = LastActionCfg()
 
-    motion_id: MotionIdCfg = MotionIdCfg()
-    motion_group: MotionGroupCfg = MotionGroupCfg()
-    robot_fsq_window: RobotFSQWindowCfg = RobotFSQWindowCfg()
-    human_fsq_window: HumanFSQWindowCfg = HumanFSQWindowCfg()
-    actor_robot_fsq_window: ActorRobotFSQWindowCfg = ActorRobotFSQWindowCfg()
-    actor_human_fsq_window: ActorHumanFSQWindowCfg = ActorHumanFSQWindowCfg()
-    critic_robot_fsq_window: CriticRobotFSQWindowCfg = CriticRobotFSQWindowCfg()
-    critic_human_fsq_window: CriticHumanFSQWindowCfg = CriticHumanFSQWindowCfg()
+    ref_motion_id: MotionIdCfg = MotionIdCfg()
+    ref_motion_group: MotionGroupCfg = MotionGroupCfg()
+    actor_ref_robot_fsq_feature_window: ActorRefRobotFSQFeatureWindowCfg = ActorRefRobotFSQFeatureWindowCfg()
+    actor_ref_human_fsq_feature_window: ActorRefHumanFSQFeatureWindowCfg = ActorRefHumanFSQFeatureWindowCfg()
+    critic_ref_robot_fsq_feature_window: CriticRefRobotFSQFeatureWindowCfg = CriticRefRobotFSQFeatureWindowCfg()
+    critic_ref_human_fsq_feature_window: CriticRefHumanFSQFeatureWindowCfg = CriticRefHumanFSQFeatureWindowCfg()
 
 
 @configclass

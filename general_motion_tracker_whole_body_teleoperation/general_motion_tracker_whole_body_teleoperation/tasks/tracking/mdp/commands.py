@@ -460,38 +460,38 @@ class MotionCommand(CommandTerm):
         )
 
         # 当前机器人关键 body 在当前机器人 anchor frame 下的位姿，供 observation 使用。
-        robot_body_pos_b, robot_body_ori_b = subtract_frame_transforms(
+        sim_robot_body_pos_in_sim_anchor, sim_robot_body_quat_in_sim_anchor = subtract_frame_transforms(
             robot_anchor_pos_w_repeat,
             robot_anchor_quat_w_repeat,
             self.sim_robot_body_pos_w,
             self.sim_robot_body_quat_w,
         )
-        self.sim_robot_body_pos_in_sim_anchor = robot_body_pos_b
-        self.sim_robot_body_rot6d_in_sim_anchor = rot6d_from_quat(robot_body_ori_b).reshape(
+        self.sim_robot_body_pos_in_sim_anchor = sim_robot_body_pos_in_sim_anchor
+        self.sim_robot_body_rot6d_in_sim_anchor = rot6d_from_quat(sim_robot_body_quat_in_sim_anchor).reshape(
             self.num_envs, -1
         )
 
         # 参考机器人 anchor 在当前机器人 anchor frame 下的相对位姿，供 observation 使用。
-        motion_anchor_pos_b, motion_anchor_ori_b = subtract_frame_transforms(
+        ref_robot_anchor_pos_in_sim_anchor, ref_robot_anchor_quat_in_sim_anchor = subtract_frame_transforms(
             self.sim_robot_anchor_pos_w,
             self.sim_robot_anchor_quat_w,
             self.ref_robot_anchor_pos_w,
             self.ref_robot_anchor_quat_w,
         )
-        self.ref_robot_anchor_pos_in_sim_anchor = motion_anchor_pos_b
-        self.ref_robot_anchor_rot6d_in_sim_anchor = rot6d_from_quat(motion_anchor_ori_b).reshape(
+        self.ref_robot_anchor_pos_in_sim_anchor = ref_robot_anchor_pos_in_sim_anchor
+        self.ref_robot_anchor_rot6d_in_sim_anchor = rot6d_from_quat(ref_robot_anchor_quat_in_sim_anchor).reshape(
             self.num_envs, -1
         )
 
         # 参考 human anchor 在当前机器人 anchor frame 下的相对姿态，供 observation 使用。
-        _, human_motion_anchor_ori_b = subtract_frame_transforms(
+        _, ref_human_anchor_quat_in_sim_anchor = subtract_frame_transforms(
             self.sim_robot_anchor_pos_w,
             self.sim_robot_anchor_quat_w,
             self.ref_human_anchor_pos_w,
             self.ref_human_anchor_quat_w,
         )
         self.ref_human_anchor_rot6d_in_sim_anchor = rot6d_from_quat(
-            human_motion_anchor_ori_b
+            ref_human_anchor_quat_in_sim_anchor
         ).reshape(self.num_envs, -1)
 
         # FSQ 使用的 history/current/future 窗口特征。
@@ -514,24 +514,24 @@ class MotionCommand(CommandTerm):
         robot_anchor_quat_repeat = robot_anchor_quat[:, :, None, :].expand(
             -1, -1, num_robot_bodies, -1
         )
-        robot_body_pos_b, robot_body_quat_b = subtract_frame_transforms(
+        ref_robot_body_pos_in_ref_anchor, ref_robot_body_quat_in_ref_anchor = subtract_frame_transforms(
             robot_anchor_pos_repeat.reshape(-1, 3),
             robot_anchor_quat_repeat.reshape(-1, 4),
             robot_body_pos.reshape(-1, 3),
             robot_body_quat.reshape(-1, 4),
         )
-        robot_body_pos_b = robot_body_pos_b.reshape(
+        ref_robot_body_pos_in_ref_anchor = ref_robot_body_pos_in_ref_anchor.reshape(
             self.num_envs, self.motion.window_size, -1
         )
-        robot_body_rot6d_b = rot6d_from_quat(robot_body_quat_b).reshape(
+        ref_robot_body_rot6d_in_ref_anchor = rot6d_from_quat(ref_robot_body_quat_in_ref_anchor).reshape(
             self.num_envs, self.motion.window_size, -1
         )
         actor_robot_feature = torch.cat(
             (
                 robot_anchor_rot6d,
                 robot_joint_pos,
-                robot_body_pos_b,
-                robot_body_rot6d_b,
+                ref_robot_body_pos_in_ref_anchor,
+                ref_robot_body_rot6d_in_ref_anchor,
             ),
             dim=-1,
         )
@@ -540,8 +540,8 @@ class MotionCommand(CommandTerm):
                 robot_anchor_rot6d,
                 robot_anchor_pos,
                 robot_joint_pos,
-                robot_body_pos_b,
-                robot_body_rot6d_b,
+                ref_robot_body_pos_in_ref_anchor,
+                ref_robot_body_rot6d_in_ref_anchor,
             ),
             dim=-1,
         )
@@ -564,20 +564,20 @@ class MotionCommand(CommandTerm):
         human_joint_quat = self.motion.human_joint_quat[window_time_steps][
             :, :, self.fsq_human_body_indexes, :
         ]
-        human_body_pos_w = human_body_pos - human_anchor_pos[:, :, None, :]
+        ref_human_body_pos_from_ref_anchor_w = human_body_pos - human_anchor_pos[:, :, None, :]
         num_human_bodies = self.fsq_human_body_indexes.numel()
         human_anchor_quat_w = human_anchor_quat[:, :, None, :].expand(
             -1, -1, num_human_bodies, -1
         )
-        human_body_pos_b = quat_apply_inverse(
+        ref_human_body_pos_in_ref_anchor = quat_apply_inverse(
             human_anchor_quat_w.reshape(-1, 4),
-            human_body_pos_w.reshape(-1, 3),
+            ref_human_body_pos_from_ref_anchor_w.reshape(-1, 3),
         ).reshape(self.num_envs, self.motion.window_size, -1)
-        human_body_quat_b = quat_mul(
+        ref_human_body_quat_in_ref_anchor = quat_mul(
             quat_inv(human_anchor_quat_w.reshape(-1, 4)),
             human_body_quat.reshape(-1, 4),
         )
-        human_body_rot6d_b = rot6d_from_quat(human_body_quat_b).reshape(
+        ref_human_body_rot6d_in_ref_anchor = rot6d_from_quat(ref_human_body_quat_in_ref_anchor).reshape(
             self.num_envs, self.motion.window_size, -1
         )
         human_joint_rot6d = rot6d_from_quat(human_joint_quat).reshape(
@@ -587,8 +587,8 @@ class MotionCommand(CommandTerm):
             (
                 human_anchor_rot6d,
                 human_joint_rot6d,
-                human_body_pos_b,
-                human_body_rot6d_b,
+                ref_human_body_pos_in_ref_anchor,
+                ref_human_body_rot6d_in_ref_anchor,
             ),
             dim=-1,
         )
@@ -597,8 +597,8 @@ class MotionCommand(CommandTerm):
                 human_anchor_rot6d,
                 human_anchor_pos,
                 human_joint_rot6d,
-                human_body_pos_b,
-                human_body_rot6d_b,
+                ref_human_body_pos_in_ref_anchor,
+                ref_human_body_rot6d_in_ref_anchor,
             ),
             dim=-1,
         )

@@ -329,7 +329,7 @@ class Q1FlatCVAEDistillationStudentMultiTeacherCfg(RslRlDistillationRunnerCfg):
                 "proprioception",
                 "last_action",
             ],  # 映射到环境提供的 'teacher' 观测组，用于教师网络
-            "motion_group": ["motion_group"],  # 新增 motion_group 观测组
+            "ref_motion_group": ["ref_motion_group"],
         },
     )
     save_interval = 500
@@ -397,7 +397,7 @@ class Q1FlatFSQCVAEDistillationStudentMultiTeacherCfg(RslRlDistillationRunnerCfg
                 "proprioception",
                 "last_action",
             ],  # 映射到环境提供的 'teacher' 观测组，用于教师网络
-            "motion_group": ["motion_group"],  # 新增 motion_group 观测组
+            "ref_motion_group": ["ref_motion_group"],
         },
     )
     save_interval = 500

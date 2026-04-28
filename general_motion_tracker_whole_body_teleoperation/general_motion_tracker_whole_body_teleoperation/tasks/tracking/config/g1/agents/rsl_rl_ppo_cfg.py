@@ -182,17 +182,17 @@ class G1FlatPPODualFSQRunnerCfg(G1FlatPPORunnerCfg):
                 "proprioception",
                 "last_action",
             ],
-            "actor_human_fsq_window": [
-                "actor_human_fsq_window",
+            "actor_ref_human_fsq_feature_window": [
+                "actor_ref_human_fsq_feature_window",
             ],
-            "actor_robot_fsq_window": [
-                "actor_robot_fsq_window",
+            "actor_ref_robot_fsq_feature_window": [
+                "actor_ref_robot_fsq_feature_window",
             ],
-            "critic_human_fsq_window": [
-                "critic_human_fsq_window",
+            "critic_ref_human_fsq_feature_window": [
+                "critic_ref_human_fsq_feature_window",
             ],
-            "critic_robot_fsq_window": [
-                "critic_robot_fsq_window",
+            "critic_ref_robot_fsq_feature_window": [
+                "critic_ref_robot_fsq_feature_window",
             ],
         },
     )
@@ -413,7 +413,7 @@ class G1FlatCVAEDistillationStudentMultiTeacherCfg(RslRlDistillationRunnerCfg):
                 "proprioception",
                 "last_action",
             ],  # 映射到环境提供的 'teacher' 观测组，用于教师网络
-            "motion_group": ["motion_group"],  # 新增 motion_group 观测组
+            "ref_motion_group": ["ref_motion_group"],
         },
     )
     save_interval = 500
@@ -481,7 +481,7 @@ class G1FlatFSQCVAEDistillationStudentMultiTeacherCfg(RslRlDistillationRunnerCfg
                 "proprioception",
                 "last_action",
             ],  # 映射到环境提供的 'teacher' 观测组，用于教师网络
-            "motion_group": ["motion_group"],  # 新增 motion_group 观测组
+            "ref_motion_group": ["ref_motion_group"],
         },
     )
     save_interval = 500
