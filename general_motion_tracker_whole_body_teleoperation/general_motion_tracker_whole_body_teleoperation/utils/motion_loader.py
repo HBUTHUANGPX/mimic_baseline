@@ -339,16 +339,22 @@ class MotionLoader_human:
         self.np_body_ang_vel_w_list: list[np.ndarray] = []
         self.np_human_body_pos_w_list: list[np.ndarray] = []
         self.np_human_body_quat_w_list: list[np.ndarray] = []
+        self.np_human_joint_quat_list: list[np.ndarray] = []
+
+    def _quat_to_wxyz(self, quat: np.ndarray, data: np.lib.npyio.NpzFile) -> np.ndarray:
+        scalar_first = bool(data["scalar_first"]) if "scalar_first" in data else False
+        return quat if scalar_first else quat[..., [3, 0, 1, 2]]
 
     def _append_motion_data(self, data: np.lib.npyio.NpzFile) -> None:
         self.np_joint_pos_list.append(data["robot_joint_pos"].astype(np.float32)[:, self._robot_joint_indexes])
         self.np_joint_vel_list.append(data["robot_joint_vel"].astype(np.float32)[:, self._robot_joint_indexes])
         self.np_body_pos_w_list.append(data["robot_body_pos"].astype(np.float32)[:, self._robot_body_indexes])
-        self.np_body_quat_w_list.append(data["robot_body_quat"].astype(np.float32)[:, self._robot_body_indexes][..., [3,0,1,2]])
+        self.np_body_quat_w_list.append(self._quat_to_wxyz(data["robot_body_quat"].astype(np.float32)[:, self._robot_body_indexes], data))
         self.np_body_lin_vel_w_list.append(data["robot_body_lin_vel"].astype(np.float32)[:, self._robot_body_indexes])
         self.np_body_ang_vel_w_list.append(data["robot_body_ang_vel"].astype(np.float32)[:, self._robot_body_indexes])
         self.np_human_body_pos_w_list.append(data["human_global_pos"].astype(np.float32)[:,self.human_joint_indexes])
-        self.np_human_body_quat_w_list.append(data["human_global_quat"].astype(np.float32)[:,self.human_joint_indexes][..., [3,0,1,2]])
+        self.np_human_body_quat_w_list.append(self._quat_to_wxyz(data["human_global_quat"].astype(np.float32)[:,self.human_joint_indexes], data))
+        self.np_human_joint_quat_list.append(self._quat_to_wxyz(data["human_local_transforms"].astype(np.float32)[:, self.human_joint_indexes, 3:7], data))
 
     def _motion_data_np_list_to_tensor(self,) -> None:
         self.joint_pos = self.np_list_to_tensor(self.np_joint_pos_list)
@@ -368,6 +374,7 @@ class MotionLoader_human:
 
         self.human_body_pos_w = self.np_list_to_tensor(self.np_human_body_pos_w_list)
         self.human_body_quat_w = self.np_list_to_tensor(self.np_human_body_quat_w_list)
+        self.human_joint_quat = self.np_list_to_tensor(self.np_human_joint_quat_list)
 
     def np_list_to_tensor(self, np_list: list[np.ndarray]) -> torch.Tensor:
         """Convert a NumPy array to a PyTorch tensor on the appropriate device."""

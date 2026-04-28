@@ -110,16 +110,32 @@ class MotionCommand(CommandTerm):
             future_frames=self.cfg.future_frames,
             device=self.device,
         )
-        self.robot_fsq_window = torch.zeros(
+        num_robot_bodies = len(self.cfg.body_names)
+        num_human_bodies = len(self.cfg.fsq_human_body_names)
+        self.actor_robot_fsq_window = torch.zeros(
             self.num_envs,
-            self.motion.window_size * (6 + self.motion.joint_pos.shape[-1]),
+            self.motion.window_size
+            * (6 + self.motion.joint_pos.shape[-1] + 9 * num_robot_bodies),
             device=self.device,
         )
-        self.human_fsq_window = torch.zeros(
+        self.critic_robot_fsq_window = torch.zeros(
             self.num_envs,
-            self.motion.window_size * (6 + 3 * len(self.cfg.fsq_human_body_names)),
+            self.motion.window_size
+            * (9 + self.motion.joint_pos.shape[-1] + 9 * num_robot_bodies),
             device=self.device,
         )
+        self.actor_human_fsq_window = torch.zeros(
+            self.num_envs,
+            self.motion.window_size * (6 + 15 * num_human_bodies),
+            device=self.device,
+        )
+        self.critic_human_fsq_window = torch.zeros(
+            self.num_envs,
+            self.motion.window_size * (9 + 15 * num_human_bodies),
+            device=self.device,
+        )
+        self.robot_fsq_window = self.actor_robot_fsq_window
+        self.human_fsq_window = self.actor_human_fsq_window
         self.time_steps = torch.zeros(
             self.num_envs, dtype=torch.long, device=self.device
         )
@@ -423,11 +439,53 @@ class MotionCommand(CommandTerm):
             window_time_steps, self.motion_anchor_body_index
         ]
         robot_anchor_rot6d = rot6d_from_quat(robot_anchor_quat)
+        robot_anchor_pos = self.motion.body_pos_w[
+            window_time_steps, self.motion_anchor_body_index
+        ]
         robot_joint_pos = self.motion.joint_pos[window_time_steps]
-        self.robot_fsq_window = torch.cat(
-            (robot_anchor_rot6d, robot_joint_pos),
+        num_robot_bodies = len(self.cfg.body_names)
+        robot_body_pos = self.motion.body_pos_w[window_time_steps]
+        robot_body_quat = self.motion.body_quat_w[window_time_steps]
+        robot_anchor_pos_repeat = robot_anchor_pos[:, :, None, :].expand(
+            -1, -1, num_robot_bodies, -1
+        )
+        robot_anchor_quat_repeat = robot_anchor_quat[:, :, None, :].expand(
+            -1, -1, num_robot_bodies, -1
+        )
+        robot_body_pos_b, robot_body_quat_b = subtract_frame_transforms(
+            robot_anchor_pos_repeat.reshape(-1, 3),
+            robot_anchor_quat_repeat.reshape(-1, 4),
+            robot_body_pos.reshape(-1, 3),
+            robot_body_quat.reshape(-1, 4),
+        )
+        robot_body_pos_b = robot_body_pos_b.reshape(
+            self.num_envs, self.motion.window_size, -1
+        )
+        robot_body_rot6d_b = rot6d_from_quat(robot_body_quat_b).reshape(
+            self.num_envs, self.motion.window_size, -1
+        )
+        actor_robot_feature = torch.cat(
+            (
+                robot_anchor_rot6d,
+                robot_joint_pos,
+                robot_body_pos_b,
+                robot_body_rot6d_b,
+            ),
             dim=-1,
-        ).reshape(self.num_envs, -1)
+        )
+        critic_robot_feature = torch.cat(
+            (
+                robot_anchor_rot6d,
+                robot_anchor_pos,
+                robot_joint_pos,
+                robot_body_pos_b,
+                robot_body_rot6d_b,
+            ),
+            dim=-1,
+        )
+        self.actor_robot_fsq_window = actor_robot_feature.reshape(self.num_envs, -1)
+        self.critic_robot_fsq_window = critic_robot_feature.reshape(self.num_envs, -1)
+        self.robot_fsq_window = self.actor_robot_fsq_window
 
         human_anchor_quat = self.motion.human_body_quat_w[
             window_time_steps, self.human_anchor_body_index
@@ -439,6 +497,12 @@ class MotionCommand(CommandTerm):
         human_body_pos = self.motion.human_body_pos_w[window_time_steps][
             :, :, self.fsq_human_body_indexes, :
         ]
+        human_body_quat = self.motion.human_body_quat_w[window_time_steps][
+            :, :, self.fsq_human_body_indexes, :
+        ]
+        human_joint_quat = self.motion.human_joint_quat[window_time_steps][
+            :, :, self.fsq_human_body_indexes, :
+        ]
         human_body_pos_w = human_body_pos - human_anchor_pos[:, :, None, :]
         num_human_bodies = self.fsq_human_body_indexes.numel()
         human_anchor_quat_w = human_anchor_quat[:, :, None, :].expand(
@@ -448,10 +512,38 @@ class MotionCommand(CommandTerm):
             human_anchor_quat_w.reshape(-1, 4),
             human_body_pos_w.reshape(-1, 3),
         ).reshape(self.num_envs, self.motion.window_size, -1)
-        self.human_fsq_window = torch.cat(
-            (human_anchor_rot6d, human_body_pos_b),
+        human_body_quat_b = quat_mul(
+            quat_inv(human_anchor_quat_w.reshape(-1, 4)),
+            human_body_quat.reshape(-1, 4),
+        )
+        human_body_rot6d_b = rot6d_from_quat(human_body_quat_b).reshape(
+            self.num_envs, self.motion.window_size, -1
+        )
+        human_joint_rot6d = rot6d_from_quat(human_joint_quat).reshape(
+            self.num_envs, self.motion.window_size, -1
+        )
+        actor_human_feature = torch.cat(
+            (
+                human_anchor_rot6d,
+                human_joint_rot6d,
+                human_body_pos_b,
+                human_body_rot6d_b,
+            ),
             dim=-1,
-        ).reshape(self.num_envs, -1)
+        )
+        critic_human_feature = torch.cat(
+            (
+                human_anchor_rot6d,
+                human_anchor_pos,
+                human_joint_rot6d,
+                human_body_pos_b,
+                human_body_rot6d_b,
+            ),
+            dim=-1,
+        )
+        self.actor_human_fsq_window = actor_human_feature.reshape(self.num_envs, -1)
+        self.critic_human_fsq_window = critic_human_feature.reshape(self.num_envs, -1)
+        self.human_fsq_window = self.actor_human_fsq_window
 
     def _update_robot_state_cache(self):
         self.robot_body_pos_w = self.robot.data.body_pos_w[:, self.body_indexes].clone()
@@ -750,12 +842,12 @@ class MotionCommandCfg(CommandTermCfg):
         'Hips', 'HeadEnd', 'LeftHand', 'RightHand', 'LeftToeEnd', 'RightToeEnd'
     ]
     fsq_human_body_names: list[str] = [
-        'Spine1', 'Spine2', 'Chest',
-        'Neck1', 'Neck2', 'Head', 'HeadEnd',
-        'LeftShoulder', 'LeftArm', 'LeftForeArm', 'LeftHand',
-        'RightShoulder', 'RightArm', 'RightForeArm', 'RightHand',
-        'LeftLeg', 'LeftShin', 'LeftFoot', 'LeftToeBase', 'LeftToeEnd',
-        'RightLeg', 'RightShin', 'RightFoot', 'RightToeBase', 'RightToeEnd'
+        'Chest',
+        'HeadEnd',
+        'LeftShoulder', 'LeftArm', 'LeftForeArm',
+        'RightShoulder', 'RightArm', 'RightForeArm',
+        'LeftLeg', 'LeftShin', 'LeftFoot',
+        'RightLeg', 'RightShin', 'RightFoot'
     ]
     
     human_anchor_name: str = 'Hips'

@@ -92,9 +92,9 @@ class RslRlPpoActorCriticDistillCfg(RslRlPpoActorCriticCfg):
 @configclass
 class RslRlPpoActorCriticDualFSQCfg(RslRlPpoActorCriticCfg):
     latent_dim: int = 64
-    robot_encoder_hidden_dims: tuple[int] | list[int] = [1024, 512, 256]
-    human_encoder_hidden_dims: tuple[int] | list[int] = [1024, 512, 256]
-    decoder_hidden_dims: tuple[int] | list[int] = [256, 512, 1024]
+    robot_encoder_hidden_dims: tuple[int] | list[int] = [512, 256]
+    human_encoder_hidden_dims: tuple[int] | list[int] = [512, 256]
+    decoder_hidden_dims: tuple[int] | list[int] = [256, 512]
     fsq_levels: int = 17
     quantizer_type: str = "ifsq"
     ifsq_boundary_fn: str = "sigmoid"
@@ -178,15 +178,21 @@ class G1FlatPPODualFSQRunnerCfg(G1FlatPPORunnerCfg):
                 "last_action",
             ],
             "critic": [
-                "command",
+                # "command",
                 "proprioception",
                 "last_action",
             ],
-            "human_fsq_window": [
-                "human_fsq_window",
+            "actor_human_fsq_window": [
+                "actor_human_fsq_window",
             ],
-            "robot_fsq_window": [
-                "robot_fsq_window",
+            "actor_robot_fsq_window": [
+                "actor_robot_fsq_window",
+            ],
+            "critic_human_fsq_window": [
+                "critic_human_fsq_window",
+            ],
+            "critic_robot_fsq_window": [
+                "critic_robot_fsq_window",
             ],
         },
     )

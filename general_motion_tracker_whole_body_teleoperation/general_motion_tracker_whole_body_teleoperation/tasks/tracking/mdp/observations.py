@@ -80,3 +80,19 @@ def robot_fsq_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
 def human_fsq_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
     return command.human_fsq_window
+
+def actor_robot_fsq_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    return command.actor_robot_fsq_window
+
+def actor_human_fsq_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    return command.actor_human_fsq_window
+
+def critic_robot_fsq_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    return command.critic_robot_fsq_window
+
+def critic_human_fsq_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    return command.critic_human_fsq_window
