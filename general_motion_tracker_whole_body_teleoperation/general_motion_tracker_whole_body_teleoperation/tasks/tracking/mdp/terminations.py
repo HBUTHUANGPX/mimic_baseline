@@ -14,12 +14,12 @@ from general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp.rewards 
 
 def bad_anchor_pos(env: ManagerBasedRLEnv, command_name: str, threshold: float) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.anchor_pos_error_norm > threshold
+    return command.ref_robot_anchor_pos_error_norm > threshold
 
 
 def bad_anchor_pos_z_only(env: ManagerBasedRLEnv, command_name: str, threshold: float) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-    return torch.abs(command.anchor_pos_error[:, -1]) > threshold
+    return torch.abs(command.ref_robot_anchor_pos_error_w[:, -1]) > threshold
 
 
 def bad_anchor_ori(
@@ -27,8 +27,8 @@ def bad_anchor_ori(
 ) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
     return (
-        command.motion_projected_gravity_b[:, 2]
-        - command.robot_projected_gravity_b[:, 2]
+        command.ref_robot_projected_gravity_in_anchor[:, 2]
+        - command.sim_robot_projected_gravity_in_anchor[:, 2]
     ).abs() > threshold
 
 
@@ -38,7 +38,7 @@ def bad_motion_body_pos(
     command: MotionCommand = env.command_manager.get_term(command_name)
 
     body_indexes = _get_body_indexes(command, body_names)
-    error = command.body_pos_error_norm[:, body_indexes]
+    error = command.yaw_aligned_ref_robot_body_pos_error_norm[:, body_indexes]
     return torch.any(error > threshold, dim=-1)
 
 
@@ -48,7 +48,7 @@ def bad_motion_body_pos_z_only(
     command: MotionCommand = env.command_manager.get_term(command_name)
 
     body_indexes = _get_body_indexes(command, body_names)
-    error = torch.abs(command.body_pos_error[:, body_indexes, -1])
+    error = torch.abs(command.yaw_aligned_ref_robot_body_pos_error_w[:, body_indexes, -1])
     return torch.any(error > threshold, dim=-1)
 
 def bad_tracking_terminated(env: ManagerBasedRLEnv, command_name: str) -> torch.Tensor:

@@ -7,95 +7,154 @@ from general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp.commands
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedEnv
 
-def human_motion_anchor_ori_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+def ref_human_anchor_rot6d_in_sim_anchor(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.human_motion_anchor_ori_b
+    return command.ref_human_anchor_rot6d_in_sim_anchor
 
-def robot_anchor_ori_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+def sim_robot_anchor_rot6d_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.robot_anchor_ori_w
+    return command.sim_robot_anchor_rot6d_w
 
 
-def robot_anchor_lin_vel_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
-    command: MotionCommand = env.command_manager.get_term(command_name)
-
-    return command.robot_anchor_vel_w[:, :3].view(env.num_envs, -1)
-
-
-def robot_anchor_ang_vel_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+def sim_robot_anchor_lin_vel_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
 
-    return command.robot_anchor_vel_w[:, 3:6].view(env.num_envs, -1)
+    return command.sim_robot_anchor_spatial_vel_w[:, :3].view(env.num_envs, -1)
 
 
-def robot_body_pos_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+def sim_robot_anchor_ang_vel_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.robot_body_pos_b.view(env.num_envs, -1)
+
+    return command.sim_robot_anchor_spatial_vel_w[:, 3:6].view(env.num_envs, -1)
 
 
-def robot_body_ori_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+def sim_robot_body_pos_in_sim_anchor(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.robot_body_ori_b
+    return command.sim_robot_body_pos_in_sim_anchor.view(env.num_envs, -1)
 
 
-def motion_anchor_pos_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+def sim_robot_body_rot6d_in_sim_anchor(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.motion_anchor_pos_b.view(env.num_envs, -1)
+    return command.sim_robot_body_rot6d_in_sim_anchor
 
 
-def motion_anchor_ori_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+def ref_robot_anchor_pos_in_sim_anchor(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.motion_anchor_ori_b
+    return command.ref_robot_anchor_pos_in_sim_anchor.view(env.num_envs, -1)
 
-def joint_pos_delta(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+
+def ref_robot_anchor_rot6d_in_sim_anchor(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.joint_pos_delta
+    return command.ref_robot_anchor_rot6d_in_sim_anchor
+
+def ref_robot_minus_sim_joint_angle_rad(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    return command.ref_robot_minus_sim_joint_angle_rad
 
 def sim_robot_joint_angle_rad(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
     return command.sim_robot_joint_angle_rad
 
-def motion_id(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+def ref_motion_id(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
     return command.ref_motion_id
 
-def motion_group(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+def ref_motion_group(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
     return command.ref_motion_group
 
-# ======================== window style ===========================
-def joint_pos_delta_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+def actor_ref_robot_fsq_feature_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.joint_pos_delta
+    return command.actor_ref_robot_fsq_feature_window
+
+def actor_ref_human_fsq_feature_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    return command.actor_ref_human_fsq_feature_window
+
+def critic_ref_robot_fsq_feature_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    return command.critic_ref_robot_fsq_feature_window
+
+def critic_ref_human_fsq_feature_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    return command.critic_ref_human_fsq_feature_window
+
+
+def human_motion_anchor_ori_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    return ref_human_anchor_rot6d_in_sim_anchor(env, command_name)
+
+
+def robot_anchor_ori_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    return sim_robot_anchor_rot6d_w(env, command_name)
+
+
+def robot_anchor_lin_vel_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    return sim_robot_anchor_lin_vel_w(env, command_name)
+
+
+def robot_anchor_ang_vel_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    return sim_robot_anchor_ang_vel_w(env, command_name)
+
+
+def robot_body_pos_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    return sim_robot_body_pos_in_sim_anchor(env, command_name)
+
+
+def robot_body_ori_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    return sim_robot_body_rot6d_in_sim_anchor(env, command_name)
+
+
+def motion_anchor_pos_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    return ref_robot_anchor_pos_in_sim_anchor(env, command_name)
+
+
+def motion_anchor_ori_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    return ref_robot_anchor_rot6d_in_sim_anchor(env, command_name)
+
+
+def joint_pos_delta(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    return ref_robot_minus_sim_joint_angle_rad(env, command_name)
+
+
+def motion_id(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    return ref_motion_id(env, command_name)
+
+
+def motion_group(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    return ref_motion_group(env, command_name)
+
+
+def joint_pos_delta_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    return ref_robot_minus_sim_joint_angle_rad(env, command_name)
+
 
 def motion_anchor_ori_b_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
-    command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.motion_anchor_ori_b
+    return ref_robot_anchor_rot6d_in_sim_anchor(env, command_name)
+
 
 def motion_anchor_pos_b_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
-    command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.motion_anchor_pos_b
+    return ref_robot_anchor_pos_in_sim_anchor(env, command_name)
+
 
 def robot_fsq_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
-    command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.robot_fsq_window
+    return actor_ref_robot_fsq_feature_window(env, command_name)
+
 
 def human_fsq_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
-    command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.human_fsq_window
+    return actor_ref_human_fsq_feature_window(env, command_name)
+
 
 def actor_robot_fsq_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
-    command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.actor_robot_fsq_window
+    return actor_ref_robot_fsq_feature_window(env, command_name)
+
 
 def actor_human_fsq_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
-    command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.actor_human_fsq_window
+    return actor_ref_human_fsq_feature_window(env, command_name)
+
 
 def critic_robot_fsq_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
-    command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.critic_robot_fsq_window
+    return critic_ref_robot_fsq_feature_window(env, command_name)
+
 
 def critic_human_fsq_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
-    command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.critic_human_fsq_window
+    return critic_ref_human_fsq_feature_window(env, command_name)

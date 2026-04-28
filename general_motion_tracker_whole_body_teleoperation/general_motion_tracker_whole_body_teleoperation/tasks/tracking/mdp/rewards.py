@@ -17,13 +17,13 @@ def _get_body_indexes(command: MotionCommand, body_names: list[str] | None) -> l
 
 def motion_global_anchor_position_error_exp(env: ManagerBasedRLEnv, command_name: str, std: float) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-    error = torch.sum(torch.square(command.anchor_pos_error), dim=-1)
+    error = torch.sum(torch.square(command.ref_robot_anchor_pos_error_w), dim=-1)
     return torch.exp(-error / std**2)
 
 
 def motion_global_anchor_orientation_error_exp(env: ManagerBasedRLEnv, command_name: str, std: float) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-    error = command.anchor_rot_error**2
+    error = command.ref_robot_anchor_angle_error**2
     return torch.exp(-error / std**2)
 
 
@@ -33,7 +33,7 @@ def motion_relative_body_position_error_exp(
     command: MotionCommand = env.command_manager.get_term(command_name)
     body_indexes = _get_body_indexes(command, body_names)
     error = torch.sum(
-        torch.square(command.body_pos_error[:, body_indexes]), dim=-1
+        torch.square(command.yaw_aligned_ref_robot_body_pos_error_w[:, body_indexes]), dim=-1
     )
     return torch.exp(-error.mean(-1) / std**2)
 
@@ -41,14 +41,14 @@ def motion_global_anchor_position_z_error_sum_square(
     env: ManagerBasedRLEnv, command_name: str,
 ) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-    error = torch.sum(torch.square(command.anchor_pos_error[..., 2:3]), dim=-1)
+    error = torch.sum(torch.square(command.ref_robot_anchor_pos_error_w[..., 2:3]), dim=-1)
     return error
 
 def xy_anchor_movement_in_recovering(
     env: ManagerBasedRLEnv, command_name: str,
 ) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-    xy_vel_sum = torch.sum(torch.square(command.robot_anchor_lin_vel_w[:, :2]), dim=-1)
+    xy_vel_sum = torch.sum(torch.square(command.sim_robot_anchor_lin_vel_w[:, :2]), dim=-1)
     return command.is_recovering*xy_vel_sum
 
 def action_rate_l2_in_recovering(env: ManagerBasedRLEnv, command_name: str,) -> torch.Tensor:
@@ -61,7 +61,7 @@ def motion_relative_body_orientation_error_exp(
 ) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
     body_indexes = _get_body_indexes(command, body_names)
-    error = command.body_rot_error[:, body_indexes] ** 2
+    error = command.yaw_aligned_ref_robot_body_angle_error[:, body_indexes] ** 2
     return torch.exp(-error.mean(-1) / std**2)
 
 
@@ -71,7 +71,7 @@ def motion_global_body_linear_velocity_error_exp(
     command: MotionCommand = env.command_manager.get_term(command_name)
     body_indexes = _get_body_indexes(command, body_names)
     error = torch.sum(
-        torch.square(command.body_lin_vel_error[:, body_indexes]), dim=-1
+        torch.square(command.ref_robot_body_lin_vel_error_w[:, body_indexes]), dim=-1
     )
     return torch.exp(-error.mean(-1) / std**2)
 
@@ -82,7 +82,7 @@ def motion_global_body_angular_velocity_error_exp(
     command: MotionCommand = env.command_manager.get_term(command_name)
     body_indexes = _get_body_indexes(command, body_names)
     error = torch.sum(
-        torch.square(command.body_ang_vel_error[:, body_indexes]), dim=-1
+        torch.square(command.ref_robot_body_ang_vel_error_w[:, body_indexes]), dim=-1
     )
     return torch.exp(-error.mean(-1) / std**2)
 
@@ -114,7 +114,7 @@ def foot_contact_velocity(
         )[0]
         > threshold
     )
-    foot_vel = torch.square(command.robot_body_lin_vel_w[:, body_indexes]).sum(
+    foot_vel = torch.square(command.sim_robot_body_lin_vel_w[:, body_indexes]).sum(
         -1
     )  # tag
     clipped_vel = torch.clip(foot_vel, min=0, max=clip)
