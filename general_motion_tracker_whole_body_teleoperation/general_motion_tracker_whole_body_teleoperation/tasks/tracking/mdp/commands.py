@@ -386,48 +386,48 @@ class MotionCommand(CommandTerm):
             self.time_steps.max() < self.motion.time_step_total
         ), f"time_steps: {self.time_steps}, motion time_step_total: {self.motion.time_step_total}"
 
-        self.body_pos_w = (
+        self.ref_robot_body_pos_w = (
             self.motion.body_pos_w[self.time_steps]
             - self.body_pos_start_w [:, self.motion_anchor_body_index:self.motion_anchor_body_index+1,:]
             + self._env.scene.env_origins[:, None, :]
         )
-        self.body_quat_w = self.motion.body_quat_w[self.time_steps]
-        self.body_lin_vel_w = self.motion.body_lin_vel_w[self.time_steps]
-        self.body_ang_vel_w = self.motion.body_ang_vel_w[self.time_steps]
-        self.joint_pos = self.motion.joint_pos[self.time_steps]
-        self.joint_vel = self.motion.joint_vel[self.time_steps]
+        self.ref_robot_body_quat_w = self.motion.body_quat_w[self.time_steps]
+        self.ref_robot_body_lin_vel_w = self.motion.body_lin_vel_w[self.time_steps]
+        self.ref_robot_body_ang_vel_w = self.motion.body_ang_vel_w[self.time_steps]
+        self.ref_robot_joint_angle_rad = self.motion.joint_pos[self.time_steps]
+        self.ref_robot_joint_vel_rad_s = self.motion.joint_vel[self.time_steps]
         if not full:
             return
-        self.anchor_pos_w = (
+        self.ref_robot_anchor_pos_w = (
             self.motion.body_pos_w[self.time_steps, self.motion_anchor_body_index]
             - self.body_pos_start_w[:, self.motion_anchor_body_index]
             + self._env.scene.env_origins
         )
-        self.anchor_quat_w = self.motion.body_quat_w[
+        self.ref_robot_anchor_quat_w = self.motion.body_quat_w[
             self.time_steps, self.motion_anchor_body_index
         ]
-        self.human_body_pos_w = (
+        self.ref_robot_anchor_lin_vel_w = self.motion.body_lin_vel_w[
+            self.time_steps, self.motion_anchor_body_index
+        ]
+        self.ref_robot_anchor_ang_vel_w = self.motion.body_ang_vel_w[
+            self.time_steps, self.motion_anchor_body_index
+        ]
+        self.ref_human_body_pos_w = (
             self.motion.human_body_pos_w[self.time_steps]
             - self.human_body_pos_start_w [:, self.human_body_indexes:self.human_body_indexes+1,:]
             + self._env.scene.env_origins[:, None, :]
         )
-        self.human_body_quat_w = self.motion.human_body_quat_w[self.time_steps]
-        self.human_anchor_pos_w = (
+        self.ref_human_body_quat_w = self.motion.human_body_quat_w[self.time_steps]
+        self.ref_human_anchor_pos_w = (
             self.motion.human_body_pos_w[self.time_steps, self.human_body_indexes]
             - self.human_body_pos_start_w[:, self.human_body_indexes]
             + self._env.scene.env_origins
         )
-        self.human_anchor_quat_w = self.motion.human_body_quat_w[
+        self.ref_human_anchor_quat_w = self.motion.human_body_quat_w[
             self.time_steps, self.human_body_indexes
         ]
-        self.anchor_lin_vel_w = self.motion.body_lin_vel_w[
-            self.time_steps, self.motion_anchor_body_index
-        ]
-        self.anchor_ang_vel_w = self.motion.body_ang_vel_w[
-            self.time_steps, self.motion_anchor_body_index
-        ]
-        self.motion_id = self.motion._motion_id[self.time_steps]
-        self.motion_group = self.motion._motion_group[self.time_steps]
+        self.ref_motion_id = self.motion._motion_id[self.time_steps]
+        self.ref_motion_group = self.motion._motion_group[self.time_steps]
 
     def _get_window_time_steps(self) -> torch.Tensor:
         window_time_steps = self.time_steps[:, None] + self.motion.window_offsets[None, :]
@@ -435,8 +435,8 @@ class MotionCommand(CommandTerm):
 
     def _make_calculate(self):
         num_bodies = len(self.cfg.body_names)
-        anchor_pos_w_repeat = self.anchor_pos_w[:, None, :].expand(-1, num_bodies, -1)
-        anchor_quat_w_repeat = self.anchor_quat_w[:, None, :].expand(-1, num_bodies, -1)
+        anchor_pos_w_repeat = self.ref_robot_anchor_pos_w[:, None, :].expand(-1, num_bodies, -1)
+        anchor_quat_w_repeat = self.ref_robot_anchor_quat_w[:, None, :].expand(-1, num_bodies, -1)
         robot_anchor_pos_w_repeat = self.sim_robot_anchor_pos_w[:, None, :].expand(
             -1, num_bodies, -1
         )
@@ -445,11 +445,11 @@ class MotionCommand(CommandTerm):
         )
 
         # 基础命令和本体观测缓存。
-        self._command = torch.cat([self.joint_pos, self.joint_vel], dim=1)
+        self._command = torch.cat([self.ref_robot_joint_angle_rad, self.ref_robot_joint_vel_rad_s], dim=1)
         self.robot_anchor_vel_w = torch.cat(
             [self.sim_robot_anchor_lin_vel_w, self.sim_robot_anchor_ang_vel_w], dim=-1
         )
-        self.joint_pos_delta = self.joint_pos - self.sim_robot_joint_angle_rad
+        self.joint_pos_delta = self.ref_robot_joint_angle_rad - self.sim_robot_joint_angle_rad
         self.robot_anchor_ori_w = rot6d_from_quat(self.sim_robot_anchor_quat_w)
 
         # 参考机器人动作对齐到当前机器人 anchor yaw 后的世界系目标。
@@ -459,9 +459,9 @@ class MotionCommand(CommandTerm):
         delta_ori_w = yaw_quat(
             quat_mul(robot_anchor_quat_w_repeat, quat_inv(anchor_quat_w_repeat))
         )
-        self.body_quat_relative_w = quat_mul(delta_ori_w, self.body_quat_w)
+        self.body_quat_relative_w = quat_mul(delta_ori_w, self.ref_robot_body_quat_w)
         self.body_pos_relative_w = delta_pos_w + quat_apply(
-            delta_ori_w, self.body_pos_w - anchor_pos_w_repeat
+            delta_ori_w, self.ref_robot_body_pos_w - anchor_pos_w_repeat
         )
 
         # 当前机器人关键 body 在当前机器人 anchor frame 下的位姿，供 observation 使用。
@@ -480,8 +480,8 @@ class MotionCommand(CommandTerm):
         motion_anchor_pos_b, motion_anchor_ori_b = subtract_frame_transforms(
             self.sim_robot_anchor_pos_w,
             self.sim_robot_anchor_quat_w,
-            self.anchor_pos_w,
-            self.anchor_quat_w,
+            self.ref_robot_anchor_pos_w,
+            self.ref_robot_anchor_quat_w,
         )
         self.motion_anchor_pos_b = motion_anchor_pos_b
         self.motion_anchor_ori_b = rot6d_from_quat(motion_anchor_ori_b).reshape(
@@ -492,8 +492,8 @@ class MotionCommand(CommandTerm):
         _, human_motion_anchor_ori_b = subtract_frame_transforms(
             self.sim_robot_anchor_pos_w,
             self.sim_robot_anchor_quat_w,
-            self.human_anchor_pos_w,
-            self.human_anchor_quat_w,
+            self.ref_human_anchor_pos_w,
+            self.ref_human_anchor_quat_w,
         )
         self.human_motion_anchor_ori_b = rot6d_from_quat(
             human_motion_anchor_ori_b
@@ -613,20 +613,20 @@ class MotionCommand(CommandTerm):
         self.human_fsq_window = self.actor_human_fsq_window
 
         # 奖励、终止和指标共用的误差缓存。
-        self.anchor_pos_error = self.anchor_pos_w - self.sim_robot_anchor_pos_w
-        self.anchor_lin_vel_error = self.anchor_lin_vel_w - self.sim_robot_anchor_lin_vel_w
-        self.anchor_ang_vel_error = self.anchor_ang_vel_w - self.sim_robot_anchor_ang_vel_w
+        self.anchor_pos_error = self.ref_robot_anchor_pos_w - self.sim_robot_anchor_pos_w
+        self.anchor_lin_vel_error = self.ref_robot_anchor_lin_vel_w - self.sim_robot_anchor_lin_vel_w
+        self.anchor_ang_vel_error = self.ref_robot_anchor_ang_vel_w - self.sim_robot_anchor_ang_vel_w
         self.anchor_rot_error = quat_error_magnitude(
-            self.anchor_quat_w, self.sim_robot_anchor_quat_w
+            self.ref_robot_anchor_quat_w, self.sim_robot_anchor_quat_w
         )
         self.body_pos_error = self.body_pos_relative_w - self.sim_robot_body_pos_w
         self.body_rot_error = quat_error_magnitude(
             self.body_quat_relative_w, self.sim_robot_body_quat_w
         )
-        self.body_lin_vel_error = self.body_lin_vel_w - self.sim_robot_body_lin_vel_w
-        self.body_ang_vel_error = self.body_ang_vel_w - self.sim_robot_body_ang_vel_w
-        self.joint_pos_error = self.joint_pos - self.sim_robot_joint_angle_rad
-        self.joint_vel_error = self.joint_vel - self.sim_robot_joint_vel_rad_s
+        self.body_lin_vel_error = self.ref_robot_body_lin_vel_w - self.sim_robot_body_lin_vel_w
+        self.body_ang_vel_error = self.ref_robot_body_ang_vel_w - self.sim_robot_body_ang_vel_w
+        self.joint_pos_error = self.ref_robot_joint_angle_rad - self.sim_robot_joint_angle_rad
+        self.joint_vel_error = self.ref_robot_joint_vel_rad_s - self.sim_robot_joint_vel_rad_s
         self.anchor_pos_error_norm = torch.norm(self.anchor_pos_error, dim=-1)
         self.anchor_lin_vel_error_norm = torch.norm(self.anchor_lin_vel_error, dim=-1)
         self.anchor_ang_vel_error_norm = torch.norm(self.anchor_ang_vel_error, dim=-1)
@@ -638,7 +638,7 @@ class MotionCommand(CommandTerm):
 
         gravity_w = self.robot.data.GRAVITY_VEC_W
         self.motion_projected_gravity_b = quat_apply_inverse(
-            self.anchor_quat_w, gravity_w
+            self.ref_robot_anchor_quat_w, gravity_w
         )
         self.robot_projected_gravity_b = quat_apply_inverse(
             self.sim_robot_anchor_quat_w, gravity_w
@@ -672,12 +672,12 @@ class MotionCommand(CommandTerm):
         self.sim_robot_root_lin_vel_b = self.robot.data.root_lin_vel_b.clone()
 
     def _reset_env_by_motion(self, env_ids: Sequence[int]):
-        root_pos = self.body_pos_w[env_ids, 0]
-        root_ori = self.body_quat_w[env_ids, 0]
-        root_lin_vel = self.body_lin_vel_w[env_ids, 0]
-        root_ang_vel = self.body_ang_vel_w[env_ids, 0]
-        joint_pos = self.joint_pos[env_ids]
-        joint_vel = self.joint_vel[env_ids]
+        root_pos = self.ref_robot_body_pos_w[env_ids, 0]
+        root_ori = self.ref_robot_body_quat_w[env_ids, 0]
+        root_lin_vel = self.ref_robot_body_lin_vel_w[env_ids, 0]
+        root_ang_vel = self.ref_robot_body_ang_vel_w[env_ids, 0]
+        joint_pos = self.ref_robot_joint_angle_rad[env_ids]
+        joint_vel = self.ref_robot_joint_vel_rad_s[env_ids]
 
         rand_samples = sample_uniform(
             self.pose_ranges[:, 0],
@@ -810,8 +810,8 @@ class MotionCommand(CommandTerm):
         self.current_anchor_visualizer.visualize(
             self.sim_robot_anchor_pos_w, self.sim_robot_anchor_quat_w
         )
-        self.goal_anchor_visualizer.visualize(self.anchor_pos_w, self.anchor_quat_w)
-        self.human_goal_anchor_visualizer.visualize(self.human_anchor_pos_w, self.human_anchor_quat_w)
+        self.goal_anchor_visualizer.visualize(self.ref_robot_anchor_pos_w, self.ref_robot_anchor_quat_w)
+        self.human_goal_anchor_visualizer.visualize(self.ref_human_anchor_pos_w, self.ref_human_anchor_quat_w)
         for i in range(len(self.cfg.body_names)):
             self.current_body_visualizers[i].visualize(
                 self.sim_robot_body_pos_w[:, i], self.sim_robot_body_quat_w[:, i]
@@ -821,7 +821,7 @@ class MotionCommand(CommandTerm):
             )
         for i in range(len(self.cfg.desire_human_joint_names)):
             self.human_goal_body_visualizers[i].visualize(
-                self.human_body_pos_w[:, i], self.human_body_quat_w[:, i]
+                self.ref_human_body_pos_w[:, i], self.ref_human_body_quat_w[:, i]
             )
 
 

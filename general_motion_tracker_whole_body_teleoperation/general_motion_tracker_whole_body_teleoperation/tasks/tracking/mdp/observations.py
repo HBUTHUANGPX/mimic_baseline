@@ -51,17 +51,17 @@ def joint_pos_delta(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
     return command.joint_pos_delta
 
-def robot_joint_pos(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+def sim_robot_joint_angle_rad(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.robot_joint_pos
+    return command.sim_robot_joint_angle_rad
 
 def motion_id(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.motion_id
+    return command.ref_motion_id
 
 def motion_group(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.motion_group
+    return command.ref_motion_group
 
 # ======================== window style ===========================
 def joint_pos_delta_window(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
