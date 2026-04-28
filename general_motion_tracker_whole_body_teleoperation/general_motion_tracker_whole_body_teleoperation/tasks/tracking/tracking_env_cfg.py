@@ -228,7 +228,11 @@ class ObservationsCfg:
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.01, n_max=0.01),
         )
-
+        human_motion_anchor_ori_b = ObsTerm(
+            func=mdp.human_motion_anchor_ori_b,
+            params={"command_name": "motion"},
+            noise=Unoise(n_min=-0.01, n_max=0.01),
+        )
         def __post_init__(self):
             self.enable_corruption = True
 
@@ -324,19 +328,23 @@ class ObservationsCfg:
         CommandAllCfg()
     )  # 有噪 无特权 cmd
     command_window_with_noise_wo_privilege.joint_pos_delta = None
+    command_window_with_noise_wo_privilege.joint_pos_delta_window = None
     command_window_with_noise_wo_privilege.motion_anchor_pos_b = None
-    command_window_with_noise_wo_privilege.motion_anchor_ori_b = None
     command_window_with_noise_wo_privilege.motion_anchor_pos_b_window = None
+    command_window_with_noise_wo_privilege.motion_anchor_ori_b = None
+    command_window_with_noise_wo_privilege.motion_anchor_ori_b_window = None
     command_window_with_noise_wo_privilege.robot_body_pos = None
     command_window_with_noise_wo_privilege.robot_body_ori = None
 
     command_with_noise_wo_privilege: CommandAllCfg = (
         CommandAllCfg()
     )  # 有噪 无特权 cmd
+    command_with_noise_wo_privilege.joint_pos_delta = None
     command_with_noise_wo_privilege.joint_pos_delta_window = None
-    command_with_noise_wo_privilege.motion_anchor_pos_b_window = None
-    command_with_noise_wo_privilege.motion_anchor_ori_b_window = None
     command_with_noise_wo_privilege.motion_anchor_pos_b = None
+    command_with_noise_wo_privilege.motion_anchor_pos_b_window = None
+    command_with_noise_wo_privilege.motion_anchor_ori_b = None
+    command_with_noise_wo_privilege.motion_anchor_ori_b_window = None
     command_with_noise_wo_privilege.robot_body_pos = None
     command_with_noise_wo_privilege.robot_body_ori = None
 
@@ -591,7 +599,7 @@ class TerminationsCfg:
         func=mdp.bad_motion_body_pos_z_only,
         params={
             "command_name": "motion",
-            "threshold": 0.35,
+            "threshold": 0.25,
             "body_names": [
                 "L_ankle_roll_link",
                 "R_ankle_roll_link",

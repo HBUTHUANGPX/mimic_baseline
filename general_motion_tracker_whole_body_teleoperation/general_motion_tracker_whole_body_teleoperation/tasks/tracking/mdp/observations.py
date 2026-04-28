@@ -7,6 +7,9 @@ from general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp.commands
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedEnv
 
+def human_motion_anchor_ori_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    return command.human_motion_anchor_ori_b
 
 def robot_anchor_ori_w(env: ManagerBasedEnv, command_name: str) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)

@@ -14,6 +14,7 @@ from isaaclab.markers.config import FRAME_MARKER_CFG
 from isaaclab.utils import configclass
 from isaaclab.utils.math import (
     matrix_from_quat,
+    euler_xyz_from_quat,
     quat_apply,
     quat_apply_inverse,
     quat_error_magnitude,
@@ -22,6 +23,7 @@ from isaaclab.utils.math import (
     quat_mul,
     sample_uniform,
     subtract_frame_transforms,
+    wrap_to_pi,
     yaw_quat,
 )
 
@@ -623,6 +625,14 @@ class MotionCommand(CommandTerm):
         )
         self.motion_anchor_pos_b = motion_anchor_pos_b
         self.motion_anchor_ori_b = rot6d_from_quat(motion_anchor_ori_b).reshape(self.num_envs, -1)
+        
+        _, human_motion_anchor_ori_b = subtract_frame_transforms(
+            self.robot_anchor_pos_w,
+            self.robot_anchor_quat_w,
+            self.human_anchor_pos_w,
+            self.human_anchor_quat_w
+        )
+        self.human_motion_anchor_ori_b = rot6d_from_quat(human_motion_anchor_ori_b).reshape(self.num_envs, -1)
         # Shared error tensors used by rewards/terminations/metrics.
         self.anchor_pos_error = self.anchor_pos_w - self.robot_anchor_pos_w
         self.anchor_lin_vel_error = self.anchor_lin_vel_w - self.robot_anchor_lin_vel_w

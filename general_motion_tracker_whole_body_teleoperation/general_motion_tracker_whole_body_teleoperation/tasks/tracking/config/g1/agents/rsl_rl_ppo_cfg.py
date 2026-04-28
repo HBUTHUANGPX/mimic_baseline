@@ -173,12 +173,12 @@ class G1FlatPPODualFSQRunnerCfg(G1FlatPPORunnerCfg):
     obs_groups = (
         {
             "policy": [
-                # "command_with_noise_wo_privilege",
+                "command_with_noise_wo_privilege",
                 "proprioception_with_noise_wo_privilege",
                 "last_action",
             ],
             "critic": [
-                # "command",
+                "command",
                 "proprioception",
                 "last_action",
             ],
