@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from isaaclab.assets import Articulation
 from isaaclab.managers import CommandTerm, CommandTermCfg
-from isaaclab.markers import VisualizationMarkers, VisualizationMarkersCfg
+from isaaclab.markers import VisualizationMarkersCfg
 from isaaclab.markers.config import FRAME_MARKER_CFG
 from isaaclab.utils import configclass
 from isaaclab.utils.math import (
@@ -39,6 +39,9 @@ from general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp.adaptive
     LegacyBinAdaptiveSamplingCfg,
     SonicBinAdaptiveSampling,
     SonicBinAdaptiveSamplingCfg,
+)
+from general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp.motion_debug_visualizer import (
+    MotionDebugVisualizer,
 )
 
 
@@ -809,99 +812,13 @@ class MotionCommand(CommandTerm):
         # self.reached_motion_end = self.time_steps > self.motion.time_step_total
 
     def _set_debug_vis_impl(self, debug_vis: bool):
-        if debug_vis:
-            if not hasattr(self, "current_anchor_visualizer"):
-                self.current_anchor_visualizer = VisualizationMarkers(
-                    self.cfg.anchor_visualizer_cfg.replace(
-                        prim_path="/Visuals/Command/current/anchor"
-                    )
-                )
-                self.goal_anchor_visualizer = VisualizationMarkers(
-                    self.cfg.anchor_visualizer_cfg.replace(
-                        prim_path="/Visuals/Command/goal/anchor"
-                    )
-                )
-
-                self.current_body_visualizers = []
-                self.goal_body_visualizers = []
-                for name in self.cfg.body_names:
-                    self.current_body_visualizers.append(
-                        VisualizationMarkers(
-                            self.cfg.body_visualizer_cfg.replace(
-                                prim_path="/Visuals/Command/current/" + name
-                            )
-                        )
-                    )
-                    self.goal_body_visualizers.append(
-                        VisualizationMarkers(
-                            self.cfg.body_visualizer_cfg.replace(
-                                prim_path="/Visuals/Command/goal/" + name
-                            )
-                        )
-                    )
-
-            if not hasattr(self, "human_goal_anchor_visualizer"):
-                self.human_goal_anchor_visualizer = VisualizationMarkers(
-                    self.cfg.human_anchor_visualizer_cfg.replace(
-                        prim_path="/Visuals/Command/current/human_goal_anchor"
-                    )
-                )
-                self.human_goal_body_visualizers = []
-                for name in self.cfg.desire_human_joint_names:
-                    self.human_goal_body_visualizers.append(
-                        VisualizationMarkers(
-                            self.cfg.human_body_visualizer_cfg.replace(
-                                prim_path="/Visuals/Command/human_goal_body/" + name
-                            )
-                        )
-                    )
-
-            self.current_anchor_visualizer.set_visibility(True)
-            self.goal_anchor_visualizer.set_visibility(True)
-            self.human_goal_anchor_visualizer.set_visibility(True)
-            for i in range(len(self.cfg.body_names)):
-                self.current_body_visualizers[i].set_visibility(True)
-                self.goal_body_visualizers[i].set_visibility(True)
-            for i in range(len(self.cfg.desire_human_joint_names)):
-                self.human_goal_body_visualizers[i].set_visibility(True)
-
-        else:
-            if hasattr(self, "current_anchor_visualizer"):
-                self.current_anchor_visualizer.set_visibility(False)
-                self.goal_anchor_visualizer.set_visibility(False)
-                for i in range(len(self.cfg.body_names)):
-                    self.current_body_visualizers[i].set_visibility(False)
-                    self.goal_body_visualizers[i].set_visibility(False)
-            if hasattr(self, "human_goal_anchor_visualizer"):
-                self.human_goal_anchor_visualizer.set_visibility(False)
-                for i in range(len(self.cfg.desire_human_joint_names)):
-                    self.human_goal_body_visualizers[i].set_visibility(False)
+        if not hasattr(self, "_motion_debug_visualizer"):
+            self._motion_debug_visualizer = MotionDebugVisualizer(self.cfg)
+        self._motion_debug_visualizer.set_visibility(debug_vis)
 
     def _debug_vis_callback(self, event):
-        if not self.robot.is_initialized:
-            return
-
-        self.current_anchor_visualizer.visualize(
-            self.sim_robot_anchor_pos_w, self.sim_robot_anchor_quat_w
-        )
-        self.goal_anchor_visualizer.visualize(
-            self.ref_robot_anchor_pos_w, self.ref_robot_anchor_quat_w
-        )
-        self.human_goal_anchor_visualizer.visualize(
-            self.ref_human_anchor_pos_w, self.ref_human_anchor_quat_w
-        )
-        for i in range(len(self.cfg.body_names)):
-            self.current_body_visualizers[i].visualize(
-                self.sim_robot_body_pos_w[:, i], self.sim_robot_body_quat_w[:, i]
-            )
-            self.goal_body_visualizers[i].visualize(
-                self.yaw_aligned_ref_robot_body_pos_w[:, i],
-                self.yaw_aligned_ref_robot_body_quat_w[:, i],
-            )
-        for i in range(len(self.cfg.desire_human_joint_names)):
-            self.human_goal_body_visualizers[i].visualize(
-                self.ref_human_body_pos_w[:, i], self.ref_human_body_quat_w[:, i]
-            )
+        if hasattr(self, "_motion_debug_visualizer"):
+            self._motion_debug_visualizer.visualize(self)
 
 
 @configclass
