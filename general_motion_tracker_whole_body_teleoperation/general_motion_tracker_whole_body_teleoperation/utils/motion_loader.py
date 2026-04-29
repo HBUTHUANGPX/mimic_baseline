@@ -233,6 +233,7 @@ class MotionLoader_robot:
         return valid_center_mask
 
 class MotionLoader_human:
+    # TODO： 多卡训练，分布式加载数据
     def __init__(
         self,
         motion_file_group: dict[str, list[str] | str] | str,
