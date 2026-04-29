@@ -8,6 +8,7 @@ from general_motion_tracker_whole_body_teleoperation.robots.g1 import (
     G1_CYLINDER_CFG,
 )
 
+
 @configclass
 class G1TerrainEnvCfg(TrackingEnvCfg):
     def __post_init__(self):
@@ -62,6 +63,7 @@ class G1TerrainEnvCfg(TrackingEnvCfg):
             "right_wrist_yaw_link",
         ]
 
+
 @configclass
 class G1TerrainEnvCfg_PLAY(G1TerrainEnvCfg):
     def __post_init__(self):
@@ -74,6 +76,7 @@ class G1TerrainEnvCfg_PLAY(G1TerrainEnvCfg):
             self.scene.terrain.terrain_generator.num_cols = 5
             self.scene.terrain.terrain_generator.curriculum = False
         self.terminations = None
+
 
 @configclass
 class G1TerrainPureEnvCfg(G1TerrainEnvCfg):

@@ -12,7 +12,7 @@ from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
-from isaaclab.sensors import ContactSensorCfg,RayCasterCfg,patterns
+from isaaclab.sensors import ContactSensorCfg, RayCasterCfg, patterns
 from isaaclab.terrains import TerrainImporterCfg
 
 ##
@@ -42,7 +42,6 @@ ROUGH_TERRAINS_CFG = TerrainGeneratorCfg(
     size=(8.0, 8.0),
     border_width=200.0,
     border_height=0.0,
-    
     num_rows=10,
     num_cols=20,
     horizontal_scale=0.1,
@@ -51,7 +50,7 @@ ROUGH_TERRAINS_CFG = TerrainGeneratorCfg(
     use_cache=False,
     sub_terrains={
         "pyramid_stairs": terrain_gen.MeshPyramidStairsTerrainCfg(
-            proportion=0.,
+            proportion=0.0,
             step_height_range=(0.05, 0.23),
             step_width=0.3,
             platform_width=3.0,
@@ -59,7 +58,7 @@ ROUGH_TERRAINS_CFG = TerrainGeneratorCfg(
             holes=False,
         ),
         "pyramid_stairs_inv": terrain_gen.MeshInvertedPyramidStairsTerrainCfg(
-            proportion=0.,
+            proportion=0.0,
             step_height_range=(0.05, 0.23),
             step_width=0.3,
             platform_width=3.0,
@@ -67,19 +66,30 @@ ROUGH_TERRAINS_CFG = TerrainGeneratorCfg(
             holes=False,
         ),
         "boxes": terrain_gen.MeshRandomGridTerrainCfg(
-            proportion=0.2, grid_width=0.45, grid_height_range=(0.05, 0.2), platform_width=2.0
+            proportion=0.2,
+            grid_width=0.45,
+            grid_height_range=(0.05, 0.2),
+            platform_width=2.0,
         ),
         "random_rough": terrain_gen.HfRandomUniformTerrainCfg(
             proportion=0.2, noise_range=(0.02, 0.10), noise_step=0.02, border_width=0.25
         ),
         "hf_pyramid_slope": terrain_gen.HfPyramidSlopedTerrainCfg(
-            proportion=0.1, slope_range=(0.0, 0.4), platform_width=2.0, border_width=0.25
+            proportion=0.1,
+            slope_range=(0.0, 0.4),
+            platform_width=2.0,
+            border_width=0.25,
         ),
         "hf_pyramid_slope_inv": terrain_gen.HfInvertedPyramidSlopedTerrainCfg(
-            proportion=0.1, slope_range=(0.0, 0.4), platform_width=2.0, border_width=0.25
+            proportion=0.1,
+            slope_range=(0.0, 0.4),
+            platform_width=2.0,
+            border_width=0.25,
         ),
     },
 )
+
+
 @configclass
 class MySceneCfg(InteractiveSceneCfg):
     """Configuration for the terrain scene with a legged robot."""
@@ -181,6 +191,7 @@ class ActionsCfg:
 @configclass
 class ObservationsCfg:
     """Observation specifications for the MDP."""
+
     @configclass
     class CommandAllCfg(ObsGroup):  # 有噪 特权 window cmd
         """Observations for command group with noise."""
@@ -233,6 +244,7 @@ class ObservationsCfg:
             params={"command_name": "motion"},
             noise=Unoise(n_min=-0.01, n_max=0.01),
         )
+
         def __post_init__(self):
             self.enable_corruption = True
 
@@ -240,9 +252,7 @@ class ObservationsCfg:
     class ProprioceptionAllCfg(ObsGroup):  # 有噪 特权 本体
         """Observations for proprioception group with noise."""
 
-        root_pos_w = ObsTerm(
-            func=mdp.root_pos_w, noise=Unoise(n_min=-0.05, n_max=0.05)
-        )
+        root_pos_w = ObsTerm(func=mdp.root_pos_w, noise=Unoise(n_min=-0.05, n_max=0.05))
         sim_robot_anchor_rot6d_w = ObsTerm(
             func=mdp.sim_robot_anchor_rot6d_w,
             params={"command_name": "motion"},
@@ -274,13 +284,17 @@ class ObservationsCfg:
     class MotionIdCfg(ObsGroup):  # 不带噪声的上一个动作观测组
         """Observations for last action group."""
 
-        ref_motion_id = ObsTerm(func=mdp.ref_motion_id, params={"command_name": "motion"})
+        ref_motion_id = ObsTerm(
+            func=mdp.ref_motion_id, params={"command_name": "motion"}
+        )
 
     @configclass
     class MotionGroupCfg(ObsGroup):  # 不带噪声的上一个动作观测组
         """Observations for last action group."""
 
-        ref_motion_group = ObsTerm(func=mdp.ref_motion_group, params={"command_name": "motion"})
+        ref_motion_group = ObsTerm(
+            func=mdp.ref_motion_group, params={"command_name": "motion"}
+        )
 
     @configclass
     class ActorRefRobotFSQFeatureWindowCfg(ObsGroup):
@@ -326,17 +340,21 @@ class ObservationsCfg:
         CommandAllCfg()
     )  # 有噪 无特权 cmd
     command_window_with_noise_wo_privilege.ref_robot_minus_sim_joint_angle_rad = None
-    command_window_with_noise_wo_privilege.ref_robot_minus_sim_joint_angle_rad_window = None
+    command_window_with_noise_wo_privilege.ref_robot_minus_sim_joint_angle_rad_window = (
+        None
+    )
     command_window_with_noise_wo_privilege.ref_robot_anchor_pos_in_sim_anchor = None
-    command_window_with_noise_wo_privilege.ref_robot_anchor_pos_in_sim_anchor_window = None
+    command_window_with_noise_wo_privilege.ref_robot_anchor_pos_in_sim_anchor_window = (
+        None
+    )
     command_window_with_noise_wo_privilege.ref_robot_anchor_rot6d_in_sim_anchor = None
-    command_window_with_noise_wo_privilege.ref_robot_anchor_rot6d_in_sim_anchor_window = None
+    command_window_with_noise_wo_privilege.ref_robot_anchor_rot6d_in_sim_anchor_window = (
+        None
+    )
     command_window_with_noise_wo_privilege.sim_robot_body_pos_in_sim_anchor = None
     command_window_with_noise_wo_privilege.sim_robot_body_rot6d_in_sim_anchor = None
 
-    command_with_noise_wo_privilege: CommandAllCfg = (
-        CommandAllCfg()
-    )  # 有噪 无特权 cmd
+    command_with_noise_wo_privilege: CommandAllCfg = CommandAllCfg()  # 有噪 无特权 cmd
     command_with_noise_wo_privilege.ref_robot_minus_sim_joint_angle_rad = None
     command_with_noise_wo_privilege.ref_robot_anchor_pos_in_sim_anchor = None
     command_with_noise_wo_privilege.ref_robot_anchor_rot6d_in_sim_anchor = None
@@ -352,25 +370,37 @@ class ObservationsCfg:
     proprioception_with_noise_wo_privilege.base_lin_vel = None
     proprioception_with_noise_wo_privilege.root_pos_w = None
 
-    command_window: CommandAllCfg = CommandAllCfg(enable_corruption = False)  # 无噪 特权 cmd 
+    command_window: CommandAllCfg = CommandAllCfg(
+        enable_corruption=False
+    )  # 无噪 特权 cmd
     command_window.ref_robot_minus_sim_joint_angle_rad = None
     command_window.ref_robot_anchor_pos_in_sim_anchor = None
     command_window.ref_robot_anchor_rot6d_in_sim_anchor = None
 
-    command: CommandAllCfg = CommandAllCfg(enable_corruption = False)  # 无噪 特权 cmd
+    command: CommandAllCfg = CommandAllCfg(enable_corruption=False)  # 无噪 特权 cmd
     command.ref_robot_minus_sim_joint_angle_rad_window = None
     command.ref_robot_anchor_rot6d_in_sim_anchor_window = None
     command.ref_robot_anchor_pos_in_sim_anchor_window = None
-    proprioception: ProprioceptionAllCfg = ProprioceptionAllCfg(enable_corruption = False)  # 无噪 特权 本体
+    proprioception: ProprioceptionAllCfg = ProprioceptionAllCfg(
+        enable_corruption=False
+    )  # 无噪 特权 本体
 
     last_action: LastActionCfg = LastActionCfg()
 
     ref_motion_id: MotionIdCfg = MotionIdCfg()
     ref_motion_group: MotionGroupCfg = MotionGroupCfg()
-    actor_ref_robot_fsq_feature_window: ActorRefRobotFSQFeatureWindowCfg = ActorRefRobotFSQFeatureWindowCfg()
-    actor_ref_human_fsq_feature_window: ActorRefHumanFSQFeatureWindowCfg = ActorRefHumanFSQFeatureWindowCfg()
-    critic_ref_robot_fsq_feature_window: CriticRefRobotFSQFeatureWindowCfg = CriticRefRobotFSQFeatureWindowCfg()
-    critic_ref_human_fsq_feature_window: CriticRefHumanFSQFeatureWindowCfg = CriticRefHumanFSQFeatureWindowCfg()
+    actor_ref_robot_fsq_feature_window: ActorRefRobotFSQFeatureWindowCfg = (
+        ActorRefRobotFSQFeatureWindowCfg()
+    )
+    actor_ref_human_fsq_feature_window: ActorRefHumanFSQFeatureWindowCfg = (
+        ActorRefHumanFSQFeatureWindowCfg()
+    )
+    critic_ref_robot_fsq_feature_window: CriticRefRobotFSQFeatureWindowCfg = (
+        CriticRefRobotFSQFeatureWindowCfg()
+    )
+    critic_ref_human_fsq_feature_window: CriticRefHumanFSQFeatureWindowCfg = (
+        CriticRefHumanFSQFeatureWindowCfg()
+    )
 
 
 @configclass

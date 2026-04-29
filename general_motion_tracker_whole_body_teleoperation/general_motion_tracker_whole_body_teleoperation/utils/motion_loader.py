@@ -49,7 +49,7 @@ class MotionLoader_robot:
     ) -> None:
         if isinstance(motion_file_group, str):
             motion_file_group = {"default": motion_file_group}
-        
+
         self.group_names: list[str] = []
         self.extracted_list: list[str] = []
         self.motion_lengths: list[int] = []
@@ -59,16 +59,16 @@ class MotionLoader_robot:
         self._body_names = body_names
         # TODO:
         if body_indexes is None and body_names is None:
-            ...# 不能都为None，否则无法确定要加载哪些身体部位的数据
+            ...  # 不能都为None，否则无法确定要加载哪些身体部位的数据
         elif body_indexes is not None and body_names is not None:
-            ...# 不能同时指定索引和名称，否则可能会出现冲突或不一致的情况，导致加载错误的数据或引发混淆,
-            ...# 此时抛出warn,建议用户指定一种方式来选择身体部位的数据
-            ...# 此时实际的self._body_indexes由 body_indexes 确定
+            ...  # 不能同时指定索引和名称，否则可能会出现冲突或不一致的情况，导致加载错误的数据或引发混淆,
+            ...  # 此时抛出warn,建议用户指定一种方式来选择身体部位的数据
+            ...  # 此时实际的self._body_indexes由 body_indexes 确定
         elif body_indexes is not None and body_names is None:
-            ...# 此时实际的self._body_indexes由 body_indexes 确定
+            ...  # 此时实际的self._body_indexes由 body_indexes 确定
         elif body_indexes is None and body_names is not None:
-            ...# 此时实际的self._body_indexes由 body_names 确定,但需要确定后续的motion文件中含有相应的key
-        
+            ...  # 此时实际的self._body_indexes由 body_names 确定,但需要确定后续的motion文件中含有相应的key
+
         self.history_frames = history_frames
         self.future_frames = future_frames
         self.window_size = history_frames + future_frames + 1
@@ -232,6 +232,7 @@ class MotionLoader_robot:
                 valid_center_mask[valid_start:valid_end] = True
         return valid_center_mask
 
+
 class MotionLoader_human:
     # TODO： 多卡训练，分布式加载数据
     def __init__(
@@ -305,7 +306,7 @@ class MotionLoader_human:
             motion_group_index += 1
 
         assert self.num_motions > 0, "At least one motion file is required."
-        
+
         self._motion_data_np_list_to_tensor()
 
         self._motion_id = torch.tensor(
@@ -347,31 +348,68 @@ class MotionLoader_human:
         return quat if scalar_first else quat[..., [3, 0, 1, 2]]
 
     def _append_motion_data(self, data: np.lib.npyio.NpzFile) -> None:
-        self.np_joint_pos_list.append(data["robot_joint_pos"].astype(np.float32)[:, self._robot_joint_indexes])
-        self.np_joint_vel_list.append(data["robot_joint_vel"].astype(np.float32)[:, self._robot_joint_indexes])
-        self.np_body_pos_w_list.append(data["robot_body_pos"].astype(np.float32)[:, self._robot_body_indexes])
-        self.np_body_quat_w_list.append(self._quat_to_wxyz(data["robot_body_quat"].astype(np.float32)[:, self._robot_body_indexes], data))
-        self.np_body_lin_vel_w_list.append(data["robot_body_lin_vel"].astype(np.float32)[:, self._robot_body_indexes])
-        self.np_body_ang_vel_w_list.append(data["robot_body_ang_vel"].astype(np.float32)[:, self._robot_body_indexes])
-        self.np_human_body_pos_w_list.append(data["human_global_pos"].astype(np.float32)[:,self.human_joint_indexes])
-        self.np_human_body_quat_w_list.append(self._quat_to_wxyz(data["human_global_quat"].astype(np.float32)[:,self.human_joint_indexes], data))
-        self.np_human_joint_quat_list.append(self._quat_to_wxyz(data["human_local_transforms"].astype(np.float32)[:, self.human_joint_indexes, 3:7], data))
+        self.np_joint_pos_list.append(
+            data["robot_joint_pos"].astype(np.float32)[:, self._robot_joint_indexes]
+        )
+        self.np_joint_vel_list.append(
+            data["robot_joint_vel"].astype(np.float32)[:, self._robot_joint_indexes]
+        )
+        self.np_body_pos_w_list.append(
+            data["robot_body_pos"].astype(np.float32)[:, self._robot_body_indexes]
+        )
+        self.np_body_quat_w_list.append(
+            self._quat_to_wxyz(
+                data["robot_body_quat"].astype(np.float32)[:, self._robot_body_indexes],
+                data,
+            )
+        )
+        self.np_body_lin_vel_w_list.append(
+            data["robot_body_lin_vel"].astype(np.float32)[:, self._robot_body_indexes]
+        )
+        self.np_body_ang_vel_w_list.append(
+            data["robot_body_ang_vel"].astype(np.float32)[:, self._robot_body_indexes]
+        )
+        self.np_human_body_pos_w_list.append(
+            data["human_global_pos"].astype(np.float32)[:, self.human_joint_indexes]
+        )
+        self.np_human_body_quat_w_list.append(
+            self._quat_to_wxyz(
+                data["human_global_quat"].astype(np.float32)[
+                    :, self.human_joint_indexes
+                ],
+                data,
+            )
+        )
+        self.np_human_joint_quat_list.append(
+            self._quat_to_wxyz(
+                data["human_local_transforms"].astype(np.float32)[
+                    :, self.human_joint_indexes, 3:7
+                ],
+                data,
+            )
+        )
 
-    def _motion_data_np_list_to_tensor(self,) -> None:
+    def _motion_data_np_list_to_tensor(
+        self,
+    ) -> None:
         self.joint_pos = self.np_list_to_tensor(self.np_joint_pos_list)
         self.joint_vel = self.np_list_to_tensor(self.np_joint_vel_list)
 
-        self.body_pos_w = self.np_list_to_tensor(self.np_body_pos_w_list)[:, self._body_indexes]
+        self.body_pos_w = self.np_list_to_tensor(self.np_body_pos_w_list)[
+            :, self._body_indexes
+        ]
 
-        self.body_quat_w = self.np_list_to_tensor(self.np_body_quat_w_list)[:, self._body_indexes]
+        self.body_quat_w = self.np_list_to_tensor(self.np_body_quat_w_list)[
+            :, self._body_indexes
+        ]
 
-        self.body_lin_vel_w = self.np_list_to_tensor(
-            self.np_body_lin_vel_w_list
-        )[:, self._body_indexes]
+        self.body_lin_vel_w = self.np_list_to_tensor(self.np_body_lin_vel_w_list)[
+            :, self._body_indexes
+        ]
 
-        self.body_ang_vel_w = self.np_list_to_tensor(
-            self.np_body_ang_vel_w_list
-        )[:, self._body_indexes]
+        self.body_ang_vel_w = self.np_list_to_tensor(self.np_body_ang_vel_w_list)[
+            :, self._body_indexes
+        ]
 
         self.human_body_pos_w = self.np_list_to_tensor(self.np_human_body_pos_w_list)
         self.human_body_quat_w = self.np_list_to_tensor(self.np_human_body_quat_w_list)
@@ -409,38 +447,45 @@ class MotionLoader_human:
     def _validate_human_joint_names(self, data: np.lib.npyio.NpzFile) -> None:
         if self.human_joint_names is None:
             self.human_joint_names = data["human_joint_names"].tolist()
-            self.human_joint_indexes = [self.human_joint_names.index(name) for name in self.desire_human_joint_names]
+            self.human_joint_indexes = [
+                self.human_joint_names.index(name)
+                for name in self.desire_human_joint_names
+            ]
             # print("human_joint_names:\r\n",self.human_joint_names)
         else:
             human_joint_names = data["human_joint_names"].tolist()
-            assert self.human_joint_names == human_joint_names, (
-                f"Motion file human joint names {human_joint_names} do not match expected {self.human_joint_names}."
-            )
+            assert (
+                self.human_joint_names == human_joint_names
+            ), f"Motion file human joint names {human_joint_names} do not match expected {self.human_joint_names}."
 
     def _validate_joint_names(self, data: np.lib.npyio.NpzFile) -> None:
         """Ensure the motion file contains the required joint names."""
         if self.file_joint_names is None:
             self.file_joint_names = data["robot_joint_names"].tolist()
             # 将file中的关节数据转换为仿真器的关节顺序,先获得索引
-            self._robot_joint_indexes = [self.file_joint_names.index(name) for name in self._robot_joint_names]
+            self._robot_joint_indexes = [
+                self.file_joint_names.index(name) for name in self._robot_joint_names
+            ]
         else:
             file_joint_names = data["robot_joint_names"].tolist()
-            assert self.file_joint_names == file_joint_names, (
-                f"Motion file joint names {file_joint_names} do not match expected {self.file_joint_names}."
-            )
+            assert (
+                self.file_joint_names == file_joint_names
+            ), f"Motion file joint names {file_joint_names} do not match expected {self.file_joint_names}."
 
     def _validate_link_names(self, data: np.lib.npyio.NpzFile) -> None:
         """Ensure the motion file contains the required link names."""
         if self.file_body_names is None:
             self.file_body_names = data["robot_body_names"].tolist()
-            print("robot_body_names",self._robot_body_names)
-            print("file_body_names",self.file_body_names)
-            self._robot_body_indexes = [self.file_body_names.index(name) for name in self._robot_body_names]
+            print("robot_body_names", self._robot_body_names)
+            print("file_body_names", self.file_body_names)
+            self._robot_body_indexes = [
+                self.file_body_names.index(name) for name in self._robot_body_names
+            ]
         else:
             file_body_names = data["robot_body_names"].tolist()
-            assert self.file_body_names == file_body_names, (
-                f"Motion file body names {file_body_names} do not match expected {self.file_body_names}."
-            )
+            assert (
+                self.file_body_names == file_body_names
+            ), f"Motion file body names {file_body_names} do not match expected {self.file_body_names}."
 
     def _build_motion_indices(self) -> torch.Tensor:
         """Build `[start, end)` index ranges for each motion segment."""
@@ -475,6 +520,7 @@ class MotionLoader_human:
             if valid_start < valid_end:
                 valid_center_mask[valid_start:valid_end] = True
         return valid_center_mask
+
 
 # Example usage:
 if __name__ == "__main__":

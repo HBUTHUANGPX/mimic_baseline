@@ -179,7 +179,7 @@ G1_CYLINDER_CFG = ArticulationCfg(
         collision_props=sim_utils.CollisionPropertiesCfg(
             contact_offset=0.1,
             rest_offset=-0.001,
-        ),# TODO:检查这个是否对碰撞检测有好的影响
+        ),  # TODO:检查这个是否对碰撞检测有好的影响
     ),
     init_state=ArticulationCfg.InitialStateCfg(
         pos=(0.0, 0.0, 80.793),

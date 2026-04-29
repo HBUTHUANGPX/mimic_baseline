@@ -41,6 +41,7 @@ from general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp.adaptive
     SonicBinAdaptiveSamplingCfg,
 )
 
+
 @torch.jit.script
 def rot6d_from_quat(quaternions: torch.Tensor) -> torch.Tensor:
     """Convert quaternions to the flattened first two rotation-matrix columns.
@@ -107,7 +108,7 @@ class MotionCommand(CommandTerm):
             robot_body_names=self.robot.body_names,
             robot_joint_names=self.robot.joint_names,
             body_indexes=self.body_indexes,
-            desire_human_joint_names = self.cfg.desire_human_joint_names,
+            desire_human_joint_names=self.cfg.desire_human_joint_names,
             history_frames=self.cfg.history_frames,
             future_frames=self.cfg.future_frames,
             device=self.device,
@@ -147,7 +148,9 @@ class MotionCommand(CommandTerm):
             self.num_envs, len(cfg.body_names), 4, device=self.device
         )
         self.yaw_aligned_ref_robot_body_quat_w[:, :, 0] = 1.0
-        self.consecutive_bad_steps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+        self.consecutive_bad_steps = torch.zeros(
+            self.num_envs, dtype=torch.long, device=self.device
+        )
 
         self.bin_count = (
             int(
@@ -198,7 +201,7 @@ class MotionCommand(CommandTerm):
             self.motion.human_body_pos_w[self.time_steps]
             * self._xy_plane_mask[None, None, :]
         )
-        self.bad_steps_threshold = torch.zeros(self.num_envs,device=self.device)
+        self.bad_steps_threshold = torch.zeros(self.num_envs, device=self.device)
 
         self._update_motion_cache(full=True)
         self._update_robot_state_cache()
@@ -262,13 +265,23 @@ class MotionCommand(CommandTerm):
         self.metrics["error_anchor_rot"] = self.ref_robot_anchor_angle_error
         self.metrics["error_anchor_lin_vel"] = self.ref_robot_anchor_lin_vel_error_norm
         self.metrics["error_anchor_ang_vel"] = self.ref_robot_anchor_ang_vel_error_norm
-        self.metrics["error_body_pos"] = self.yaw_aligned_ref_robot_body_pos_error_norm.mean(dim=-1)
-        self.metrics["error_body_rot"] = self.yaw_aligned_ref_robot_body_angle_error.mean(dim=-1)
-        self.metrics["error_body_lin_vel"] = self.ref_robot_body_lin_vel_error_norm.mean(dim=-1)
-        self.metrics["error_body_ang_vel"] = self.ref_robot_body_ang_vel_error_norm.mean(dim=-1)
+        self.metrics["error_body_pos"] = (
+            self.yaw_aligned_ref_robot_body_pos_error_norm.mean(dim=-1)
+        )
+        self.metrics["error_body_rot"] = (
+            self.yaw_aligned_ref_robot_body_angle_error.mean(dim=-1)
+        )
+        self.metrics["error_body_lin_vel"] = (
+            self.ref_robot_body_lin_vel_error_norm.mean(dim=-1)
+        )
+        self.metrics["error_body_ang_vel"] = (
+            self.ref_robot_body_ang_vel_error_norm.mean(dim=-1)
+        )
         self.metrics["error_joint_pos"] = self.ref_robot_joint_angle_error_norm
         self.metrics["error_joint_vel"] = self.ref_robot_joint_vel_error_norm
-        self.metrics["scale_difficulty"] = self.scale_difficulty*torch.ones(self.num_envs, device=self.device)
+        self.metrics["scale_difficulty"] = self.scale_difficulty * torch.ones(
+            self.num_envs, device=self.device
+        )
 
     def _build_adaptive_sampler(self) -> AdaptiveSamplingModule:
         sampler_cfg = self.cfg.adaptive_sampler
@@ -309,9 +322,9 @@ class MotionCommand(CommandTerm):
         right_indices = torch.clamp(right_indices, max=valid_counts - 1)
         left_indices = torch.clamp(right_indices - 1, min=0)
 
-        left_centers = torch.gather(
-            valid_centers, 1, left_indices.view(-1, 1)
-        ).squeeze(-1)
+        left_centers = torch.gather(valid_centers, 1, left_indices.view(-1, 1)).squeeze(
+            -1
+        )
         right_centers = torch.gather(
             valid_centers, 1, right_indices.view(-1, 1)
         ).squeeze(-1)
@@ -350,7 +363,7 @@ class MotionCommand(CommandTerm):
             * self._xy_plane_mask[None, None, :]
         )[env_ids]
         self.consecutive_bad_steps[env_ids] = 0  # 重置坏跟踪连续计数器
-        self._update_motion_cache(full = False)
+        self._update_motion_cache(full=False)
         self._reset_env_by_motion(
             env_ids
         )  # 根据采样的time_stamps对应的motion数据重置环境状态
@@ -371,7 +384,7 @@ class MotionCommand(CommandTerm):
             overflow_mask | (~valid_center_mask), as_tuple=False
         ).squeeze(-1)
 
-    def _update_motion_cache(self,full = False):
+    def _update_motion_cache(self, full=False):
         # 在time_stamps更新后，更新缓存的motion数据,因为_resample_command在_update_command中被调用,所以当需要reset的env_ids数量为0时也要触发一次
         assert (
             self.time_steps.max() < self.motion.time_step_total
@@ -379,7 +392,9 @@ class MotionCommand(CommandTerm):
 
         self.ref_robot_body_pos_w = (
             self.motion.body_pos_w[self.time_steps]
-            - self.body_pos_start_w [:, self.motion_anchor_body_index:self.motion_anchor_body_index+1,:]
+            - self.body_pos_start_w[
+                :, self.motion_anchor_body_index : self.motion_anchor_body_index + 1, :
+            ]
             + self._env.scene.env_origins[:, None, :]
         )
         self.ref_robot_body_quat_w = self.motion.body_quat_w[self.time_steps]
@@ -405,7 +420,9 @@ class MotionCommand(CommandTerm):
         ]
         self.ref_human_body_pos_w = (
             self.motion.human_body_pos_w[self.time_steps]
-            - self.human_body_pos_start_w [:, self.human_body_indexes:self.human_body_indexes+1,:]
+            - self.human_body_pos_start_w[
+                :, self.human_body_indexes : self.human_body_indexes + 1, :
+            ]
             + self._env.scene.env_origins[:, None, :]
         )
         self.ref_human_body_quat_w = self.motion.human_body_quat_w[self.time_steps]
@@ -421,19 +438,25 @@ class MotionCommand(CommandTerm):
         self.ref_motion_group = self.motion._motion_group[self.time_steps]
 
     def _get_window_time_steps(self) -> torch.Tensor:
-        window_time_steps = self.time_steps[:, None] + self.motion.window_offsets[None, :]
+        window_time_steps = (
+            self.time_steps[:, None] + self.motion.window_offsets[None, :]
+        )
         return torch.clamp(window_time_steps, 0, self.motion.time_step_total - 1)
 
     def _make_calculate(self):
         num_bodies = len(self.cfg.body_names)
-        anchor_pos_w_repeat = self.ref_robot_anchor_pos_w[:, None, :].expand(-1, num_bodies, -1)
-        anchor_quat_w_repeat = self.ref_robot_anchor_quat_w[:, None, :].expand(-1, num_bodies, -1)
-        robot_anchor_pos_w_repeat = self.sim_robot_anchor_pos_w[:, None, :].expand(
+        ref_robot_anchor_pos_w_repeat = self.ref_robot_anchor_pos_w[:, None, :].expand(
             -1, num_bodies, -1
         )
-        robot_anchor_quat_w_repeat = self.sim_robot_anchor_quat_w[:, None, :].expand(
+        ref_robot_anchor_quat_w_repeat = self.ref_robot_anchor_quat_w[
+            :, None, :
+        ].expand(-1, num_bodies, -1)
+        sim_robot_anchor_pos_w_repeat = self.sim_robot_anchor_pos_w[:, None, :].expand(
             -1, num_bodies, -1
         )
+        sim_robot_anchor_quat_w_repeat = self.sim_robot_anchor_quat_w[
+            :, None, :
+        ].expand(-1, num_bodies, -1)
 
         # 基础命令和本体观测缓存。
         self.ref_robot_joint_state_cmd = torch.cat(
@@ -449,39 +472,51 @@ class MotionCommand(CommandTerm):
 
         # 参考机器人动作对齐到当前机器人 anchor yaw 后的世界系目标。
         delta_pos_w = torch.cat(
-            [robot_anchor_pos_w_repeat[..., :2], anchor_pos_w_repeat[..., 2:3]], dim=-1
+            [
+                sim_robot_anchor_pos_w_repeat[..., :2],
+                ref_robot_anchor_pos_w_repeat[..., 2:3],
+            ],
+            dim=-1,
         )
         delta_ori_w = yaw_quat(
-            quat_mul(robot_anchor_quat_w_repeat, quat_inv(anchor_quat_w_repeat))
+            quat_mul(
+                sim_robot_anchor_quat_w_repeat, quat_inv(ref_robot_anchor_quat_w_repeat)
+            )
         )
-        self.yaw_aligned_ref_robot_body_quat_w = quat_mul(delta_ori_w, self.ref_robot_body_quat_w)
+        self.yaw_aligned_ref_robot_body_quat_w = quat_mul(
+            delta_ori_w, self.ref_robot_body_quat_w
+        )
         self.yaw_aligned_ref_robot_body_pos_w = delta_pos_w + quat_apply(
-            delta_ori_w, self.ref_robot_body_pos_w - anchor_pos_w_repeat
+            delta_ori_w, self.ref_robot_body_pos_w - ref_robot_anchor_pos_w_repeat
         )
 
         # 当前机器人关键 body 在当前机器人 anchor frame 下的位姿，供 observation 使用。
-        sim_robot_body_pos_in_sim_anchor, sim_robot_body_quat_in_sim_anchor = subtract_frame_transforms(
-            robot_anchor_pos_w_repeat,
-            robot_anchor_quat_w_repeat,
-            self.sim_robot_body_pos_w,
-            self.sim_robot_body_quat_w,
+        sim_robot_body_pos_in_sim_anchor, sim_robot_body_quat_in_sim_anchor = (
+            subtract_frame_transforms(
+                sim_robot_anchor_pos_w_repeat,
+                sim_robot_anchor_quat_w_repeat,
+                self.sim_robot_body_pos_w,
+                self.sim_robot_body_quat_w,
+            )
         )
         self.sim_robot_body_pos_in_sim_anchor = sim_robot_body_pos_in_sim_anchor
-        self.sim_robot_body_rot6d_in_sim_anchor = rot6d_from_quat(sim_robot_body_quat_in_sim_anchor).reshape(
-            self.num_envs, -1
-        )
+        self.sim_robot_body_rot6d_in_sim_anchor = rot6d_from_quat(
+            sim_robot_body_quat_in_sim_anchor
+        ).reshape(self.num_envs, -1)
 
         # 参考机器人 anchor 在当前机器人 anchor frame 下的相对位姿，供 observation 使用。
-        ref_robot_anchor_pos_in_sim_anchor, ref_robot_anchor_quat_in_sim_anchor = subtract_frame_transforms(
-            self.sim_robot_anchor_pos_w,
-            self.sim_robot_anchor_quat_w,
-            self.ref_robot_anchor_pos_w,
-            self.ref_robot_anchor_quat_w,
+        ref_robot_anchor_pos_in_sim_anchor, ref_robot_anchor_quat_in_sim_anchor = (
+            subtract_frame_transforms(
+                self.sim_robot_anchor_pos_w,
+                self.sim_robot_anchor_quat_w,
+                self.ref_robot_anchor_pos_w,
+                self.ref_robot_anchor_quat_w,
+            )
         )
         self.ref_robot_anchor_pos_in_sim_anchor = ref_robot_anchor_pos_in_sim_anchor
-        self.ref_robot_anchor_rot6d_in_sim_anchor = rot6d_from_quat(ref_robot_anchor_quat_in_sim_anchor).reshape(
-            self.num_envs, -1
-        )
+        self.ref_robot_anchor_rot6d_in_sim_anchor = rot6d_from_quat(
+            ref_robot_anchor_quat_in_sim_anchor
+        ).reshape(self.num_envs, -1)
 
         # 参考 human anchor 在当前机器人 anchor frame 下的相对姿态，供 observation 使用。
         _, ref_human_anchor_quat_in_sim_anchor = subtract_frame_transforms(
@@ -514,18 +549,20 @@ class MotionCommand(CommandTerm):
         robot_anchor_quat_repeat = robot_anchor_quat[:, :, None, :].expand(
             -1, -1, num_robot_bodies, -1
         )
-        ref_robot_body_pos_in_ref_anchor, ref_robot_body_quat_in_ref_anchor = subtract_frame_transforms(
-            robot_anchor_pos_repeat.reshape(-1, 3),
-            robot_anchor_quat_repeat.reshape(-1, 4),
-            robot_body_pos.reshape(-1, 3),
-            robot_body_quat.reshape(-1, 4),
+        ref_robot_body_pos_in_ref_anchor, ref_robot_body_quat_in_ref_anchor = (
+            subtract_frame_transforms(
+                robot_anchor_pos_repeat.reshape(-1, 3),
+                robot_anchor_quat_repeat.reshape(-1, 4),
+                robot_body_pos.reshape(-1, 3),
+                robot_body_quat.reshape(-1, 4),
+            )
         )
         ref_robot_body_pos_in_ref_anchor = ref_robot_body_pos_in_ref_anchor.reshape(
             self.num_envs, self.motion.window_size, -1
         )
-        ref_robot_body_rot6d_in_ref_anchor = rot6d_from_quat(ref_robot_body_quat_in_ref_anchor).reshape(
-            self.num_envs, self.motion.window_size, -1
-        )
+        ref_robot_body_rot6d_in_ref_anchor = rot6d_from_quat(
+            ref_robot_body_quat_in_ref_anchor
+        ).reshape(self.num_envs, self.motion.window_size, -1)
         actor_robot_feature = torch.cat(
             (
                 robot_anchor_rot6d,
@@ -545,8 +582,12 @@ class MotionCommand(CommandTerm):
             ),
             dim=-1,
         )
-        self.actor_ref_robot_fsq_feature_window = actor_robot_feature.reshape(self.num_envs, -1)
-        self.critic_ref_robot_fsq_feature_window = critic_robot_feature.reshape(self.num_envs, -1)
+        self.actor_ref_robot_fsq_feature_window = actor_robot_feature.reshape(
+            self.num_envs, -1
+        )
+        self.critic_ref_robot_fsq_feature_window = critic_robot_feature.reshape(
+            self.num_envs, -1
+        )
 
         human_anchor_quat = self.motion.human_body_quat_w[
             window_time_steps, self.human_anchor_body_index
@@ -564,7 +605,9 @@ class MotionCommand(CommandTerm):
         human_joint_quat = self.motion.human_joint_quat[window_time_steps][
             :, :, self.fsq_human_body_indexes, :
         ]
-        ref_human_body_pos_from_ref_anchor_w = human_body_pos - human_anchor_pos[:, :, None, :]
+        ref_human_body_pos_from_ref_anchor_w = (
+            human_body_pos - human_anchor_pos[:, :, None, :]
+        )
         num_human_bodies = self.fsq_human_body_indexes.numel()
         human_anchor_quat_w = human_anchor_quat[:, :, None, :].expand(
             -1, -1, num_human_bodies, -1
@@ -577,9 +620,9 @@ class MotionCommand(CommandTerm):
             quat_inv(human_anchor_quat_w.reshape(-1, 4)),
             human_body_quat.reshape(-1, 4),
         )
-        ref_human_body_rot6d_in_ref_anchor = rot6d_from_quat(ref_human_body_quat_in_ref_anchor).reshape(
-            self.num_envs, self.motion.window_size, -1
-        )
+        ref_human_body_rot6d_in_ref_anchor = rot6d_from_quat(
+            ref_human_body_quat_in_ref_anchor
+        ).reshape(self.num_envs, self.motion.window_size, -1)
         human_joint_rot6d = rot6d_from_quat(human_joint_quat).reshape(
             self.num_envs, self.motion.window_size, -1
         )
@@ -602,11 +645,17 @@ class MotionCommand(CommandTerm):
             ),
             dim=-1,
         )
-        self.actor_ref_human_fsq_feature_window = actor_human_feature.reshape(self.num_envs, -1)
-        self.critic_ref_human_fsq_feature_window = critic_human_feature.reshape(self.num_envs, -1)
+        self.actor_ref_human_fsq_feature_window = actor_human_feature.reshape(
+            self.num_envs, -1
+        )
+        self.critic_ref_human_fsq_feature_window = critic_human_feature.reshape(
+            self.num_envs, -1
+        )
 
         # 奖励、终止和指标共用的误差缓存。
-        self.ref_robot_anchor_pos_error_w = self.ref_robot_anchor_pos_w - self.sim_robot_anchor_pos_w
+        self.ref_robot_anchor_pos_error_w = (
+            self.ref_robot_anchor_pos_w - self.sim_robot_anchor_pos_w
+        )
         self.ref_robot_anchor_lin_vel_error_w = (
             self.ref_robot_anchor_lin_vel_w - self.sim_robot_anchor_lin_vel_w
         )
@@ -634,16 +683,30 @@ class MotionCommand(CommandTerm):
         self.ref_robot_joint_vel_error_rad_s = (
             self.ref_robot_joint_vel_rad_s - self.sim_robot_joint_vel_rad_s
         )
-        self.ref_robot_anchor_pos_error_norm = torch.norm(self.ref_robot_anchor_pos_error_w, dim=-1)
-        self.ref_robot_anchor_lin_vel_error_norm = torch.norm(self.ref_robot_anchor_lin_vel_error_w, dim=-1)
-        self.ref_robot_anchor_ang_vel_error_norm = torch.norm(self.ref_robot_anchor_ang_vel_error_w, dim=-1)
+        self.ref_robot_anchor_pos_error_norm = torch.norm(
+            self.ref_robot_anchor_pos_error_w, dim=-1
+        )
+        self.ref_robot_anchor_lin_vel_error_norm = torch.norm(
+            self.ref_robot_anchor_lin_vel_error_w, dim=-1
+        )
+        self.ref_robot_anchor_ang_vel_error_norm = torch.norm(
+            self.ref_robot_anchor_ang_vel_error_w, dim=-1
+        )
         self.yaw_aligned_ref_robot_body_pos_error_norm = torch.norm(
             self.yaw_aligned_ref_robot_body_pos_error_w, dim=-1
         )
-        self.ref_robot_body_lin_vel_error_norm = torch.norm(self.ref_robot_body_lin_vel_error_w, dim=-1)
-        self.ref_robot_body_ang_vel_error_norm = torch.norm(self.ref_robot_body_ang_vel_error_w, dim=-1)
-        self.ref_robot_joint_angle_error_norm = torch.norm(self.ref_robot_joint_angle_error_rad, dim=-1)
-        self.ref_robot_joint_vel_error_norm = torch.norm(self.ref_robot_joint_vel_error_rad_s, dim=-1)
+        self.ref_robot_body_lin_vel_error_norm = torch.norm(
+            self.ref_robot_body_lin_vel_error_w, dim=-1
+        )
+        self.ref_robot_body_ang_vel_error_norm = torch.norm(
+            self.ref_robot_body_ang_vel_error_w, dim=-1
+        )
+        self.ref_robot_joint_angle_error_norm = torch.norm(
+            self.ref_robot_joint_angle_error_rad, dim=-1
+        )
+        self.ref_robot_joint_vel_error_norm = torch.norm(
+            self.ref_robot_joint_vel_error_rad_s, dim=-1
+        )
 
         gravity_w = self.robot.data.GRAVITY_VEC_W
         self.ref_robot_projected_gravity_in_anchor = quat_apply_inverse(
@@ -654,7 +717,9 @@ class MotionCommand(CommandTerm):
         )
 
     def _update_robot_state_cache(self):
-        self.sim_robot_body_pos_w = self.robot.data.body_pos_w[:, self.body_indexes].clone()
+        self.sim_robot_body_pos_w = self.robot.data.body_pos_w[
+            :, self.body_indexes
+        ].clone()
         self.sim_robot_body_quat_w = self.robot.data.body_quat_w[
             :, self.body_indexes
         ].clone()
@@ -736,7 +801,7 @@ class MotionCommand(CommandTerm):
         self.time_steps += 1
         env_ids = self._get_env_ids_to_resample()
         self._resample_command(env_ids)
-        self._update_motion_cache(full = True)
+        self._update_motion_cache(full=True)
         self._update_robot_state_cache()
         self._make_calculate()
         # self._update_termination_cache()
@@ -819,8 +884,12 @@ class MotionCommand(CommandTerm):
         self.current_anchor_visualizer.visualize(
             self.sim_robot_anchor_pos_w, self.sim_robot_anchor_quat_w
         )
-        self.goal_anchor_visualizer.visualize(self.ref_robot_anchor_pos_w, self.ref_robot_anchor_quat_w)
-        self.human_goal_anchor_visualizer.visualize(self.ref_human_anchor_pos_w, self.ref_human_anchor_quat_w)
+        self.goal_anchor_visualizer.visualize(
+            self.ref_robot_anchor_pos_w, self.ref_robot_anchor_quat_w
+        )
+        self.human_goal_anchor_visualizer.visualize(
+            self.ref_human_anchor_pos_w, self.ref_human_anchor_quat_w
+        )
         for i in range(len(self.cfg.body_names)):
             self.current_body_visualizers[i].visualize(
                 self.sim_robot_body_pos_w[:, i], self.sim_robot_body_quat_w[:, i]
@@ -846,37 +915,88 @@ class MotionCommandCfg(CommandTermCfg):
     motion_file: dict[str, list[str] | str] | str = MISSING
     anchor_body_name: str = MISSING
     body_names: list[str] = MISSING
-    desire_human_joint_names: list[str] =  [
-        'Hips', 
-        'Spine1', 'Spine2', 'Chest', 
-        'Neck1', 'Neck2', 'Head', 'HeadEnd', 
-        'LeftShoulder', 'LeftArm', 'LeftForeArm', 'LeftHand', 
-        'RightShoulder', 'RightArm', 'RightForeArm', 'RightHand', 
-        'LeftLeg', 'LeftShin', 'LeftFoot', 'LeftToeBase', 'LeftToeEnd', 
-        'RightLeg', 'RightShin', 'RightFoot', 'RightToeBase', 'RightToeEnd'
+    desire_human_joint_names: list[str] = [
+        "Hips",
+        "Spine1",
+        "Spine2",
+        "Chest",
+        "Neck1",
+        "Neck2",
+        "Head",
+        "HeadEnd",
+        "LeftShoulder",
+        "LeftArm",
+        "LeftForeArm",
+        "LeftHand",
+        "RightShoulder",
+        "RightArm",
+        "RightForeArm",
+        "RightHand",
+        "LeftLeg",
+        "LeftShin",
+        "LeftFoot",
+        "LeftToeBase",
+        "LeftToeEnd",
+        "RightLeg",
+        "RightShin",
+        "RightFoot",
+        "RightToeBase",
+        "RightToeEnd",
     ]
-    desire_human_joint_names_for_human_bodys: list[str]= [
-        'Hips', 
-        'Spine1', 'Spine2', 'Chest', 
-        'Neck1', 'Neck2', 'Head', 'HeadEnd', 
-        'LeftShoulder', 'LeftArm', 'LeftForeArm', 'LeftHand', 
-        'RightShoulder', 'RightArm', 'RightForeArm', 'RightHand', 
-        'LeftLeg', 'LeftShin', 'LeftFoot', 'LeftToeBase', 'LeftToeEnd', 
-        'RightLeg', 'RightShin', 'RightFoot', 'RightToeBase', 'RightToeEnd'
+    desire_human_joint_names_for_human_bodys: list[str] = [
+        "Hips",
+        "Spine1",
+        "Spine2",
+        "Chest",
+        "Neck1",
+        "Neck2",
+        "Head",
+        "HeadEnd",
+        "LeftShoulder",
+        "LeftArm",
+        "LeftForeArm",
+        "LeftHand",
+        "RightShoulder",
+        "RightArm",
+        "RightForeArm",
+        "RightHand",
+        "LeftLeg",
+        "LeftShin",
+        "LeftFoot",
+        "LeftToeBase",
+        "LeftToeEnd",
+        "RightLeg",
+        "RightShin",
+        "RightFoot",
+        "RightToeBase",
+        "RightToeEnd",
     ]
-    desire_human_joint_names_for_six_point_human_bodys: list[str]= [
-        'Hips', 'HeadEnd', 'LeftHand', 'RightHand', 'LeftToeEnd', 'RightToeEnd'
+    desire_human_joint_names_for_six_point_human_bodys: list[str] = [
+        "Hips",
+        "HeadEnd",
+        "LeftHand",
+        "RightHand",
+        "LeftToeEnd",
+        "RightToeEnd",
     ]
     fsq_human_body_names: list[str] = [
-        'Chest',
-        'HeadEnd',
-        'LeftShoulder', 'LeftArm', 'LeftForeArm',
-        'RightShoulder', 'RightArm', 'RightForeArm',
-        'LeftLeg', 'LeftShin', 'LeftFoot',
-        'RightLeg', 'RightShin', 'RightFoot'
+        "Chest",
+        "HeadEnd",
+        "LeftShoulder",
+        "LeftArm",
+        "LeftForeArm",
+        "RightShoulder",
+        "RightArm",
+        "RightForeArm",
+        "LeftLeg",
+        "LeftShin",
+        "LeftFoot",
+        "RightLeg",
+        "RightShin",
+        "RightFoot",
     ]
-    
-    human_anchor_name: str = 'Hips'
+
+    human_anchor_name: str = "Hips"
 
     pose_range: dict[str, tuple[float, float]] = {}
     velocity_range: dict[str, tuple[float, float]] = {}
@@ -896,7 +1016,7 @@ class MotionCommandCfg(CommandTermCfg):
         prim_path="/Visuals/Command/pose"
     )
     body_visualizer_cfg.markers["frame"].scale = (0.1, 0.1, 0.1)
-    
+
     human_anchor_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(
         prim_path="/Visuals/Command/pose"
     )

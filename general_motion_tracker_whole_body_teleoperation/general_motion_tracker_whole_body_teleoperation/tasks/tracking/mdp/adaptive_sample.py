@@ -19,9 +19,7 @@ if TYPE_CHECKING:
 class AdaptiveSamplingModule(ABC):
     """Abstract interface for pluggable time-bin sampling strategies."""
 
-    def __init__(
-        self, command: CommandTerm, cfg: AdaptiveSamplingModuleCfg
-    ) -> None:
+    def __init__(self, command: CommandTerm, cfg: AdaptiveSamplingModuleCfg) -> None:
         self.command = command
         self.cfg = cfg
 
@@ -52,9 +50,7 @@ class AdaptiveSamplingModule(ABC):
 class LegacyBinAdaptiveSampling(AdaptiveSamplingModule):
     """Legacy bin-based sampler matching the original mdp behavior."""
 
-    def __init__(
-        self, command: CommandTerm, cfg: LegacyBinAdaptiveSamplingCfg
-    ) -> None:
+    def __init__(self, command: CommandTerm, cfg: LegacyBinAdaptiveSamplingCfg) -> None:
         super().__init__(command, cfg)
         self.bin_failed_count = torch.zeros(
             command.bin_count, dtype=torch.float32, device=command.device
@@ -135,9 +131,7 @@ class LegacyBinAdaptiveSampling(AdaptiveSamplingModule):
 class SonicBinAdaptiveSampling(AdaptiveSamplingModule):
     """SONIC-style time-bin sampler."""
 
-    def __init__(
-        self, command: CommandTerm, cfg: SonicBinAdaptiveSamplingCfg
-    ) -> None:
+    def __init__(self, command: CommandTerm, cfg: SonicBinAdaptiveSamplingCfg) -> None:
         super().__init__(command, cfg)
         self.bin_visit_count = torch.zeros(
             command.bin_count, dtype=torch.float32, device=command.device

@@ -5,59 +5,93 @@ from typing import TYPE_CHECKING
 
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors import ContactSensor
-from general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp.commands import MotionCommand
+from general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp.commands import (
+    MotionCommand,
+)
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
 
-def _get_body_indexes(command: MotionCommand, body_names: list[str] | None) -> list[int]:
-    return [i for i, name in enumerate(command.cfg.body_names) if (body_names is None) or (name in body_names)]
+def _get_body_indexes(
+    command: MotionCommand, body_names: list[str] | None
+) -> list[int]:
+    return [
+        i
+        for i, name in enumerate(command.cfg.body_names)
+        if (body_names is None) or (name in body_names)
+    ]
 
 
-def motion_global_anchor_position_error_exp(env: ManagerBasedRLEnv, command_name: str, std: float) -> torch.Tensor:
+def motion_global_anchor_position_error_exp(
+    env: ManagerBasedRLEnv, command_name: str, std: float
+) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
     error = torch.sum(torch.square(command.ref_robot_anchor_pos_error_w), dim=-1)
     return torch.exp(-error / std**2)
 
 
-def motion_global_anchor_orientation_error_exp(env: ManagerBasedRLEnv, command_name: str, std: float) -> torch.Tensor:
+def motion_global_anchor_orientation_error_exp(
+    env: ManagerBasedRLEnv, command_name: str, std: float
+) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
     error = command.ref_robot_anchor_angle_error**2
     return torch.exp(-error / std**2)
 
 
 def motion_relative_body_position_error_exp(
-    env: ManagerBasedRLEnv, command_name: str, std: float, body_names: list[str] | None = None
+    env: ManagerBasedRLEnv,
+    command_name: str,
+    std: float,
+    body_names: list[str] | None = None,
 ) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
     body_indexes = _get_body_indexes(command, body_names)
     error = torch.sum(
-        torch.square(command.yaw_aligned_ref_robot_body_pos_error_w[:, body_indexes]), dim=-1
+        torch.square(command.yaw_aligned_ref_robot_body_pos_error_w[:, body_indexes]),
+        dim=-1,
     )
     return torch.exp(-error.mean(-1) / std**2)
 
+
 def motion_global_anchor_position_z_error_sum_square(
-    env: ManagerBasedRLEnv, command_name: str,
+    env: ManagerBasedRLEnv,
+    command_name: str,
 ) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-    error = torch.sum(torch.square(command.ref_robot_anchor_pos_error_w[..., 2:3]), dim=-1)
+    error = torch.sum(
+        torch.square(command.ref_robot_anchor_pos_error_w[..., 2:3]), dim=-1
+    )
     return error
 
+
 def xy_anchor_movement_in_recovering(
-    env: ManagerBasedRLEnv, command_name: str,
+    env: ManagerBasedRLEnv,
+    command_name: str,
 ) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
-    xy_vel_sum = torch.sum(torch.square(command.sim_robot_anchor_lin_vel_w[:, :2]), dim=-1)
-    return command.is_recovering*xy_vel_sum
+    xy_vel_sum = torch.sum(
+        torch.square(command.sim_robot_anchor_lin_vel_w[:, :2]), dim=-1
+    )
+    return command.is_recovering * xy_vel_sum
 
-def action_rate_l2_in_recovering(env: ManagerBasedRLEnv, command_name: str,) -> torch.Tensor:
+
+def action_rate_l2_in_recovering(
+    env: ManagerBasedRLEnv,
+    command_name: str,
+) -> torch.Tensor:
     """Penalize the rate of change of the actions using L2 squared kernel."""
     command: MotionCommand = env.command_manager.get_term(command_name)
-    return command.is_recovering*torch.sum(torch.square(env.action_manager.action - env.action_manager.prev_action), dim=1)
+    return command.is_recovering * torch.sum(
+        torch.square(env.action_manager.action - env.action_manager.prev_action), dim=1
+    )
+
 
 def motion_relative_body_orientation_error_exp(
-    env: ManagerBasedRLEnv, command_name: str, std: float, body_names: list[str] | None = None
+    env: ManagerBasedRLEnv,
+    command_name: str,
+    std: float,
+    body_names: list[str] | None = None,
 ) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
     body_indexes = _get_body_indexes(command, body_names)
@@ -66,7 +100,10 @@ def motion_relative_body_orientation_error_exp(
 
 
 def motion_global_body_linear_velocity_error_exp(
-    env: ManagerBasedRLEnv, command_name: str, std: float, body_names: list[str] | None = None
+    env: ManagerBasedRLEnv,
+    command_name: str,
+    std: float,
+    body_names: list[str] | None = None,
 ) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
     body_indexes = _get_body_indexes(command, body_names)
@@ -77,7 +114,10 @@ def motion_global_body_linear_velocity_error_exp(
 
 
 def motion_global_body_angular_velocity_error_exp(
-    env: ManagerBasedRLEnv, command_name: str, std: float, body_names: list[str] | None = None
+    env: ManagerBasedRLEnv,
+    command_name: str,
+    std: float,
+    body_names: list[str] | None = None,
 ) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
     body_indexes = _get_body_indexes(command, body_names)
@@ -87,12 +127,17 @@ def motion_global_body_angular_velocity_error_exp(
     return torch.exp(-error.mean(-1) / std**2)
 
 
-def feet_contact_time(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg, threshold: float) -> torch.Tensor:
+def feet_contact_time(
+    env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg, threshold: float
+) -> torch.Tensor:
     contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
-    first_air = contact_sensor.compute_first_air(env.step_dt, env.physics_dt)[:, sensor_cfg.body_ids]
+    first_air = contact_sensor.compute_first_air(env.step_dt, env.physics_dt)[
+        :, sensor_cfg.body_ids
+    ]
     last_contact_time = contact_sensor.data.last_contact_time[:, sensor_cfg.body_ids]
     reward = torch.sum((last_contact_time < threshold) * first_air, dim=-1)
     return reward
+
 
 def foot_contact_velocity(
     env: ManagerBasedRLEnv,

@@ -10,6 +10,8 @@ from general_motion_tracker_whole_body_teleoperation.robots.g1 import (
 from general_motion_tracker_whole_body_teleoperation.tasks.tracking.config.g1.terrain_env_cfg import (
     G1TerrainEnvCfg,
 )
+
+
 @configclass
 class G1FlatEnvCfg(G1TerrainEnvCfg):
     def __post_init__(self):
@@ -18,7 +20,7 @@ class G1FlatEnvCfg(G1TerrainEnvCfg):
         self.scene.terrain.terrain_type = "plane"
         self.scene.terrain.terrain_generator = None
         self.scene.terrain.max_init_terrain_level = None
-        
+
 
 @configclass
 class G1FlatPureEnvCfg(G1FlatEnvCfg):
