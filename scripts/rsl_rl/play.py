@@ -134,6 +134,59 @@ from general_motion_tracker_whole_body_teleoperation.utils.exporter import (
 
 from load_motion_file import collect_npz_paths
 
+import onnxruntime as ort
+import numpy as np
+
+
+def _to_onnx_input(value, expected_rank: int = 2):
+    if isinstance(value, torch.Tensor):
+        value = value.detach().cpu().numpy()
+    value = np.asarray(value, dtype=np.float32)
+    if expected_rank == 2 and value.ndim == 1:
+        value = value[None, :]
+    return value
+
+
+def _run_onnx_inference(session, actor_obs, human_fsq_obs, robot_fsq_obs, selector):
+    actor_obs = _to_onnx_input(actor_obs)
+    human_fsq_obs = _to_onnx_input(human_fsq_obs)
+    robot_fsq_obs = _to_onnx_input(robot_fsq_obs)
+    selector = _to_onnx_input(selector)
+
+    actor_obs_name = session.get_inputs()[0].name
+    human_fsq_obs_name = session.get_inputs()[1].name
+    robot_fsq_obs_name = session.get_inputs()[2].name
+    selector_name = session.get_inputs()[3].name
+
+    (
+        actions,
+    ) = session.run(
+        None,
+        {
+            actor_obs_name: actor_obs,
+            human_fsq_obs_name: human_fsq_obs,
+            robot_fsq_obs_name: robot_fsq_obs,
+            selector_name: selector,
+        },
+    )
+    return actions
+
+def _onnx_policy_reasoning(actor_obs, human_fsq_obs, robot_fsq_obs, selector, onnx_policy):
+    (
+        act
+    ) = _run_onnx_inference(
+        onnx_policy, actor_obs, human_fsq_obs, robot_fsq_obs, selector
+    )
+    return act
+
+
+def _load_onnx_model(onnx_path, device="cpu"):
+    providers = (
+        ["CPUExecutionProvider"] if device == "cpu" else ["CUDAExecutionProvider"]
+    )
+    session = ort.InferenceSession(onnx_path, providers=providers)
+    return session
+
 @hydra_task_config(args_cli.task, args_cli.agent)
 def main(
     env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg,
@@ -289,7 +342,10 @@ def main(
             path=export_model_dir,
             filename="policy.onnx",
         )
-    
+    onnx_policy = _load_onnx_model(
+        os.path.join(export_model_dir, "policy.onnx"), device=agent_cfg.device
+    )
+
     dt = env.unwrapped.step_dt
 
     # reset environment
@@ -302,6 +358,19 @@ def main(
         with torch.inference_mode():
             # agent stepping
             actions = policy(obs,only_action=True)
+            human_fsq_obs = _policy.get_actor_human_fsq_obs(obs)
+            robot_fsq_obs = _policy.get_actor_robot_fsq_obs(obs)
+            actor_obs = _policy.get_actor_obs(obs)
+            selector = torch.zeros(1, 1, device=human_fsq_obs.device)
+            act = _onnx_policy_reasoning(
+                actor_obs[0:1, :],
+                human_fsq_obs[0:1, :],
+                robot_fsq_obs[0:1, :],
+                selector,
+                onnx_policy,
+            )
+            actions[0, :] = torch.from_numpy(act)
+
             # env stepping
             obs, _, dones, _ = env.step(actions)
             # reset recurrent states for episodes that have terminated
