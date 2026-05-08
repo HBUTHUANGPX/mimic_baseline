@@ -570,8 +570,8 @@ class MotionCommand(CommandTerm):
             (
                 robot_anchor_rot6d,
                 robot_joint_pos,
-                ref_robot_body_pos_in_ref_anchor,
-                ref_robot_body_rot6d_in_ref_anchor,
+                # ref_robot_body_pos_in_ref_anchor,
+                # ref_robot_body_rot6d_in_ref_anchor,
             ),
             dim=-1,
         )
@@ -632,9 +632,9 @@ class MotionCommand(CommandTerm):
         actor_human_feature = torch.cat(
             (
                 human_anchor_rot6d,
-                human_joint_rot6d,
+                # human_joint_rot6d,
                 ref_human_body_pos_in_ref_anchor,
-                ref_human_body_rot6d_in_ref_anchor,
+                # ref_human_body_rot6d_in_ref_anchor,
             ),
             dim=-1,
         )
