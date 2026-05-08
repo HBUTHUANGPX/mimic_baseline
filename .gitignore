@@ -38,3 +38,4 @@ nymeria_parse/test_data/*
 hdf5_parse/test_data/*
 nymeria_parse/out/*
 tests/*
+gmt_deploy/*

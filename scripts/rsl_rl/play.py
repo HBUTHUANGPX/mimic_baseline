@@ -159,7 +159,7 @@ def _run_onnx_inference(session, actor_obs, human_fsq_obs, robot_fsq_obs, select
     selector_name = session.get_inputs()[3].name
 
     (
-        actions,
+        actions,q_human,q_robot
     ) = session.run(
         None,
         {
@@ -169,15 +169,15 @@ def _run_onnx_inference(session, actor_obs, human_fsq_obs, robot_fsq_obs, select
             selector_name: selector,
         },
     )
-    return actions
+    return actions,q_human,q_robot
 
 def _onnx_policy_reasoning(actor_obs, human_fsq_obs, robot_fsq_obs, selector, onnx_policy):
     (
-        act
+        act,q_human,q_robot
     ) = _run_onnx_inference(
         onnx_policy, actor_obs, human_fsq_obs, robot_fsq_obs, selector
     )
-    return act
+    return act,q_human,q_robot
 
 
 def _load_onnx_model(onnx_path, device="cpu"):
@@ -362,13 +362,18 @@ def main(
             robot_fsq_obs = _policy.get_actor_robot_fsq_obs(obs)
             actor_obs = _policy.get_actor_obs(obs)
             selector = torch.zeros(1, 1, device=human_fsq_obs.device)
-            act = _onnx_policy_reasoning(
+            act,q_human,q_robot = _onnx_policy_reasoning(
                 actor_obs[0:1, :],
                 human_fsq_obs[0:1, :],
                 robot_fsq_obs[0:1, :],
                 selector,
                 onnx_policy,
             )
+            # print("================================")
+            # print("human_fsq_obs:\r\n",human_fsq_obs[0:1, :].tolist())
+            # print("robot_fsq_obs:\r\n",robot_fsq_obs[0:1, :].tolist())
+            # print("q_human:\r\n",q_human)
+            # print("q_robot:\r\n",q_robot)
             actions[0, :] = torch.from_numpy(act)
 
             # env stepping
