@@ -115,6 +115,7 @@ class MotionCommand(CommandTerm):
             history_frames=self.cfg.history_frames,
             future_frames=self.cfg.future_frames,
             device=self.device,
+            enable_distributed_sharding=self.cfg.enable_distributed_motion_sharding,
         )
         num_robot_bodies = len(self.cfg.body_names)
         num_human_bodies = len(self.cfg.fsq_human_body_names)
@@ -839,7 +840,7 @@ class MotionCommandCfg(CommandTermCfg):
         "LeftShoulder", "LeftArm", "LeftForeArm", "LeftHand",
         "RightShoulder", "RightArm", "RightForeArm", "RightHand",
         "LeftLeg", "LeftShin", "LeftFoot", "LeftToeBase", "LeftToeEnd",
-        "RightLeg","RightShin","RightFoot","RightToeBase","RightToeEnd",
+        "RightLeg", "RightShin", "RightFoot", "RightToeBase", "RightToeEnd",
     ]
     desire_human_joint_names_for_human_bodys: list[str] = [
         "Hips",
@@ -894,6 +895,7 @@ class MotionCommandCfg(CommandTermCfg):
     joint_position_range: tuple[float, float] = (-0.52, 0.52)
     history_frames: int = 0
     future_frames: int = 0
+    enable_distributed_motion_sharding: bool = True
 
     adaptive_sampler: AdaptiveSamplingModuleCfg = SonicBinAdaptiveSamplingCfg()
 

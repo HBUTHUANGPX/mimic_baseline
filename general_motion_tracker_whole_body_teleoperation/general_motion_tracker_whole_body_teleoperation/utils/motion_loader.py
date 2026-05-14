@@ -3,6 +3,13 @@ import torch
 import os
 import numpy as np
 
+from general_motion_tracker_whole_body_teleoperation.utils.motion_sharding import (
+    DistributedRuntimeInfo,
+    FrameBalancedMotionFileShardStrategy,
+    MotionFileShardStrategy,
+    MotionFileGroup,
+)
+
 
 class MotionLoader:
     def __init__(
@@ -234,6 +241,15 @@ class MotionLoader_robot:
 
 
 class MotionLoader_human:
+    """Load human/robot reference motion data for tracking commands.
+
+    Preconditions:
+        Motion files share compatible fps, robot names, and human joint names.
+    Postconditions:
+        Only the current distributed rank's motion shard is loaded into CPU numpy
+        arrays and then moved to the configured device.
+    """
+
     # TODO： 多卡训练，分布式加载数据
     def __init__(
         self,
@@ -245,9 +261,28 @@ class MotionLoader_human:
         history_frames: int = 0,
         future_frames: int = 0,
         device: str = "cpu",
+        enable_distributed_sharding: bool = True,
+        distributed_runtime: DistributedRuntimeInfo | None = None,
+        shard_strategy: MotionFileShardStrategy | None = None,
     ) -> None:
-        if isinstance(motion_file_group, str):
-            motion_file_group = {"default": motion_file_group}
+        """Initialize a GPU-resident motion loader.
+
+        Preconditions:
+            ``motion_file_group`` contains readable ``.npz`` files. In distributed
+            training, all ranks see the same file list and expose torchrun-style
+            ``RANK``/``WORLD_SIZE`` environment variables.
+        Postconditions:
+            This process loads only its assigned shard when distributed sharding is
+            enabled; single-rank behavior remains equivalent to loading all files.
+        """
+        motion_file_group = self._prepare_motion_file_group(
+            motion_file_group,
+            history_frames,
+            future_frames,
+            enable_distributed_sharding,
+            distributed_runtime,
+            shard_strategy,
+        )
         self.device = device
         self.group_names: list[str] = []
         self.extracted_list: list[str] = []
@@ -331,6 +366,57 @@ class MotionLoader_human:
         assert (
             self.valid_center_indices.numel() > 0
         ), "No valid center frames found for the configured window size."
+
+    def _prepare_motion_file_group(
+        self,
+        motion_file_group: dict[str, list[str] | str] | str,
+        history_frames: int,
+        future_frames: int,
+        enable_distributed_sharding: bool,
+        distributed_runtime: DistributedRuntimeInfo | None,
+        shard_strategy: MotionFileShardStrategy | None,
+    ) -> dict[str, list[str]]:
+        """Normalize and optionally shard motion files before full data loading.
+
+        Preconditions:
+            ``motion_file_group`` describes the complete dataset visible to every
+            distributed rank.
+        Postconditions:
+            A grouped file list owned by the current rank is returned; no full motion
+            arrays are loaded during this step.
+        """
+        normalized_group = MotionFileGroup(motion_file_group).groups
+        runtime = distributed_runtime or DistributedRuntimeInfo.from_environment()
+        if not enable_distributed_sharding or not runtime.enabled:
+            return dict(normalized_group)
+
+        strategy = shard_strategy or FrameBalancedMotionFileShardStrategy()
+        sharded_group = strategy.shard(
+            normalized_group,
+            runtime,
+            history_frames,
+            future_frames,
+        )
+        shard_file_count = sum(len(paths) for paths in sharded_group.values())
+        shard_message = (
+            "[MotionShard] "
+            f"rank {runtime.global_rank}/{runtime.world_size} "
+            f"(local_rank={runtime.local_rank}) loads {shard_file_count} files "
+            f"from {len(sharded_group)} groups."
+        )
+        if isinstance(strategy, FrameBalancedMotionFileShardStrategy):
+            last_shards = strategy.last_shards
+            if last_shards:
+                local_weight = last_shards[runtime.global_rank].total_valid_weight
+                shard_message += f" valid_frames={local_weight}."
+                if runtime.global_rank == 0:
+                    shard_weights = [shard.total_valid_weight for shard in last_shards]
+                    shard_message += (
+                        " global_valid_frame_range="
+                        f"[{min(shard_weights)}, {max(shard_weights)}]."
+                    )
+        print(shard_message)
+        return dict(sharded_group)
 
     def _prepare_np_list(self):
         self.np_joint_pos_list: list[np.ndarray] = []
