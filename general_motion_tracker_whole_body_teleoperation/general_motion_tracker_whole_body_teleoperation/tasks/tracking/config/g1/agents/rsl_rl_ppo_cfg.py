@@ -95,14 +95,14 @@ class RslRlPpoActorCriticDualFSQCfg(RslRlPpoActorCriticCfg):
     robot_encoder_hidden_dims: tuple[int] | list[int] = [512, 256]
     human_encoder_hidden_dims: tuple[int] | list[int] = [512, 256]
     decoder_hidden_dims: tuple[int] | list[int] = [256, 512]
-    fsq_levels: int = 17
+    fsq_levels: int = 32
     quantizer_type: str = "ifsq"
     ifsq_boundary_fn: str = "sigmoid"
     ifsq_boundary_scale: float = 1.6
     dual_fsq_loss_weights: dict[str, float] = {
         "robot_recon": 1.0,
         "human_recon": 1.0,
-        "latent_align": 0.25,
+        "latent_align": 5,
         "cycle_latent": 0.25,
     }
     detach_fsq_latent_in_policy: bool = False
