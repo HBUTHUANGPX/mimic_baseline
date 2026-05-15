@@ -637,7 +637,7 @@ class TerminationsCfg:
         func=mdp.bad_motion_body_pos,
         params={
             "command_name": "motion",
-            "threshold": 0.25,
+            "threshold": 0.30,
             "body_names": [
                 "L_wrist_pitch_link",
                 "R_wrist_pitch_link",
