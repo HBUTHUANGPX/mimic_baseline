@@ -2,7 +2,7 @@ from collections.abc import Sequence
 import torch
 import os
 import numpy as np
-
+from pathlib import Path
 from general_motion_tracker_whole_body_teleoperation.utils.motion_sharding import (
     DistributedRuntimeInfo,
     FrameBalancedMotionFileShardStrategy,
@@ -323,6 +323,8 @@ class MotionLoader_human:
             for local_motion_id, motion_path in enumerate(normalized_paths):
                 self._validate_motion_file(motion_path)
                 data = np.load(motion_path)
+                p = Path(motion_path)
+                token = np.load(p.with_name(p.stem + "_token.tknpz"))
                 self._validate_fps(data)
                 self._validate_joint_names(data)
                 self._validate_link_names(data)
