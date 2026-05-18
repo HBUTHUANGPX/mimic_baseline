@@ -844,31 +844,12 @@ class MotionCommandCfg(CommandTermCfg):
     ]
     desire_human_joint_names_for_human_bodys: list[str] = [
         "Hips",
-        "Spine1",
-        "Spine2",
-        "Chest",
-        "Neck1",
-        "Neck2",
-        "Head",
-        "HeadEnd",
-        "LeftShoulder",
-        "LeftArm",
-        "LeftForeArm",
-        "LeftHand",
-        "RightShoulder",
-        "RightArm",
-        "RightForeArm",
-        "RightHand",
-        "LeftLeg",
-        "LeftShin",
-        "LeftFoot",
-        "LeftToeBase",
-        "LeftToeEnd",
-        "RightLeg",
-        "RightShin",
-        "RightFoot",
-        "RightToeBase",
-        "RightToeEnd",
+        "Spine1", "Spine2", "Chest",
+        "Neck1", "Neck2", "Head", "HeadEnd",
+        "LeftShoulder", "LeftArm", "LeftForeArm", "LeftHand",
+        "RightShoulder", "RightArm", "RightForeArm", "RightHand",
+        "LeftLeg", "LeftShin", "LeftFoot", "LeftToeBase", "LeftToeEnd",
+        "RightLeg", "RightShin", "RightFoot", "RightToeBase", "RightToeEnd",
     ]
     desire_human_joint_names_for_six_point_human_bodys: list[str] = [
         "Hips",
@@ -881,10 +862,10 @@ class MotionCommandCfg(CommandTermCfg):
     fsq_human_body_names: list[str] = [
         "Chest",
         "HeadEnd",
-        "LeftShoulder", "LeftArm", "LeftForeArm",
-        "RightShoulder", "RightArm", "RightForeArm",
-        "LeftLeg", "LeftShin", "LeftFoot",
-        "RightLeg", "RightShin", "RightFoot",
+        "LeftShoulder", "LeftArm", "LeftForeArm", "LeftHand",
+        "RightShoulder", "RightArm", "RightForeArm", "RightHand",
+        "LeftLeg", "LeftShin", "LeftFoot", "LeftToeBase",
+        "RightLeg", "RightShin", "RightFoot", "RightToeBase",
     ]
 
     human_anchor_name: str = "Hips"

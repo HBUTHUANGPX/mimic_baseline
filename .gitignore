@@ -39,3 +39,4 @@ hdf5_parse/test_data/*
 nymeria_parse/out/*
 tests/*
 gmt_deploy/*
+motion_fsq_reconstruction/*
