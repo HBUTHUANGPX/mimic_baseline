@@ -324,7 +324,7 @@ class MotionLoader_human:
                 self._validate_motion_file(motion_path)
                 data = np.load(motion_path)
                 p = Path(motion_path)
-                token = np.load(p.with_name(p.stem + "_token.tknpz"))
+                token = np.load(p.with_name(p.stem + "_token.tknpz"), allow_pickle=True)
                 self._validate_fps(data)
                 self._validate_joint_names(data)
                 self._validate_link_names(data)
@@ -332,6 +332,8 @@ class MotionLoader_human:
                 self._append_motion_data(data)
 
                 num_frames = self.np_joint_pos_list[-1].shape[0]
+                self._validate_token_data(token, motion_path, num_frames)
+                self._append_token_data(token)
                 self.motion_lengths.append(num_frames)
 
                 motion_group_list.extend([motion_group_index] * num_frames)
@@ -430,6 +432,10 @@ class MotionLoader_human:
         self.np_human_body_pos_w_list: list[np.ndarray] = []
         self.np_human_body_quat_w_list: list[np.ndarray] = []
         self.np_human_joint_quat_list: list[np.ndarray] = []
+        self.np_actor_q_human_list: list[np.ndarray] = []
+        self.np_actor_q_robot_list: list[np.ndarray] = []
+        self.np_critic_q_human_list: list[np.ndarray] = []
+        self.np_critic_q_robot_list: list[np.ndarray] = []
 
     def _quat_to_wxyz(self, quat: np.ndarray, data: np.lib.npyio.NpzFile) -> np.ndarray:
         scalar_first = bool(data["scalar_first"]) if "scalar_first" in data else False
@@ -477,6 +483,36 @@ class MotionLoader_human:
             )
         )
 
+    def _validate_token_data(
+        self,
+        token: np.lib.npyio.NpzFile,
+        motion_path: str,
+        num_frames: int,
+    ) -> None:
+        required_fields = (
+            "actor_q_human",
+            "actor_q_robot",
+            "critic_q_human",
+            "critic_q_robot",
+        )
+        for field in required_fields:
+            assert field in token, f"{motion_path} 对应 token 文件缺少字段 {field}."
+            assert (
+                token[field].ndim == 2
+            ), f"{motion_path} 对应 token 字段 {field} 必须是 [num_frames, latent_dim]."
+            assert (
+                token[field].shape[0] == num_frames
+            ), (
+                f"{motion_path} 对应 token 字段 {field} 帧数为 "
+                f"{token[field].shape[0]}，motion 帧数为 {num_frames}."
+            )
+
+    def _append_token_data(self, token: np.lib.npyio.NpzFile) -> None:
+        self.np_actor_q_human_list.append(token["actor_q_human"].astype(np.float32))
+        self.np_actor_q_robot_list.append(token["actor_q_robot"].astype(np.float32))
+        self.np_critic_q_human_list.append(token["critic_q_human"].astype(np.float32))
+        self.np_critic_q_robot_list.append(token["critic_q_robot"].astype(np.float32))
+
     def _motion_data_np_list_to_tensor(
         self,
     ) -> None:
@@ -502,6 +538,10 @@ class MotionLoader_human:
         self.human_body_pos_w = self.np_list_to_tensor(self.np_human_body_pos_w_list)
         self.human_body_quat_w = self.np_list_to_tensor(self.np_human_body_quat_w_list)
         self.human_joint_quat = self.np_list_to_tensor(self.np_human_joint_quat_list)
+        self.actor_q_human = self.np_list_to_tensor(self.np_actor_q_human_list)
+        self.actor_q_robot = self.np_list_to_tensor(self.np_actor_q_robot_list)
+        self.critic_q_human = self.np_list_to_tensor(self.np_critic_q_human_list)
+        self.critic_q_robot = self.np_list_to_tensor(self.np_critic_q_robot_list)
 
     def np_list_to_tensor(self, np_list: list[np.ndarray]) -> torch.Tensor:
         """Convert a NumPy array to a PyTorch tensor on the appropriate device."""

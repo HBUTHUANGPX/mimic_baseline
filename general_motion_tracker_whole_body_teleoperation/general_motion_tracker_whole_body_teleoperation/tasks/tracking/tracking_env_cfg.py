@@ -336,6 +336,18 @@ class ObservationsCfg:
         def __post_init__(self):
             self.enable_corruption = False
 
+    @configclass
+    class ActorLatentCfg(ObsGroup):
+        actor_latent = ObsTerm(
+            func=mdp.actor_replace_latent_space,
+            params={"command_name": "motion"},
+        )
+    @configclass
+    class CriticLatentCfg(ObsGroup):
+        critic_latent = ObsTerm(
+            func=mdp.critic_replace_latent_space,
+            params={"command_name": "motion"},
+        )
     command_window_with_noise_wo_privilege: CommandAllCfg = (
         CommandAllCfg()
     )  # 有噪 无特权 cmd
@@ -401,6 +413,8 @@ class ObservationsCfg:
     critic_ref_human_fsq_feature_window: CriticRefHumanFSQFeatureWindowCfg = (
         CriticRefHumanFSQFeatureWindowCfg()
     )
+    actor_latent:ActorLatentCfg=ActorLatentCfg()
+    critic_latent:CriticLatentCfg=CriticLatentCfg()
 
 
 @configclass
@@ -637,7 +651,7 @@ class TerminationsCfg:
         func=mdp.bad_motion_body_pos,
         params={
             "command_name": "motion",
-            "threshold": 0.30,
+            "threshold": 0.35,
             "body_names": [
                 "L_wrist_pitch_link",
                 "R_wrist_pitch_link",

@@ -111,3 +111,25 @@ def critic_ref_human_fsq_feature_window(
 ) -> torch.Tensor:
     command: MotionCommand = env.command_manager.get_term(command_name)
     return command.critic_ref_human_fsq_feature_window
+
+def actor_replace_latent_space(
+    env: ManagerBasedEnv, command_name: str
+) -> torch.Tensor:
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    rand = torch.rand(
+        (env.num_envs, 1),
+        dtype=command.actor_q_human_latent.dtype,
+        device=command.actor_q_human_latent.device,
+    )
+    return command.actor_q_human_latent * rand + command.actor_q_robot_latent * (1.0 - rand)
+
+def critic_replace_latent_space(
+    env: ManagerBasedEnv, command_name: str
+) -> torch.Tensor:
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    rand = torch.rand(
+        (env.num_envs, 1),
+        dtype=command.critic_q_human_latent.dtype,
+        device=command.critic_q_human_latent.device,
+    )
+    return command.critic_q_human_latent * rand + command.critic_q_robot_latent * (1.0 - rand)

@@ -440,7 +440,11 @@ class MotionCommand(CommandTerm):
         ]
         self.ref_motion_id = self.motion._motion_id[self.time_steps]
         self.ref_motion_group = self.motion._motion_group[self.time_steps]
-
+        self.actor_q_human_latent = self.motion.actor_q_human[self.time_steps]
+        self.actor_q_robot_latent = self.motion.actor_q_robot[self.time_steps]
+        self.critic_q_human_latent = self.motion.critic_q_human[self.time_steps]
+        self.critic_q_robot_latent = self.motion.critic_q_robot[self.time_steps]
+        
     def _get_window_time_steps(self) -> torch.Tensor:
         window_time_steps = (
             self.time_steps[:, None] + self.motion.window_offsets[None, :]
