@@ -137,49 +137,6 @@ from load_motion_file import collect_npz_paths
 import onnxruntime as ort
 import numpy as np
 
-
-def _to_onnx_input(value, expected_rank: int = 2):
-    if isinstance(value, torch.Tensor):
-        value = value.detach().cpu().numpy()
-    value = np.asarray(value, dtype=np.float32)
-    if expected_rank == 2 and value.ndim == 1:
-        value = value[None, :]
-    return value
-
-
-def _run_onnx_inference(session, actor_obs, human_fsq_obs, robot_fsq_obs, selector):
-    actor_obs = _to_onnx_input(actor_obs)
-    human_fsq_obs = _to_onnx_input(human_fsq_obs)
-    robot_fsq_obs = _to_onnx_input(robot_fsq_obs)
-    selector = _to_onnx_input(selector)
-
-    actor_obs_name = session.get_inputs()[0].name
-    human_fsq_obs_name = session.get_inputs()[1].name
-    robot_fsq_obs_name = session.get_inputs()[2].name
-    selector_name = session.get_inputs()[3].name
-
-    (
-        actions,q_human,q_robot
-    ) = session.run(
-        None,
-        {
-            actor_obs_name: actor_obs,
-            human_fsq_obs_name: human_fsq_obs,
-            robot_fsq_obs_name: robot_fsq_obs,
-            selector_name: selector,
-        },
-    )
-    return actions,q_human,q_robot
-
-def _onnx_policy_reasoning(actor_obs, human_fsq_obs, robot_fsq_obs, selector, onnx_policy):
-    (
-        act,q_human,q_robot
-    ) = _run_onnx_inference(
-        onnx_policy, actor_obs, human_fsq_obs, robot_fsq_obs, selector
-    )
-    return act,q_human,q_robot
-
-
 def _load_onnx_model(onnx_path, device="cpu"):
     providers = (
         ["CPUExecutionProvider"] if device == "cpu" else ["CUDAExecutionProvider"]
@@ -326,6 +283,7 @@ def main(
         runner.alg.policy.__class__.__name__ == "ActorCriticSingleFSQ"
         or runner.alg.policy.__class__.__name__ == "ActorCriticSingleFSQDistillation"
         or runner.alg.policy.__class__.__name__ == "ActorCriticDualFSQ"
+        or runner.alg.policy.__class__.__name__ == "ActorCriticDualToken"
     ):
         _policy = runner.alg.policy
         _policy.export_policy_as_onnx(
@@ -358,15 +316,15 @@ def main(
         with torch.inference_mode():
             # agent stepping
             actions = policy(obs,only_action=True)
-            human_fsq_obs = _policy.get_actor_human_fsq_obs(obs)
-            robot_fsq_obs = _policy.get_actor_robot_fsq_obs(obs)
-            actor_obs = _policy.get_actor_obs(obs)
-            selector = torch.zeros(1, 1, device=human_fsq_obs.device)
-            act,q_human,q_robot = _onnx_policy_reasoning(
-                actor_obs[0:1, :],
-                human_fsq_obs[0:1, :],
-                robot_fsq_obs[0:1, :],
-                selector,
+            # human_fsq_obs = _policy.get_actor_human_fsq_obs(obs)
+            # robot_fsq_obs = _policy.get_actor_robot_fsq_obs(obs)
+            
+            # actor_obs = policy_nn.get_actor_obs(obs)
+            # actor_token = policy_nn.get_actor_token(obs)
+            # selector = torch.zeros(1, 1, device=human_fsq_obs.device)
+            
+            act = policy_nn._onnx_policy_reasoning(
+                obs,
                 onnx_policy,
             )
             # print("================================")
