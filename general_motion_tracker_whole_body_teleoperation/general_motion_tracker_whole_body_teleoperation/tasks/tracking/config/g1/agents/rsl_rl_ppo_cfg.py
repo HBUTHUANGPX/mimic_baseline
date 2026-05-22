@@ -242,10 +242,10 @@ class G1FlatPPODualTokenRunnerCfg(G1FlatPPORunnerCfg):
                 "last_action",
             ],
             "actor_token": [
-                "actor_ref_robot_fsq_feature_window",
+                "actor_latent",
             ],
             "critic_token": [
-                "critic_ref_robot_fsq_feature_window",
+                "critic_latent",
             ],
         },
     )
