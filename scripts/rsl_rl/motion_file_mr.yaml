@@ -4,8 +4,8 @@ motion_group:
     file_name: []
     folder_name: [
       # "soma-retargeter/assets/motions/soma_uniform_bvh_export/240918"
-      # "soma-retargeter/assets/motions/soma_uniform_bvh_export"
-      "soma-retargeter/assets/motions/bvh_export"
+      "soma-retargeter/assets/motions/soma_uniform_bvh_export"
+      # "soma-retargeter/assets/motions/bvh_export"
       # "hdf5_parse/out/soma_bvh_export"
       # "dataset_converter/test_out_export/nymeria_batch"
     ]

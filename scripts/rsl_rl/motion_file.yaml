@@ -16,7 +16,7 @@ motion_group:
       # "soma-retargeter/assets/motions/soma_uniform_bvh_export/test_0415/Neutral_walk_forward_002__A057.npz"
       # "soma-retargeter/assets/motions/bvh_export/high_jump_R_001__A277.npz"
       # "soma-retargeter/assets/motions/bvh_export/Neutral_throw_ball_001__A057.npz"
-      "dataset_converter/test_out_export/nymeria_batch/20230607_s0_james_johnson_act0_e72nhq/soma_bvh/nymeria_soma.npz"
+      # "dataset_converter/test_out_export/nymeria_batch/20230607_s0_james_johnson_act0_e72nhq/soma_bvh/nymeria_soma.npz"
     ]
     # file_name: [ "artifacts/g1/xsens_bvh/251203/03_fast_forward_walk_120Hz.npz", "artifacts/g1/xsens_bvh/251203/01_slowly_forward_walk_120Hz.npz" ]
     # folder_name: ["artifacts/g1/xsens_bvh"]
@@ -24,7 +24,7 @@ motion_group:
       # "soma-retargeter/assets/motions/test-export"
       # "soma-retargeter/assets/motions/soma_uniform_bvh_export/240918"
       # "soma-retargeter/assets/motions/bvh_export"
-      # "soma-retargeter/assets/motions/soma_uniform_bvh_export"
+      "soma-retargeter/assets/motions/soma_uniform_bvh_export"
     ]
     wo_file_name: []
     wo_folder_name: []
