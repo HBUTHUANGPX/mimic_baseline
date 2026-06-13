@@ -1,0 +1,6 @@
+[submodule "IsaacLab_v230"]
+	path = IsaacLab_v230
+	url = https://github.com/HBUTHUANGPX/IsaacLab_v230.git
+[submodule "rsl_rl_v320"]
+	path = rsl_rl_v320
+	url = https://github.com/HBUTHUANGPX/rsl_rl_v320.git
