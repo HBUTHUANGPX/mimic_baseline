@@ -207,21 +207,21 @@ if __name__ == "__main__":
     print(f"Using {args.num_cpus} CPUs.")
 
     robot_xml_file_name = (
-        # "/home/hpx/HPX_LOCO_2/GMR/assets/unitree_h1_2/h1_2_handless.xml"
-        # "/home/hpx/HPX_LOCO_2/GMR/assets/rotaku_xs3/mjcf/rotaku_xs3_rl.xml"
-        # "/home/hpx/HPX_LOCO_2/GMR/assets/Q1/mjcf/Q1_wo_hand.xml"
-        "/home/hpx/HPX_LOCO_2/mimic_baseline/general_motion_tracker_whole_body_teleoperation/general_motion_tracker_whole_body_teleoperation/assets/unitree_g1/g1_29dof_rev_1_0.xml"
-        # "/home/hpx/HPX_LOCO_2/GMR/assets/h1_2/h1_2_wo_hand.xml"
+        # "/home/jerry_huang/HPX_Loco/GMR/assets/unitree_h1_2/h1_2_handless.xml"
+        # "/home/jerry_huang/HPX_Loco/GMR/assets/rotaku_xs3/mjcf/rotaku_xs3_rl.xml"
+        # "/home/jerry_huang/HPX_Loco/GMR/assets/Q1/mjcf/Q1_wo_hand.xml"
+        "/home/jerry_huang/HPX_Loco/mimic_baseline/general_motion_tracker_whole_body_teleoperation/general_motion_tracker_whole_body_teleoperation/assets/unitree_g1/g1_29dof_rev_1_0.xml"
+        # "/home/jerry_huang/HPX_Loco/GMR/assets/h1_2/h1_2_wo_hand.xml"
     )
     motion = "g1_walk"
     retargeting_data_file_name = (
-        # "/home/hpx/HPX_LOCO_2/mimic_baseline/scripts/mimickit_data_read/MimicKit_Data/motions/g1/g1_cartwheel.pkl"
+        # "/home/jerry_huang/HPX_Loco/mimic_baseline/scripts/mimickit_data_read/MimicKit_Data/motions/g1/g1_cartwheel.pkl"
         # "scripts/mimickit_data_read/MimicKit_Data/motions/g1/g1_double_kong.pkl"
         "scripts/mimickit_data_read/MimicKit_Data/motions/g1/"+motion+".pkl"
     )
     # 7+27
     d = mujoco_displayanimanim(robot_xml_file_name, retargeting_data_file_name)
-    d.save_as_csv("/home/hpx/HPX_LOCO_2/mimic_baseline/scripts/mimickit_data_read/MimicKit_Data/motions/g1/"+motion+".csv")
+    d.save_as_csv("/home/jerry_huang/HPX_Loco/mimic_baseline/scripts/mimickit_data_read/MimicKit_Data/motions/g1/"+motion+".csv")
     d.animate_bvh()
 
 # python scripts/mimickit_data_read/g1_pkl_mj_view.py

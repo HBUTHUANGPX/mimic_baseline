@@ -116,6 +116,7 @@ class MotionCommand(CommandTerm):
             future_frames=self.cfg.future_frames,
             device=self.device,
             enable_distributed_sharding=self.cfg.enable_distributed_motion_sharding,
+            use_token = self.cfg.use_token
         )
         num_robot_bodies = len(self.cfg.body_names)
         num_human_bodies = len(self.cfg.fsq_human_body_names)
@@ -881,6 +882,7 @@ class MotionCommandCfg(CommandTermCfg):
     history_frames: int = 0
     future_frames: int = 0
     enable_distributed_motion_sharding: bool = True
+    use_token: bool = False
 
     adaptive_sampler: AdaptiveSamplingModuleCfg = SonicBinAdaptiveSamplingCfg()
 

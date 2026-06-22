@@ -264,6 +264,8 @@ class MotionLoader_human:
         enable_distributed_sharding: bool = True,
         distributed_runtime: DistributedRuntimeInfo | None = None,
         shard_strategy: MotionFileShardStrategy | None = None,
+        use_token: bool = False,
+        token_latent_dim: int = 64,
     ) -> None:
         """Initialize a GPU-resident motion loader.
 
@@ -302,7 +304,8 @@ class MotionLoader_human:
         self.history_frames = history_frames
         self.future_frames = future_frames
         self.window_size = history_frames + future_frames + 1
-
+        self.use_token = use_token
+        self.token_latent_dim = token_latent_dim
         self._prepare_np_list()
 
         motion_group_list: list[int] = []
@@ -324,7 +327,6 @@ class MotionLoader_human:
                 self._validate_motion_file(motion_path)
                 data = np.load(motion_path)
                 p = Path(motion_path)
-                token = np.load(p.with_name(p.stem + "_token.tknpz"), allow_pickle=True)
                 self._validate_fps(data)
                 self._validate_joint_names(data)
                 self._validate_link_names(data)
@@ -332,8 +334,12 @@ class MotionLoader_human:
                 self._append_motion_data(data)
 
                 num_frames = self.np_joint_pos_list[-1].shape[0]
-                self._validate_token_data(token, motion_path, num_frames)
-                self._append_token_data(token)
+                if self.use_token:
+                    token = np.load(p.with_name(p.stem + "_token.tknpz"), allow_pickle=True)
+                    self._validate_token_data(token, motion_path, num_frames)
+                    self._append_token_data(token)
+                else:
+                    self._append_dummy_token_data(num_frames)
                 self.motion_lengths.append(num_frames)
 
                 motion_group_list.extend([motion_group_index] * num_frames)
@@ -513,6 +519,13 @@ class MotionLoader_human:
         self.np_critic_q_human_list.append(token["critic_q_human"].astype(np.float32))
         self.np_critic_q_robot_list.append(token["critic_q_robot"].astype(np.float32))
 
+    def _append_dummy_token_data(self, num_frames: int) -> None:
+        dummy_token = np.zeros((num_frames, self.token_latent_dim), dtype=np.float32)
+        self.np_actor_q_human_list.append(dummy_token)
+        self.np_actor_q_robot_list.append(dummy_token)
+        self.np_critic_q_human_list.append(dummy_token)
+        self.np_critic_q_robot_list.append(dummy_token)
+
     def _motion_data_np_list_to_tensor(
         self,
     ) -> None:
@@ -534,7 +547,6 @@ class MotionLoader_human:
         self.body_ang_vel_w = self.np_list_to_tensor(self.np_body_ang_vel_w_list)[
             :, self._body_indexes
         ]
-
         self.human_body_pos_w = self.np_list_to_tensor(self.np_human_body_pos_w_list)
         self.human_body_quat_w = self.np_list_to_tensor(self.np_human_body_quat_w_list)
         self.human_joint_quat = self.np_list_to_tensor(self.np_human_joint_quat_list)

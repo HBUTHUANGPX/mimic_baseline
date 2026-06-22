@@ -118,10 +118,10 @@ conda activate mimic_baseline
 python hdf5_parse/scripts/export_hdf5_to_soma_npz.py
 
 python hdf5_parse/scripts/export_hdf5_to_soma_bvh.py \
-  --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
+  --smpl-model-path /home/jerry_huang/HPX_Loco/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
 
 python hdf5_parse/scripts/export_hdf5_segmented_motion.py \
-  --smpl-model-path /home/hpx/HPX_LOCO_2/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
+  --smpl-model-path /home/jerry_huang/HPX_Loco/SOMA-X/assets/SMPL/SMPL_NEUTRAL.npz
   ```
 
 如果后面要做 human-only 可视化，正确链路是先把导出的 `SOMA BVH` 交给
@@ -235,23 +235,23 @@ Traceback (most recent call last):
   File "/home/hpx/miniconda3/envs/mimic_baseline/lib/python3.11/site-packages/gymnasium/envs/registration.py", line 734, in make
     env = env_creator(**env_spec_kwargs)
           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpx/HPX_LOCO_2/mimic_baseline/IsaacLab_v230/source/isaaclab/isaaclab/envs/manager_based_rl_env.py", line 82, in __init__
+  File "/home/jerry_huang/HPX_Loco/mimic_baseline/IsaacLab_v230/source/isaaclab/isaaclab/envs/manager_based_rl_env.py", line 82, in __init__
     super().__init__(cfg=cfg)
-  File "/home/hpx/HPX_LOCO_2/mimic_baseline/IsaacLab_v230/source/isaaclab/isaaclab/envs/manager_based_env.py", line 140, in __init__
+  File "/home/jerry_huang/HPX_Loco/mimic_baseline/IsaacLab_v230/source/isaaclab/isaaclab/envs/manager_based_env.py", line 140, in __init__
     self.scene = InteractiveScene(self.cfg.scene)
                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpx/HPX_LOCO_2/mimic_baseline/IsaacLab_v230/source/isaaclab/isaaclab/scene/interactive_scene.py", line 180, in __init__
+  File "/home/jerry_huang/HPX_Loco/mimic_baseline/IsaacLab_v230/source/isaaclab/isaaclab/scene/interactive_scene.py", line 180, in __init__
     self._add_entities_from_cfg()
-  File "/home/hpx/HPX_LOCO_2/mimic_baseline/IsaacLab_v230/source/isaaclab/isaaclab/scene/interactive_scene.py", line 741, in _add_entities_from_cfg
+  File "/home/jerry_huang/HPX_Loco/mimic_baseline/IsaacLab_v230/source/isaaclab/isaaclab/scene/interactive_scene.py", line 741, in _add_entities_from_cfg
     self._terrain = asset_cfg.class_type(asset_cfg)
                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpx/HPX_LOCO_2/mimic_baseline/IsaacLab_v230/source/isaaclab/isaaclab/terrains/terrain_importer.py", line 109, in __init__
+  File "/home/jerry_huang/HPX_Loco/mimic_baseline/IsaacLab_v230/source/isaaclab/isaaclab/terrains/terrain_importer.py", line 109, in __init__
     self.import_ground_plane("terrain")
-  File "/home/hpx/HPX_LOCO_2/mimic_baseline/IsaacLab_v230/source/isaaclab/isaaclab/terrains/terrain_importer.py", line 223, in import_ground_plane
+  File "/home/jerry_huang/HPX_Loco/mimic_baseline/IsaacLab_v230/source/isaaclab/isaaclab/terrains/terrain_importer.py", line 223, in import_ground_plane
     ground_plane_cfg.func(prim_path, ground_plane_cfg)
-  File "/home/hpx/HPX_LOCO_2/mimic_baseline/IsaacLab_v230/source/isaaclab/isaaclab/sim/spawners/from_files/from_files.py", line 209, in spawn_ground_plane
+  File "/home/jerry_huang/HPX_Loco/mimic_baseline/IsaacLab_v230/source/isaaclab/isaaclab/sim/spawners/from_files/from_files.py", line 209, in spawn_ground_plane
     bind_physics_material(collision_prim_path, f"{prim_path}/physicsMaterial")
-  File "/home/hpx/HPX_LOCO_2/mimic_baseline/IsaacLab_v230/source/isaaclab/isaaclab/sim/utils/prims.py", line 1503, in wrapper
+  File "/home/jerry_huang/HPX_Loco/mimic_baseline/IsaacLab_v230/source/isaaclab/isaaclab/sim/utils/prims.py", line 1503, in wrapper
     prim: Usd.Prim = stage.GetPrimAtPath(prim_path)
                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Boost.Python.ArgumentError: Python argument types in
@@ -262,9 +262,9 @@ did not match C++ signature:
 During handling of the above exception, another exception occurred:
 
 Traceback (most recent call last):
-  File "/home/hpx/HPX_LOCO_2/mimic_baseline/IsaacLab_v230/source/isaaclab_tasks/isaaclab_tasks/utils/hydra.py", line 101, in hydra_main
+  File "/home/jerry_huang/HPX_Loco/mimic_baseline/IsaacLab_v230/source/isaaclab_tasks/isaaclab_tasks/utils/hydra.py", line 101, in hydra_main
     func(env_cfg, agent_cfg, *args, **kwargs)
-  File "/home/hpx/HPX_LOCO_2/mimic_baseline/scripts/rsl_rl/train_multi_teacher_motion_group_one_by_one_gpu.py", line 243, in main
+  File "/home/jerry_huang/HPX_Loco/mimic_baseline/scripts/rsl_rl/train_multi_teacher_motion_group_one_by_one_gpu.py", line 243, in main
     _env = gym.make(
            ^^^^^^^^^
   File "/home/hpx/miniconda3/envs/mimic_baseline/lib/python3.11/site-packages/gymnasium/envs/registration.py", line 746, in make

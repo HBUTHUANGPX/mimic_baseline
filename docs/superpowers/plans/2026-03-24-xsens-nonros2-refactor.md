@@ -13,12 +13,12 @@
 ### Task 1: Scaffold the standalone CMake project
 
 **Files:**
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/CMakeLists.txt`
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/cmake/`
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/include/`
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/src/`
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/tests/`
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/proto/`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/CMakeLists.txt`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/cmake/`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/include/`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/src/`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/tests/`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/proto/`
 
 - [ ] **Step 1: Write the top-level standalone CMakeLists**
 
@@ -37,7 +37,7 @@ Include:
 
 Run:
 ```bash
-cd /home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build
+cd /home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build
 source ~/miniconda3/bin/activate mimic_baseline
 cmake -S . -B build
 ```
@@ -54,9 +54,9 @@ git commit -m "build: scaffold standalone xsens refactor project"
 ### Task 2: Port `xsens_sdk` and lock parser behavior with tests
 
 **Files:**
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/include/xsens_sdk/...`
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/src/xsens_sdk/...`
-- Test: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/tests/test_parsermanager_cache.cpp`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/include/xsens_sdk/...`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/src/xsens_sdk/...`
+- Test: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/tests/test_parsermanager_cache.cpp`
 
 - [ ] **Step 1: Copy the SDK headers and sources from the ROS2 package**
 
@@ -85,7 +85,7 @@ Use the existing validated logic from:
 
 Run:
 ```bash
-cd /home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build
+cd /home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build
 source ~/miniconda3/bin/activate mimic_baseline
 cmake -S . -B build
 cmake --build build --target test_parsermanager_cache
@@ -104,14 +104,14 @@ git commit -m "feat: port xsens sdk with parser cache tests"
 ### Task 3: Port `xsens_core` and remove ROS2 types
 
 **Files:**
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/include/xsens_core/HumanDataHandler.h`
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/include/xsens_core/Socket.h`
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/include/xsens_core/XSensClient.h`
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/include/xsens_core/XsensFrame.h`
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/src/xsens_core/HumanDataHandler.cpp`
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/src/xsens_core/Socket.cpp`
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/src/xsens_core/XSensClient.cpp`
-- Test: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/tests/test_human_data_handler.cpp`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/include/xsens_core/HumanDataHandler.h`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/include/xsens_core/Socket.h`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/include/xsens_core/XSensClient.h`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/include/xsens_core/XsensFrame.h`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/src/xsens_core/HumanDataHandler.cpp`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/src/xsens_core/Socket.cpp`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/src/xsens_core/XSensClient.cpp`
+- Test: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/tests/test_human_data_handler.cpp`
 
 - [ ] **Step 1: Copy `HumanDataHandler`, `Socket`, and `XSensClient` into the new tree**
 
@@ -173,12 +173,12 @@ git commit -m "feat: port xsens core without ros2 types"
 ### Task 4: Port protobuf + ZMQ transport to pure C++
 
 **Files:**
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/proto/link_states.proto`
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/include/xsens_transport/LinkStateProtoSerializer.h`
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/include/xsens_transport/LinkStatePublisher.h`
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/src/xsens_transport/LinkStateProtoSerializer.cpp`
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/src/xsens_transport/LinkStatePublisher.cpp`
-- Test: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/tests/test_link_state_proto_serializer.cpp`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/proto/link_states.proto`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/include/xsens_transport/LinkStateProtoSerializer.h`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/include/xsens_transport/LinkStatePublisher.h`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/src/xsens_transport/LinkStateProtoSerializer.cpp`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/src/xsens_transport/LinkStatePublisher.cpp`
+- Test: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/tests/test_link_state_proto_serializer.cpp`
 
 - [ ] **Step 1: Copy the validated `.proto` schema into the new project**
 
@@ -224,11 +224,11 @@ git commit -m "feat: add pure c++ protobuf zmq transport"
 ### Task 5: Build non-ROS2 apps and local loopback validation
 
 **Files:**
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/src/apps/xsens_zmq_publisher.cpp`
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/src/apps/link_states_test_publisher.cpp`
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/src/apps/link_states_zmq_subscriber.cpp`
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/tests/test_zmq_loopback.cpp`
-- Create: `/home/hpx/HPX_LOCO_2/mimic_baseline/xsens_mvn_refactor_build/README.md`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/src/apps/xsens_zmq_publisher.cpp`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/src/apps/link_states_test_publisher.cpp`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/src/apps/link_states_zmq_subscriber.cpp`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/tests/test_zmq_loopback.cpp`
+- Create: `/home/jerry_huang/HPX_Loco/mimic_baseline/xsens_mvn_refactor_build/README.md`
 
 - [ ] **Step 1: Implement the production non-ROS2 publisher app**
 

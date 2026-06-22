@@ -37,7 +37,7 @@ fi
 per_gpu=$(( (total + gpu_num - 1) / gpu_num ))
 
 # 工作目录（根据您脚本中的 cd 路径设置）
-work_dir="/home/hpx/HPX_LOCO_2/mimic_baseline"
+work_dir="/home/jerry_huang/HPX_Loco/mimic_baseline"
 
 active_gpus=0
 

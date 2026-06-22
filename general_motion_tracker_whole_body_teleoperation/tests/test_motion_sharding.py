@@ -29,6 +29,13 @@ MotionFileMetadata = motion_sharding.MotionFileMetadata
 MotionMetadataReader = motion_sharding.MotionMetadataReader
 NpzMotionMetadataReader = motion_sharding.NpzMotionMetadataReader
 
+_MOTION_LOADER_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "general_motion_tracker_whole_body_teleoperation"
+    / "utils"
+    / "motion_loader.py"
+)
+
 
 class FakeMotionMetadataReader(MotionMetadataReader):
     """Return deterministic frame counts for tests.
@@ -163,3 +170,38 @@ def test_npz_metadata_reader_reads_frame_count_without_loading_full_loader(
     assert metadata.path == str(motion_path)
     assert metadata.group_name == "default"
     assert metadata.frame_count == 7
+
+
+def test_motion_loader_human_appends_dummy_token_data_when_tokens_are_disabled():
+    import numpy as np
+
+    spec = importlib.util.spec_from_file_location(
+        "motion_loader_under_test",
+        _MOTION_LOADER_PATH,
+    )
+    assert spec is not None and spec.loader is not None
+    motion_loader = importlib.util.module_from_spec(spec)
+    sys.modules.setdefault("motion_loader_under_test", motion_loader)
+    spec.loader.exec_module(motion_loader)
+
+    loader = motion_loader.MotionLoader_human.__new__(
+        motion_loader.MotionLoader_human
+    )
+    loader.token_latent_dim = 64
+    loader.np_actor_q_human_list = []
+    loader.np_actor_q_robot_list = []
+    loader.np_critic_q_human_list = []
+    loader.np_critic_q_robot_list = []
+
+    loader._append_dummy_token_data(num_frames=3)
+
+    for token_list in (
+        loader.np_actor_q_human_list,
+        loader.np_actor_q_robot_list,
+        loader.np_critic_q_human_list,
+        loader.np_critic_q_robot_list,
+    ):
+        assert len(token_list) == 1
+        assert token_list[0].shape == (3, 64)
+        assert token_list[0].dtype == np.float32
+        assert np.all(token_list[0] == 0.0)

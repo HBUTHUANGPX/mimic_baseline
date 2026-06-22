@@ -343,7 +343,7 @@ def main(
     # save resume path before creating a new log_dir
     if agent_cfg.resume or agent_cfg.algorithm.class_name == "PPO_Distil":
         resume_path = get_checkpoint_path(
-            "/home/hpx/HPX_LOCO_2/mimic_baseline/logs/rsl_rl/pure_q1_flat",
+            "/home/jerry_huang/HPX_Loco/mimic_baseline/logs/rsl_rl/pure_q1_flat",
             agent_cfg.load_run,
         )
     print(f"[INFO]: Resuming training from checkpoint: {resume_path}")

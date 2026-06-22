@@ -258,15 +258,15 @@ def main(
     # save resume path before creating a new log_dir
     if agent_cfg.resume or agent_cfg.algorithm.class_name == "Distillation":
         # resume_path = get_checkpoint_path(
-        #     "/home/hpx/HPX_LOCO_2/mimic_baseline/logs/rsl_rl/pure_q1_flat", agent_cfg.load_run, agent_cfg.load_checkpoint
+        #     "/home/jerry_huang/HPX_Loco/mimic_baseline/logs/rsl_rl/pure_q1_flat", agent_cfg.load_run, agent_cfg.load_checkpoint
         # )
         if args_cli.other_dirs is not None:
             resume_path = get_checkpoint_path(
-                "/home/hpx/HPX_LOCO_2/mimic_baseline/logs/rsl_rl/pure_q1_flat", agent_cfg.load_run, agent_cfg.load_checkpoint, other_dirs=[args_cli.other_dirs]
+                "/home/jerry_huang/HPX_Loco/mimic_baseline/logs/rsl_rl/pure_q1_flat", agent_cfg.load_run, agent_cfg.load_checkpoint, other_dirs=[args_cli.other_dirs]
             )   
         else:
             resume_path = get_checkpoint_path(
-                "/home/hpx/HPX_LOCO_2/mimic_baseline/logs/rsl_rl/q1_flat", agent_cfg.load_run, agent_cfg.load_checkpoint
+                "/home/jerry_huang/HPX_Loco/mimic_baseline/logs/rsl_rl/q1_flat", agent_cfg.load_run, agent_cfg.load_checkpoint
             )
     # wrap for video recording
     if args_cli.video:
