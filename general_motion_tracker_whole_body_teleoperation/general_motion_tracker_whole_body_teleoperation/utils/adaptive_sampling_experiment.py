@@ -262,6 +262,11 @@ class LegacySamplerAdapter(_AdaptiveSamplerAdapter):
     sampler_cfg_class_name = "LegacyBinAdaptiveSamplingCfg"
 
 
+class StratifiedLegacySamplerAdapter(_AdaptiveSamplerAdapter):
+    name = "stratified_legacy"
+    sampler_cfg_class_name = "StratifiedLegacyBinAdaptiveSamplingCfg"
+
+
 class SonicSamplerAdapter(_AdaptiveSamplerAdapter):
     name = "sonic"
     sampler_cfg_class_name = "SonicBinAdaptiveSamplingCfg"

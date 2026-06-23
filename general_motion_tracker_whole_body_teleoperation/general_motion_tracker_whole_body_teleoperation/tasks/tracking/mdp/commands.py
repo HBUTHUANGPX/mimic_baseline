@@ -39,6 +39,8 @@ from general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp.adaptive
     LegacyBinAdaptiveSamplingCfg,
     SonicBinAdaptiveSampling,
     SonicBinAdaptiveSamplingCfg,
+    StratifiedLegacyBinAdaptiveSampling,
+    StratifiedLegacyBinAdaptiveSamplingCfg,
 )
 from general_motion_tracker_whole_body_teleoperation.tasks.tracking.mdp.motion_debug_visualizer import (
     MotionDebugVisualizer,
@@ -884,7 +886,8 @@ class MotionCommandCfg(CommandTermCfg):
     enable_distributed_motion_sharding: bool = True
     use_token: bool = False
 
-    adaptive_sampler: AdaptiveSamplingModuleCfg = LegacyBinAdaptiveSamplingCfg()
+    # adaptive_sampler: AdaptiveSamplingModuleCfg = LegacyBinAdaptiveSamplingCfg()
+    adaptive_sampler: AdaptiveSamplingModuleCfg = StratifiedLegacyBinAdaptiveSamplingCfg()
     # adaptive_sampler: AdaptiveSamplingModuleCfg = SonicBinAdaptiveSamplingCfg()
 
     anchor_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(

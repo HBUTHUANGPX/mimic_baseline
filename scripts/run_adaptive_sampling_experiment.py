@@ -41,6 +41,7 @@ DifficultyDatasetConfig = _EXPERIMENT_MODULE.DifficultyDatasetConfig
 LegacySamplerAdapter = _EXPERIMENT_MODULE.LegacySamplerAdapter
 SimulationConfig = _EXPERIMENT_MODULE.SimulationConfig
 SonicSamplerAdapter = _EXPERIMENT_MODULE.SonicSamplerAdapter
+StratifiedLegacySamplerAdapter = _EXPERIMENT_MODULE.StratifiedLegacySamplerAdapter
 TrainingSimulator = _EXPERIMENT_MODULE.TrainingSimulator
 UniformSamplerAdapter = _EXPERIMENT_MODULE.UniformSamplerAdapter
 
@@ -113,7 +114,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--samplers",
         nargs="+",
-        choices=("uniform", "legacy", "sonic"),
+        choices=("uniform", "legacy", "stratified_legacy", "sonic"),
         default=("uniform", "legacy", "sonic"),
     )
     return parser.parse_args()
@@ -131,6 +132,14 @@ def _build_sampler(
         return UniformSamplerAdapter(num_envs=num_envs, dataset=dataset, seed=seed)
     if sampler_name == "legacy":
         return LegacySamplerAdapter(
+            num_envs=num_envs,
+            dataset=dataset,
+            bin_frame_count=bin_frame_count,
+            seed=seed,
+            device=device,
+        )
+    if sampler_name == "stratified_legacy":
+        return StratifiedLegacySamplerAdapter(
             num_envs=num_envs,
             dataset=dataset,
             bin_frame_count=bin_frame_count,

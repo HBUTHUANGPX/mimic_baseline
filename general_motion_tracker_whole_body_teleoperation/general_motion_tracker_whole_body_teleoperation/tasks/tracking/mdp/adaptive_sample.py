@@ -102,9 +102,10 @@ class LegacyBinAdaptiveSampling(AdaptiveSamplingModule):
             (0, self.cfg.adaptive_kernel_size - 1),
             mode="replicate",
         )
-        sampling_probabilities = torch.nn.functional.conv1d(
-            sampling_probabilities, self.kernel.view(1, 1, -1)
-        ).view(-1)
+        with torch.backends.cudnn.flags(enabled=not sampling_probabilities.is_cuda):
+            sampling_probabilities = torch.nn.functional.conv1d(
+                sampling_probabilities, self.kernel.view(1, 1, -1)
+            ).view(-1)
         sampling_probabilities = (
             sampling_probabilities * command.valid_sampling_bin_mask.float()
         )
@@ -126,6 +127,46 @@ class LegacyBinAdaptiveSampling(AdaptiveSamplingModule):
             + (1 - self.cfg.adaptive_alpha) * self.bin_failed_count
         )
         self.current_bin_failed.zero_()
+
+
+class StratifiedLegacyBinAdaptiveSampling(LegacyBinAdaptiveSampling):
+    """Legacy failure sampler mixed with a fixed uniform sampling budget."""
+
+    def __init__(
+        self, command: CommandTerm, cfg: StratifiedLegacyBinAdaptiveSamplingCfg
+    ) -> None:
+        super().__init__(command, cfg)
+
+    def build_sampling_probabilities(self) -> torch.Tensor:
+        command = self.command
+        valid_mask = command.valid_sampling_bin_mask
+        valid_bin_count = max(int(valid_mask.sum().item()), 1)
+
+        failure_scores = torch.nn.functional.pad(
+            self.bin_failed_count.unsqueeze(0).unsqueeze(0),
+            (0, self.cfg.adaptive_kernel_size - 1),
+            mode="replicate",
+        )
+        with torch.backends.cudnn.flags(enabled=not failure_scores.is_cuda):
+            failure_scores = torch.nn.functional.conv1d(
+                failure_scores, self.kernel.view(1, 1, -1)
+            ).view(-1)
+        failure_scores = failure_scores * valid_mask.float()
+
+        uniform_distribution = valid_mask.float() / float(valid_bin_count)
+        failure_sum = failure_scores.sum()
+        if failure_sum > 0:
+            failure_distribution = failure_scores / failure_sum
+        else:
+            failure_distribution = uniform_distribution
+
+        uniform_ratio = self.cfg.uniform_sampling_ratio
+        sampling_probabilities = (
+            (1.0 - uniform_ratio) * failure_distribution
+            + uniform_ratio * uniform_distribution
+        )
+        sampling_probabilities = sampling_probabilities * valid_mask.float()
+        return sampling_probabilities / sampling_probabilities.sum()
 
 
 class SonicBinAdaptiveSampling(AdaptiveSamplingModule):
@@ -234,6 +275,16 @@ class LegacyBinAdaptiveSamplingCfg(AdaptiveSamplingModuleCfg):
     adaptive_lambda: float = 0.8
     adaptive_uniform_ratio: float = 0.1
     adaptive_alpha: float = 0.001
+
+
+@configclass
+class StratifiedLegacyBinAdaptiveSamplingCfg(LegacyBinAdaptiveSamplingCfg):
+    """Configuration for fixed-ratio legacy failure/uniform sampling."""
+
+    class_type: type[StratifiedLegacyBinAdaptiveSampling] = (
+        StratifiedLegacyBinAdaptiveSampling
+    )
+    uniform_sampling_ratio: float = 0.2
 
 
 @configclass
