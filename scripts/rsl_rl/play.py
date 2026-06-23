@@ -323,16 +323,16 @@ def main(
             # actor_token = policy_nn.get_actor_token(obs)
             # selector = torch.zeros(1, 1, device=human_fsq_obs.device)
             
-            act = policy_nn._onnx_policy_reasoning(
-                obs,
-                onnx_policy,
-            )
+            # act = policy_nn._onnx_policy_reasoning(
+            #     obs,
+            #     onnx_policy,
+            # )
             # print("================================")
             # print("human_fsq_obs:\r\n",human_fsq_obs[0:1, :].tolist())
             # print("robot_fsq_obs:\r\n",robot_fsq_obs[0:1, :].tolist())
             # print("q_human:\r\n",q_human)
             # print("q_robot:\r\n",q_robot)
-            actions[0, :] = torch.from_numpy(act)
+            # actions[0, :] = torch.from_numpy(act)
 
             # env stepping
             obs, _, dones, _ = env.step(actions)
