@@ -30,6 +30,7 @@ LearningState = adaptive_sampling_experiment.LearningState
 SimulationConfig = adaptive_sampling_experiment.SimulationConfig
 TrainingSimulator = adaptive_sampling_experiment.TrainingSimulator
 UniformSamplerAdapter = adaptive_sampling_experiment.UniformSamplerAdapter
+LegacySamplerAdapter = adaptive_sampling_experiment.LegacySamplerAdapter
 SonicSamplerAdapter = adaptive_sampling_experiment.SonicSamplerAdapter
 
 
@@ -103,3 +104,29 @@ def test_sonic_sampler_adapter_runs_one_iteration_against_real_sampler_logic():
 
     assert result.iterations == 1
     assert result.samples == 4
+
+
+def test_legacy_sampler_runs_on_cuda_without_cudnn_initialization_failure():
+    if not torch.cuda.is_available():
+        return
+
+    dataset = DifficultyDataset.generate(
+        DifficultyDatasetConfig(total_frames=30_000_000, device="cuda")
+    )
+    sampler = LegacySamplerAdapter(
+        num_envs=4096,
+        dataset=dataset,
+        bin_frame_count=50,
+        seed=3,
+        device="cuda",
+    )
+    simulator = TrainingSimulator(
+        dataset=dataset,
+        sampler=sampler,
+        config=SimulationConfig(num_envs=4096, max_iterations=1),
+    )
+
+    result = simulator.run()
+
+    assert result.iterations == 1
+    assert result.samples == 4096

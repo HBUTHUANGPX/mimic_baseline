@@ -603,6 +603,8 @@ class MotionLoader_human:
         if self.file_joint_names is None:
             self.file_joint_names = data["robot_joint_names"].tolist()
             # 将file中的关节数据转换为仿真器的关节顺序,先获得索引
+            print("robot_joint_names", self._robot_joint_names)
+            print("file_joint_names", self.file_joint_names)
             self._robot_joint_indexes = [
                 self.file_joint_names.index(name) for name in self._robot_joint_names
             ]

@@ -884,7 +884,8 @@ class MotionCommandCfg(CommandTermCfg):
     enable_distributed_motion_sharding: bool = True
     use_token: bool = False
 
-    adaptive_sampler: AdaptiveSamplingModuleCfg = SonicBinAdaptiveSamplingCfg()
+    adaptive_sampler: AdaptiveSamplingModuleCfg = LegacyBinAdaptiveSamplingCfg()
+    # adaptive_sampler: AdaptiveSamplingModuleCfg = SonicBinAdaptiveSamplingCfg()
 
     anchor_visualizer_cfg: VisualizationMarkersCfg = FRAME_MARKER_CFG.replace(
         prim_path="/Visuals/Command/pose"
