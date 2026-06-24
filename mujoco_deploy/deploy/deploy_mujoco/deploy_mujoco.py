@@ -1,11 +1,28 @@
+import os
+import argparse
+
+from deploy.utils.cfg import available_robots, cfg, current_path, select_robot
+
+
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--robot",
+        choices=available_robots(),
+        default=cfg.robot_name,
+        help="Robot config to deploy.",
+    )
+    return parser.parse_args(argv)
+
+
+_ARGS = parse_args() if __name__ == "__main__" else None
+
 from deploy.utils.video_recorder import VideoRecorder
 from deploy.utils.math_func import *
-from deploy.utils.cfg import cfg, current_path
 from deploy.utils.infer import infere
 
 import numpy as np
 import time
-import os
 
 import mujoco.viewer
 import mujoco
@@ -15,7 +32,9 @@ np.set_printoptions(precision=16, linewidth=100, threshold=np.inf, suppress=True
 
 class simulator(infere):
 
-    def __init__(self):
+    def __init__(self, robot_name=None):
+        if robot_name is not None:
+            select_robot(robot_name)
         # Load robot model
         self.spec = mujoco.MjSpec.from_file(cfg.mjcf_path)
         self.m = mujoco.MjModel.from_xml_path(cfg.mjcf_path)
@@ -299,48 +318,56 @@ class simulator(infere):
             "qfrc_actuator": [],
         }
 
-        while self.viewer.is_running():
-            if not first_flag:
-                first_flag = True
-                if cfg.motion_play:
-                    self.motion_play()
+        try:
+            while self.viewer.is_running():
+                if not first_flag:
+                    first_flag = True
+                    if cfg.motion_play:
+                        self.motion_play()
+                        self.time_step = 0
+                    else:
+                        self.motion_play()
+                        ...
+                    mujoco.mj_step(self.m, self.d)
+                    self.viewer.sync()
+                self.perpare_data()
+                self.policy_loop()
+                # print(self.time_step, self.motion.time_step_total)
+                log["dof_positions"].append(np.copy(self.d.qpos[7:]))
+                log["dof_velocities"].append(np.copy(self.d.qvel[6:]))
+                log["dof_torque"].append(np.copy(self.d.qfrc_actuator[6:]))
+                log["body_positions"].append(
+                    np.copy(self.d.xpos[self.mujoco_body_names_indices, :])
+                )
+                log["body_rotations"].append(
+                    np.copy(self.d.xquat[self.mujoco_body_names_indices, :])
+                )
+                log["body_linear_velocities"].append(
+                    np.copy(self.d.cvel[self.mujoco_body_names_indices, 0:3])
+                )
+                log["body_angular_velocities"].append(
+                    np.copy(self.d.cvel[self.mujoco_body_names_indices, 3:6])
+                )
+                log["qpos"].append(np.copy(self.d.qpos))
+                log["qvel"].append(np.copy(self.d.qvel))
+                log["xpos"].append(
+                    np.copy(self.d.xpos[self.mujoco_body_names_indices, :])
+                )
+                log["xquat"].append(
+                    np.copy(self.d.xquat[self.mujoco_body_names_indices, :])
+                )
+                log["cvel"].append(
+                    np.copy(self.d.cvel[self.mujoco_body_names_indices, :])
+                )
+                log["target_pos"].append(np.copy(self.target_dof_pos))
+                log["qfrc_actuator"].append(np.copy(self.d.qfrc_actuator))
+                # if self.time_step >= 50*60:
+                if self.time_step >= self.motion.time_step_total:
                     self.time_step = 0
-                else:
-                    self.motion_play()
-                    ...
-                mujoco.mj_step(self.m, self.d)
-                self.viewer.sync()
-            self.perpare_data()
-            self.policy_loop()
-            # print(self.time_step, self.motion.time_step_total)
-            log["dof_positions"].append(np.copy(self.d.qpos[7:]))
-            log["dof_velocities"].append(np.copy(self.d.qvel[6:]))
-            log["dof_torque"].append(np.copy(self.d.qfrc_actuator[6:]))
-            log["body_positions"].append(
-                np.copy(self.d.xpos[self.mujoco_body_names_indices, :])
-            )
-            log["body_rotations"].append(
-                np.copy(self.d.xquat[self.mujoco_body_names_indices, :])
-            )
-            log["body_linear_velocities"].append(
-                np.copy(self.d.cvel[self.mujoco_body_names_indices, 0:3])
-            )
-            log["body_angular_velocities"].append(
-                np.copy(self.d.cvel[self.mujoco_body_names_indices, 3:6])
-            )
-            log["qpos"].append(np.copy(self.d.qpos))
-            log["qvel"].append(np.copy(self.d.qvel))
-            log["xpos"].append(np.copy(self.d.xpos[self.mujoco_body_names_indices, :]))
-            log["xquat"].append(
-                np.copy(self.d.xquat[self.mujoco_body_names_indices, :])
-            )
-            log["cvel"].append(np.copy(self.d.cvel[self.mujoco_body_names_indices, :]))
-            log["target_pos"].append(np.copy(self.target_dof_pos))
-            log["qfrc_actuator"].append(np.copy(self.d.qfrc_actuator))
-            # if self.time_step >= 50*60:
-            if self.time_step >= self.motion.time_step_total:
-                self.time_step = 0
-                # break
+                    # break
+        finally:
+            print("stop")
+            self.video_recorder.stop()
         for k in (
             "dof_positions",
             "dof_velocities",
@@ -359,8 +386,6 @@ class simulator(infere):
         save_path = current_path + "/tmp/motion.npz"
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         np.savez(save_path, **log)
-        print("stop")
-        self.video_recorder.stop()
 
     def perpare_data(self):
         if self.first_flag:
@@ -416,7 +441,41 @@ class simulator(infere):
     
     def _obs_actor_human_token(self):
         return self.motion.actor_q_human[int(self.time_step)]
-     
+    
+    def _obs_ref_robot_minus_sim_joint_angle_rad(self):
+        ref_robot_minus_sim_joint_angle_rad = (
+            self.motion.joint_pos[int(self.time_step)]
+            - self.d.qpos[7:][self.mujoco2isaac_sim_index]
+        )
+        return ref_robot_minus_sim_joint_angle_rad
+
+    def _obs_ref_robot_anchor_rot6d_in_sim_anchor(self):
+        self.pin.mujoco_to_pinocchio(
+            self.d.qpos[7:],
+            base_pos=self.d.qpos[0:3],
+            base_quat=self.d.qpos[3:7][[1, 2, 3, 0]],
+        )
+        _quat = self.pin.get_link_quaternion(cfg.motion_reference_body)
+        sim_robot_anchor_quat_w = np.expand_dims(_quat, axis=0)
+        ref_robot_anchor_quat_w = self.motion.body_quat_w[
+            int(self.time_step),
+            cfg.motion_body_names.index(cfg.motion_reference_body),
+            :,
+        ]
+        q01 = sim_robot_anchor_quat_w
+        q02 = ref_robot_anchor_quat_w
+        if q02 is not None and q02.ndim == 1:
+            q02 = np.expand_dims(q02, axis=0)
+        _, ref_robot_anchor_quat_in_sim_anchor = subtract_frame_transforms(
+            np.zeros((1, 3), dtype=np.float32),
+            q01,
+            np.zeros((1, 3), dtype=np.float32),
+            q02,
+        )
+        mat = matrix_from_quat(ref_robot_anchor_quat_in_sim_anchor)
+        motion_ref_ori_b = mat[..., :2].reshape(mat.shape[0], -1)  # shape [n,6]
+        return motion_ref_ori_b
+    
     def _obs_ref_human_anchor_rot6d_in_sim_anchor(self):
         self.pin.mujoco_to_pinocchio(
             self.d.qpos[7:],
@@ -699,5 +758,5 @@ class simulator(infere):
 
 
 if __name__ == "__main__":
-    s = simulator()
+    s = simulator(robot_name=_ARGS.robot)
     s.run()

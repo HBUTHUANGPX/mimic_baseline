@@ -21,6 +21,9 @@ class MDRXFlatEnvCfg(MDRXTerrainEnvCfg):
         self.scene.terrain.terrain_generator = None
         self.scene.terrain.max_init_terrain_level = None
 
+        self.terminations.ee_body_pos_knee.params["threshold"] *= 0.523/0.8
+        self.terminations.ee_body_pos_ankle.params["threshold"] *= 0.523/0.8
+        self.terminations.ee_body_pos_wrist.params["threshold"] *= 0.523/0.8
 
 @configclass
 class MDRXFlatPureEnvCfg(MDRXFlatEnvCfg):

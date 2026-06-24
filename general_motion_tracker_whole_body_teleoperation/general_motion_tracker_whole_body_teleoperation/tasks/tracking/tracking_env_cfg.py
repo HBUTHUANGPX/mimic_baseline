@@ -367,14 +367,20 @@ class ObservationsCfg:
     command_window_with_noise_wo_privilege.sim_robot_body_rot6d_in_sim_anchor = None
 
     command_with_noise_wo_privilege: CommandAllCfg = CommandAllCfg()  # 有噪 无特权 cmd
-    command_with_noise_wo_privilege.ref_robot_minus_sim_joint_angle_rad = None
+    # command_with_noise_wo_privilege.ref_robot_minus_sim_joint_angle_rad = None
+    command_with_noise_wo_privilege.ref_robot_minus_sim_joint_angle_rad_window = None
+
     command_with_noise_wo_privilege.ref_robot_anchor_pos_in_sim_anchor = None
-    command_with_noise_wo_privilege.ref_robot_anchor_rot6d_in_sim_anchor = None
+    command_with_noise_wo_privilege.ref_robot_anchor_pos_in_sim_anchor_window = None
+
+    command_with_noise_wo_privilege.ref_robot_anchor_rot6d_in_sim_anchor_window = None
+    # command_with_noise_wo_privilege.ref_robot_anchor_rot6d_in_sim_anchor = None
+
     command_with_noise_wo_privilege.sim_robot_body_pos_in_sim_anchor = None
     command_with_noise_wo_privilege.sim_robot_body_rot6d_in_sim_anchor = None
-    command_with_noise_wo_privilege.ref_robot_minus_sim_joint_angle_rad_window = None
-    command_with_noise_wo_privilege.ref_robot_anchor_pos_in_sim_anchor_window = None
-    command_with_noise_wo_privilege.ref_robot_anchor_rot6d_in_sim_anchor_window = None
+
+    command_with_noise_wo_privilege.ref_human_anchor_rot6d_in_sim_anchor = None
+
 
     proprioception_with_noise_wo_privilege: ProprioceptionAllCfg = (
         ProprioceptionAllCfg()

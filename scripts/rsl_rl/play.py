@@ -279,27 +279,27 @@ def main(
     # export policy to onnx/jit
     export_model_dir = os.path.join(os.path.dirname(resume_path), "exported")
 
-    if (
-        runner.alg.policy.__class__.__name__ == "ActorCriticSingleFSQ"
-        or runner.alg.policy.__class__.__name__ == "ActorCriticSingleFSQDistillation"
-        or runner.alg.policy.__class__.__name__ == "ActorCriticDualFSQ"
-        or runner.alg.policy.__class__.__name__ == "ActorCriticDualToken"
-    ):
-        _policy = runner.alg.policy
-        _policy.export_policy_as_onnx(
-            env,
-            path=export_model_dir,
-            filename="policy.onnx",
-            verbose=False,
-        )
-    else:
-        export_motion_policy_as_onnx(
-            env.unwrapped,
-            policy_nn,
-            normalizer=normalizer,
-            path=export_model_dir,
-            filename="policy.onnx",
-        )
+    # if (
+    #     runner.alg.policy.__class__.__name__ == "ActorCriticSingleFSQ"
+    #     or runner.alg.policy.__class__.__name__ == "ActorCriticSingleFSQDistillation"
+    #     or runner.alg.policy.__class__.__name__ == "ActorCriticDualFSQ"
+    #     or runner.alg.policy.__class__.__name__ == "ActorCriticDualToken"
+    # ):
+    _policy = runner.alg.policy
+    _policy.export_policy_as_onnx(
+        env,
+        path=export_model_dir,
+        filename="policy.onnx",
+        verbose=False,
+    )
+    # else:
+    #     export_motion_policy_as_onnx(
+    #         env.unwrapped,
+    #         policy_nn,
+    #         normalizer=normalizer,
+    #         path=export_model_dir,
+    #         filename="policy.onnx",
+    #     )
     onnx_policy = _load_onnx_model(
         os.path.join(export_model_dir, "policy.onnx"), device=agent_cfg.device
     )

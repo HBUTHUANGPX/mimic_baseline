@@ -284,7 +284,7 @@ class StratifiedLegacyBinAdaptiveSamplingCfg(LegacyBinAdaptiveSamplingCfg):
     class_type: type[StratifiedLegacyBinAdaptiveSampling] = (
         StratifiedLegacyBinAdaptiveSampling
     )
-    uniform_sampling_ratio: float = 0.2
+    uniform_sampling_ratio: float = 0.4
 
 
 @configclass

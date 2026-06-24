@@ -128,13 +128,17 @@ class infere:
         session = ort.InferenceSession(onnx_path, providers=providers)
         return session
 
-    def run_onnx_inference(self, session, actor_obs, actor_token):
+    def run_onnx_inference(self, 
+                           session, 
+                           actor_obs, 
+                        #    actor_token
+                           ):
         # 转换为numpy array并确保数据类型正确
         actor_obs = np.asarray(actor_obs,dtype=np.float32)
-        actor_token = np.asarray(actor_token,dtype=np.float32)
+        # actor_token = np.asarray(actor_token,dtype=np.float32)
         # 获取输入名称
         actor_obs_name = session.get_inputs()[0].name
-        actor_token_name = session.get_inputs()[1].name
+        # actor_token_name = session.get_inputs()[1].name
         # 运行推理
         (
             actions
@@ -142,7 +146,7 @@ class infere:
             None,
             {
                 actor_obs_name: actor_obs,
-                actor_token_name: actor_token,
+                # actor_token_name: actor_token,
             },
         )
         return actions
@@ -152,7 +156,7 @@ class infere:
         act= self.run_onnx_inference(
             self.policy,
             self.actor_obs,
-            self.actor_token,
+            # self.actor_token,
         )[0] # 1用的是robot encoder，0用的是human encoder
         self.action[:] = act.copy()
 
@@ -234,13 +238,13 @@ class infere:
         self.actor_obs = np.clip(
             self.obs_manager.compute_group("actor_obs", update_history=True), -10, 10
         )
-        self.human_token_obs = np.clip(
-            self.obs_manager.compute_group("human_token_obs", update_history=False), -1e5, 1e5
-        )
-        self.robot_token_obs = np.clip(
-            self.obs_manager.compute_group("robot_token_obs", update_history=False), -1e5, 1e5
-        )
-        self.actor_token = self.human_token_obs * self.token_selector + self.robot_token_obs * (1-self.token_selector)
+        # self.human_token_obs = np.clip(
+        #     self.obs_manager.compute_group("human_token_obs", update_history=False), -1e5, 1e5
+        # )
+        # self.robot_token_obs = np.clip(
+        #     self.obs_manager.compute_group("robot_token_obs", update_history=False), -1e5, 1e5
+        # )
+        # self.actor_token = self.human_token_obs * self.token_selector + self.robot_token_obs * (1-self.token_selector)
         # self.human_obs = np.clip(
         #     self.obs_manager.compute_group("human_obs", update_history=True), -10, 10
         # )

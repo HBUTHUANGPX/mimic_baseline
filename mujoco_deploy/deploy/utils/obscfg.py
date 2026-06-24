@@ -3,7 +3,9 @@ class ObsCfg:
     """观测总配置：每个属性是一个 GroupCfg 实例。"""
 
     class PolicyCfg(GroupCfg):
-        ref_human_anchor_rot6d_in_sim_anchor = TermCfg()
+        # ref_human_anchor_rot6d_in_sim_anchor = TermCfg()
+        ref_robot_minus_sim_joint_angle_rad = TermCfg()
+        ref_robot_anchor_rot6d_in_sim_anchor = TermCfg()
         sim_robot_anchor_rot6d_w = TermCfg(history_length=8)
         base_ang_vel = TermCfg(history_length=8)
         joint_pos = TermCfg(history_length=8)
@@ -20,8 +22,8 @@ class ObsCfg:
     class HumanTokenCfg(GroupCfg):
         actor_human_token = TermCfg()
     actor_obs = PolicyCfg()
-    human_obs = HumanFSQCfg()
-    robot_obs = RobotFSQCfg()
-    human_token_obs = RobotTokenCfg()
-    robot_token_obs = HumanTokenCfg()
+    # human_obs = HumanFSQCfg()
+    # robot_obs = RobotFSQCfg()
+    # human_token_obs = RobotTokenCfg()
+    # robot_token_obs = HumanTokenCfg()
     

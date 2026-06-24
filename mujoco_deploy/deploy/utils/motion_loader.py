@@ -14,7 +14,8 @@ class MotionLoader:
         desire_human_joint_names: Sequence[int] | None = None,
         history_frames: int = 0,
         future_frames: int = 0,
-        device: str = "cpu"
+        device: str = "cpu",
+        use_token: bool = False,
     ):
 
         if isinstance(motion_file, str):
@@ -41,7 +42,6 @@ class MotionLoader:
         for _file in self.motion_file:
             data = np.load(_file)
             p = Path(_file)
-            token = np.load(p.with_name(p.stem + "_token.tknpz"), allow_pickle=True)
             if self.fps is None:
                 self.fps = data["fps"]
             else:
@@ -54,8 +54,10 @@ class MotionLoader:
             self._append_motion_data(data)
 
             num_frames = self.np_joint_pos_list[-1].shape[0]
-            self._validate_token_data(token, _file, num_frames)
-            self._append_token_data(token)
+            if use_token:
+                token = np.load(p.with_name(p.stem + "_token.tknpz"), allow_pickle=True)
+                self._validate_token_data(token, _file, num_frames)
+                self._append_token_data(token)
             
         # Concatenate along time dimension (dim=0)
         self.joint_pos = np.concatenate(self.np_joint_pos_list, axis=0)
@@ -73,8 +75,9 @@ class MotionLoader:
         self.human_body_pos_w = np.concatenate(self.np_human_body_pos_w_list, axis=0)
         self.human_body_quat_w = np.concatenate(self.np_human_body_quat_w_list, axis=0)
         self.human_joint_quat = np.concatenate(self.np_human_joint_quat_list, axis=0)
-        self.actor_q_human = np.concatenate(self.np_actor_q_human_list, axis=0)
-        self.actor_q_robot = np.concatenate(self.np_actor_q_robot_list, axis=0)
+        if use_token:
+            self.actor_q_human = np.concatenate(self.np_actor_q_human_list, axis=0)
+            self.actor_q_robot = np.concatenate(self.np_actor_q_robot_list, axis=0)
         print("motion clips:")
         print("self.joint_pos.shape: ", self.joint_pos.shape)
         print("self.joint_vel.shape: ", self.joint_vel.shape)
