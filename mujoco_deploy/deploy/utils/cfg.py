@@ -236,20 +236,20 @@ class G1Cfg(G1RobotModelCfg, G1RobotControlCfg, HumanCfg, EnvCfg):
 
 
 class MdrxPolicyCfg(BasePolicyCfg):
+    # group = {
+    #     "policy": "deploy/policy/mdrx/2026-06-24_15-19-38_test",
+    #     "motion":  
+    #     [
+    #         "seed_subsets_acrobatics_flip_roll_bvh_export_mdrx/230324/flip_360_004__A304"
+    #     ],
+    # }
     group = {
         "policy": "deploy/policy/mdrx/2026-06-24_11-38-56_test",
         "motion":  
         [
-            # "big_light_one_hand_pick_up_front_low_R_005__A508",
-            # "body_stretch_1_004__A069",
-            # "dance_basic_chaines_180_R_001__A306",
-            # "dance_hiphop_shuffle_square_R_fast_002__A318",
-            # "high_jump_R_001__A277",
-            # "item_pick_up_standing_R_001__A410",
+            "high_jump_R_001__A277",
             # "Neutral_throw_ball_001__A057",
-            "Neutral_walk_forward_002__A057",
-            # "small_light_one_hand_pick_up_front_low_002__A507",
-            # "wave_R_001__A428"
+            # "Neutral_walk_forward_002__A057",
         ],
     }
 
