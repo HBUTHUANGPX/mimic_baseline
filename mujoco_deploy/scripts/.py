@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import argparse
-import math
+import xml.etree.ElementTree as ET
 from collections import namedtuple
 from pathlib import Path
 
@@ -10,6 +10,9 @@ import numpy as np
 SCRIPT_DIR = Path(__file__).resolve().parent
 MUJOCO_DEPLOY_ROOT = SCRIPT_DIR.parent
 DEFAULT_LOG_PATH = MUJOCO_DEPLOY_ROOT / "tmp/motion.npz"
+DEFAULT_URDF_PATH = (
+    MUJOCO_DEPLOY_ROOT / "deploy/assets/rx_27dof/rx_custom_collision_27dof.urdf"
+)
 DEFAULT_OUTPUT_PATH = MUJOCO_DEPLOY_ROOT / "tmp/joint_torque_speed.png"
 
 JointLog = namedtuple("JointLog", ["joint_names", "velocities", "torques"])
@@ -111,35 +114,24 @@ def build_joint_layout(joint_names):
     return rows
 
 
-def read_mdrx_actuator_limits():
-    fast_torque = 62.4
-    fast_speed = (4000 * 2.0 * math.pi / 60.0) / 24.0
-    slow_torque = 19.5
-    slow_speed = (6000 * 2.0 * math.pi / 60.0) / 19.36
+def read_urdf_limits(urdf_path):
+    urdf_path = Path(urdf_path)
+    if not urdf_path.exists():
+        raise FileNotFoundError(f"URDF file does not exist: {urdf_path}")
 
-    fast_motor = {"torque": fast_torque, "speed": fast_speed}
-    slow_motor = {"torque": slow_torque, "speed": slow_speed}
-    doubled_slow_motor = {"torque": slow_torque * 2.0, "speed": slow_speed}
-
+    root = ET.parse(urdf_path).getroot()
     limits = {}
-    for side in ("l", "r"):
-        limits[f"{side}_hip_pitch_joint"] = fast_motor
-        limits[f"{side}_hip_roll_joint"] = fast_motor
-        limits[f"{side}_hip_yaw_joint"] = slow_motor
-        limits[f"{side}_knee_joint"] = fast_motor
-        limits[f"{side}_ankle_pitch_joint"] = doubled_slow_motor
-        limits[f"{side}_ankle_roll_joint"] = doubled_slow_motor
-
-        limits[f"{side}_shoulder_pitch_joint"] = slow_motor
-        limits[f"{side}_shoulder_roll_joint"] = slow_motor
-        limits[f"{side}_shoulder_yaw_joint"] = slow_motor
-        limits[f"{side}_elbow_joint"] = slow_motor
-        limits[f"{side}_wrist_yaw_joint"] = slow_motor
-        limits[f"{side}_wrist_roll_joint"] = slow_motor
-
-    limits["waist_yaw_joint"] = fast_motor
-    limits["waist_roll_joint"] = doubled_slow_motor
-    limits["waist_pitch_joint"] = doubled_slow_motor
+    for joint in root.findall("joint"):
+        joint_name = joint.attrib.get("name")
+        limit = joint.find("limit")
+        if joint_name is None or limit is None:
+            continue
+        effort = limit.attrib.get("effort")
+        velocity = limit.attrib.get("velocity")
+        limits[joint_name] = {
+            "torque": None if effort is None else abs(float(effort)),
+            "speed": None if velocity is None else abs(float(velocity)),
+        }
     return limits
 
 
@@ -295,6 +287,12 @@ def parse_args(argv=None):
         help=f"Path to deploy_mujoco log npz. Default: {DEFAULT_LOG_PATH}",
     )
     parser.add_argument(
+        "--urdf",
+        type=Path,
+        default=DEFAULT_URDF_PATH,
+        help=f"URDF used for effort/velocity limits. Default: {DEFAULT_URDF_PATH}",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=DEFAULT_OUTPUT_PATH,
@@ -330,7 +328,7 @@ def main(argv=None):
     args = parse_args(argv)
     with np.load(args.log, allow_pickle=True) as log:
         joint_log = load_joint_log(log)
-    limits = read_mdrx_actuator_limits()
+    limits = read_urdf_limits(args.urdf)
     output_path = plot_joint_torque_speed(
         joint_log,
         limits,

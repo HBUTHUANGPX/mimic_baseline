@@ -698,6 +698,8 @@ class TrackingEnvCfg(ManagerBasedRLEnvCfg):
     terminations: TerminationsCfg = TerminationsCfg()
     events: EventCfg = EventCfg()
     curriculum: CurriculumCfg = CurriculumCfg()
+    probabilistic_termination_expected_recovery_horizon: int = int(2.0/0.02)
+    probabilistic_termination_term_names: tuple[str, ...] | None = ("ref_pos", "ref_ori")
 
     def __post_init__(self):
         """Post initialization."""

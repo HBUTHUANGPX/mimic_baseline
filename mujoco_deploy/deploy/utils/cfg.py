@@ -236,30 +236,30 @@ class G1Cfg(G1RobotModelCfg, G1RobotControlCfg, HumanCfg, EnvCfg):
 
 
 class MdrxPolicyCfg(BasePolicyCfg):
-    # group = {
-    #     "policy": "deploy/policy/mdrx/2026-06-24_15-19-38_test",
-    #     "motion":  
-    #     [
-    #         "seed_subsets_acrobatics_flip_roll_bvh_export_mdrx/230324/flip_360_004__A304"
-    #     ],
-    # }
     group = {
-        "policy": "deploy/policy/mdrx/2026-06-24_11-38-56_test",
+        "policy": "deploy/policy/mdrx/2026-06-25_10-28-11_test",
         "motion":  
         [
-            "high_jump_R_001__A277",
-            # "Neutral_throw_ball_001__A057",
-            # "Neutral_walk_forward_002__A057",
+            "seed_subsets_acrobatics_flip_roll_bvh_export_mdrx/230324/flip_360_004__A304"
         ],
     }
+    # group = {
+    #     "policy": "deploy/policy/mdrx/2026-06-24_11-38-56_test",
+    #     "motion":  
+    #     [
+    #         "high_jump_R_001__A277",
+    #         # "Neutral_throw_ball_001__A057",
+    #         # "Neutral_walk_forward_002__A057",
+    #     ],
+    # }
 
 
 class MdrxPathCfg(MdrxPolicyCfg):
     policy_raw_path = os.path.join(current_path, MdrxPolicyCfg.group["policy"])
     policy_path = os.path.join(policy_raw_path, "policy.onnx")
-    asset_path = os.path.join(current_path, "deploy/assets/rx_27dof")
+    asset_path = os.path.join(current_path, "deploy/assets/rx_27dof_0602")
     mjcf_path = os.path.join(asset_path, "rx_27dof.xml")
-    urdf_path = os.path.join(asset_path, "rx_custom_collision_27dof.urdf")
+    urdf_path = os.path.join(asset_path, "rx_27dof_0602.urdf")
 
     motion_names = _normalize_motion_names(MdrxPolicyCfg.group["motion"])
     motion_file = _build_motion_files(policy_raw_path, motion_names)
@@ -268,15 +268,15 @@ class MdrxPathCfg(MdrxPolicyCfg):
 class MdrxRobotControlCfg:
     leg_P_gains = [80.0, 80.0, 80.0, 80.0, 30.0, 30.0] * 2
     leg_D_gains = [2.0, 2.0, 2.0, 2.0, 2.0, 2.0] * 2
-    leg_tq_max = [45.0, 35.0, 25.0, 45.0, 50.0, 50.0] * 2
+    leg_tq_max = [62.4, 62.4, 19.5, 62.4, 39.0, 39.0] * 2
 
     pelvis_P_gains = [80.0, 80.0, 80.0]
     pelvis_D_gains = [2.0, 2.0, 2.0]
-    pelvis_tq_max = [27.0, 27.0, 27.0]
+    pelvis_tq_max = [62.4, 39.0, 39.0]
 
-    arm_P_gains = [4.0, 4.0, 4.0, 4.0, 4.0, 4.0] * 2
-    arm_D_gains = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0] * 2
-    arm_tq_max = [14.0, 14.0, 14.0, 14.0, 14.0, 14.0] * 2
+    arm_P_gains = [15.0] * (6 * 2)
+    arm_D_gains = [1.5, 1.5, 1.0, 1.5, 1.0, 1.0] * 2
+    arm_tq_max = [19.5] * (6 * 2)
 
     leg_default_pos = [0.0] * (6 * 2)
     pelvis_default_pos = [0.0] * 3

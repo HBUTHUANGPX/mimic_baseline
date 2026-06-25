@@ -20,5 +20,9 @@
     ],
     "github.copilot.chat.codeGeneration.useInstructionFiles": true,
     "python-envs.defaultEnvManager": "ms-python.python:conda",
-    "python-envs.defaultPackageManager": "ms-python.python:conda"
+    "python-envs.defaultPackageManager": "ms-python.python:conda",
+    "chat.fontSize": 20,
+    "chat.editor.fontSize": 15,
+    "chat.fontFamily": "'Noto Sans CJK SC', 'Source Han Sans SC', sans-serif",
+    "chat.editor.fontFamily": "'Noto Sans Mono CJK SC', 'JetBrains Mono', monospace",
 }

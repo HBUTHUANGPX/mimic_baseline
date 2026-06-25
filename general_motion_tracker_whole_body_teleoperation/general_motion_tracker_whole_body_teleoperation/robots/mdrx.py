@@ -18,6 +18,11 @@ ARMATURE_LIGHT = 0.001744  # J4310: shoulder, elbow, wrist, hip_yaw
 NATURAL_FREQ = 10 * 2.0 * pi  # 10Hz
 DAMPING_RATIO = 2.0
 
+EFF_LIM_F = 62.4 #2.6*24
+VEL_LIM_F = (4000*2*pi/60)/24
+
+EFF_LIM_S = 19.5 # 1.01*19.36
+VEL_LIM_S = (6000*2*pi/60)/19.36
 
 ImplicitActuator_actuators = {
     "legs": ImplicitActuatorCfg(
@@ -28,16 +33,16 @@ ImplicitActuator_actuators = {
             ".*_knee_joint",
         ],
         effort_limit_sim={
-            ".*_hip_pitch_joint": 45.0,
-            ".*_hip_roll_joint": 35.0,
-            ".*_hip_yaw_joint": 25.0,
-            ".*_knee_joint": 45.0,
+            ".*_hip_pitch_joint": EFF_LIM_F,
+            ".*_hip_roll_joint": EFF_LIM_F,
+            ".*_hip_yaw_joint": EFF_LIM_S,
+            ".*_knee_joint": EFF_LIM_F,
         },
         velocity_limit_sim={
-            ".*_hip_pitch_joint": 8.0,
-            ".*_hip_roll_joint": 12.9,
-            ".*_hip_yaw_joint": 18.0,
-            ".*_knee_joint": 12.5,
+            ".*_hip_pitch_joint": VEL_LIM_F,
+            ".*_hip_roll_joint": VEL_LIM_F,
+            ".*_hip_yaw_joint": VEL_LIM_S,
+            ".*_knee_joint": VEL_LIM_F,
         },
         stiffness={
             ".*_hip_pitch_joint": 80,
@@ -59,24 +64,24 @@ ImplicitActuator_actuators = {
         },
     ),
     "feet": ImplicitActuatorCfg(
-        effort_limit_sim=50.0,
-        velocity_limit_sim=37.0,
+        effort_limit_sim=EFF_LIM_S * 2.0,
+        velocity_limit_sim= VEL_LIM_S,
         joint_names_expr=[".*_ankle_pitch_joint", ".*_ankle_roll_joint"],
         stiffness= 30.0,
         damping= 2.0,
         armature=2.0 * ARMATURE_LIGHT,
     ),
     "waist": ImplicitActuatorCfg(
-        effort_limit_sim=27,
-        velocity_limit_sim=12.0,
+        effort_limit_sim=EFF_LIM_S * 2.0,
+        velocity_limit_sim=VEL_LIM_S,
         joint_names_expr=["waist_roll_joint", "waist_pitch_joint"],
         stiffness=80.0,
         damping=2.0,
         armature=2.0 * ARMATURE_HEAVY,
     ),
     "waist_yaw": ImplicitActuatorCfg(
-        effort_limit_sim=27,
-        velocity_limit_sim=12.0,
+        effort_limit_sim=EFF_LIM_F,
+        velocity_limit_sim=VEL_LIM_F,
         joint_names_expr=["waist_yaw_joint"],
         stiffness=80,
         damping=2.0,
@@ -92,34 +97,34 @@ ImplicitActuator_actuators = {
             ".*_wrist_roll_joint",
         ],
         effort_limit_sim={
-            ".*_shoulder_pitch_joint": 14.0,
-            ".*_shoulder_roll_joint": 14.0,
-            ".*_shoulder_yaw_joint": 14.0,
-            ".*_elbow_joint": 14.0,
-            ".*_wrist_yaw_joint": 14.0,
-            ".*_wrist_roll_joint": 14.0,
+            ".*_shoulder_pitch_joint": EFF_LIM_S,
+            ".*_shoulder_roll_joint": EFF_LIM_S,
+            ".*_shoulder_yaw_joint": EFF_LIM_S,
+            ".*_elbow_joint": EFF_LIM_S,
+            ".*_wrist_yaw_joint": EFF_LIM_S,
+            ".*_wrist_roll_joint": EFF_LIM_S,
         },
         velocity_limit_sim={
-            ".*_shoulder_pitch_joint": 18.0,
-            ".*_shoulder_roll_joint": 18.0,
-            ".*_shoulder_yaw_joint": 18.0,
-            ".*_elbow_joint": 18.0,
-            ".*_wrist_yaw_joint": 18.0,
-            ".*_wrist_roll_joint": 18.0,
+            ".*_shoulder_pitch_joint": VEL_LIM_S,
+            ".*_shoulder_roll_joint": VEL_LIM_S,
+            ".*_shoulder_yaw_joint": VEL_LIM_S,
+            ".*_elbow_joint": VEL_LIM_S,
+            ".*_wrist_yaw_joint": VEL_LIM_S,
+            ".*_wrist_roll_joint": VEL_LIM_S,
         },
         stiffness={
-            ".*_shoulder_pitch_joint": 4,
-            ".*_shoulder_roll_joint": 4,
-            ".*_shoulder_yaw_joint": 4,
-            ".*_elbow_joint": 4,
-            ".*_wrist_yaw_joint": 4,
-            ".*_wrist_roll_joint": 4,
+            ".*_shoulder_pitch_joint": 15,
+            ".*_shoulder_roll_joint": 15,
+            ".*_shoulder_yaw_joint": 15,
+            ".*_elbow_joint": 15,
+            ".*_wrist_yaw_joint": 15,
+            ".*_wrist_roll_joint": 15,
         },
         damping={
-            ".*_shoulder_pitch_joint": 1,
-            ".*_shoulder_roll_joint": 1,
+            ".*_shoulder_pitch_joint": 1.5,
+            ".*_shoulder_roll_joint": 1.5,
             ".*_shoulder_yaw_joint": 1,
-            ".*_elbow_joint": 1,
+            ".*_elbow_joint": 1.5,
             ".*_wrist_yaw_joint": 1,
             ".*_wrist_roll_joint": 1,
         },
@@ -138,7 +143,7 @@ MDRX_CYLINDER_CFG = ArticulationCfg(
     spawn=sim_utils.UrdfFileCfg(
         fix_base=False,
         replace_cylinders_with_capsules=True,
-        asset_path="assets/rx_27dof/rx_custom_collision_27dof.urdf",
+        asset_path="assets/rx_27dof_0602/rx_27dof_0602.urdf",
         activate_contact_sensors=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=False,

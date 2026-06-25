@@ -1,4 +1,5 @@
 import importlib.util
+import math
 from pathlib import Path
 
 import numpy as np
@@ -72,6 +73,22 @@ def main():
     assert len(layout) == 5
     assert [row.group_name for row in layout] == ["l_leg", "r_leg", "l_arm", "r_arm", "waist"]
     assert [len(row.joint_indices) for row in layout] == [6, 6, 6, 6, 3]
+
+    limits = module.read_mdrx_actuator_limits()
+    fast_torque = 62.4
+    fast_speed = (4000 * 2.0 * math.pi / 60.0) / 24.0
+    slow_torque = 19.5
+    slow_speed = (6000 * 2.0 * math.pi / 60.0) / 19.36
+
+    assert limits["l_hip_pitch_joint"]["torque"] == fast_torque
+    assert limits["l_hip_pitch_joint"]["speed"] == fast_speed
+    assert limits["l_hip_yaw_joint"]["torque"] == slow_torque
+    assert limits["l_hip_yaw_joint"]["speed"] == slow_speed
+    assert limits["l_ankle_pitch_joint"]["torque"] == slow_torque * 2.0
+    assert limits["waist_yaw_joint"]["torque"] == fast_torque
+    assert limits["waist_roll_joint"]["torque"] == slow_torque * 2.0
+    assert limits["l_shoulder_pitch_joint"]["torque"] == slow_torque
+    assert set(limits) == set(data.joint_names)
 
 
 if __name__ == "__main__":
